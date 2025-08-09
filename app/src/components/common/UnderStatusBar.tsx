@@ -2,7 +2,7 @@
 
 export default function UnderStatusBar() {
   return (
-    <div className="under-status-bar">
+    <div className="bg-red-500">
       <p>Under Status Bar</p>
     </div>
   )
