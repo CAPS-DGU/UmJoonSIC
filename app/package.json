@@ -15,6 +15,7 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
+    "@monaco-editor/react": "^4.7.0",
     "electron": "^37.2.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
@@ -36,7 +37,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "@swc/core"
     ]
   }
 }
