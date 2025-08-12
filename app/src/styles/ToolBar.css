@@ -1,0 +1,32 @@
+.toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background-color: #ffffff;
+  align-items: center;
+  position: relative;
+}
+
+.toolbar-button {
+  padding: 8px 16px;
+  background-color: #ffffff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.toolbar-button:hover {
+  background-color: #e0e0e0;
+}
+
+.toolbar-search {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  background-color: #cb601529;
+  outline: none;
+}
