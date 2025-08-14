@@ -1,177 +1,203 @@
 package sic.sim;
 
+import com.google.gwt.core.client.GWT;
+import com.google.gwt.user.client.Timer;
 import sic.sim.breakpoints.Breakpoints;
 import sic.sim.breakpoints.DataBreakpointException;
 import sic.sim.breakpoints.DataBreakpoints;
 import sic.sim.vm.Machine;
 
-import java.awt.event.ActionListener;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.function.Predicate;
-
 /**
- * @author jure
+ * Manages the execution flow of the SIC/XE virtual machine.
+ * This class handles running, stopping, stepping, and managing the execution speed,
+ * while respecting breakpoints. It is designed to be compatible with GWT for
+ * web-based environments.
  */
-// TODO: rename class
 public class Executor {
-    public static final int MaxSpeed = 100000000; // Hz
+
+    /**
+     * A functional interface to define a condition for stopping the execution.
+     * This is a GWT-compatible replacement for java.util.function.Predicate.
+     */
+    @FunctionalInterface
+    public interface StopCondition {
+        boolean test(Machine machine);
+    }
+
+    /**
+     * A listener interface to handle breakpoint events.
+     * This is a GWT-compatible replacement for java.awt.event.ActionListener.
+     */
+    @FunctionalInterface
+    public interface BreakpointListener {
+        void onBreakpointHit();
+    }
+
+    public static final int MAX_SPEED_HZ = 100_000_000;
 
     public final Machine machine;
-    private Timer timer;
-    private int timerPeriod;        // timer period in miliseconds
-    private int timerRepeat;        // timer loop-repeat count
-
     public final Breakpoints breakpoints;
     private final DataBreakpoints dataBreakpoints;
-    public ActionListener onBreakpoint;
-    private boolean hasChanged;
 
-    private boolean printStats = false;
+    private Timer executionTimer;
+    private int timerPeriodMs;
+    private int instructionsPerTick;
+    private boolean hasChanged;
+    private boolean shouldPrintStats = false;
+
+    private BreakpointListener breakpointListener;
 
     public Executor(final Machine machine) {
         this.machine = machine;
         this.breakpoints = new Breakpoints();
         this.dataBreakpoints = machine.memory.dataBreakpoints;
         this.dataBreakpoints.enable();
-        setSpeed(100);
+        setSpeed(100); // Default speed
     }
 
     public Executor(final Machine machine, Args arg) {
         this(machine);
-
-        this.printStats = arg.isStats();
-        if (arg.getFreq() > 0) setSpeed(arg.getFreq());
+        this.shouldPrintStats = arg.isStats();
+        if (arg.getFreq() > 0) {
+            setSpeed(arg.getFreq());
+        }
     }
 
     public Machine getMachine() {
         return machine;
     }
 
+    public void setBreakpointListener(BreakpointListener listener) {
+        this.breakpointListener = listener;
+    }
+
     public int getSpeed() {
-        return 1000 / timerPeriod * timerRepeat;
+        if (timerPeriodMs == 0) return 0;
+        return (1000 / timerPeriodMs) * instructionsPerTick;
     }
 
-    public void setSpeed(int Hz) {
-        if (Hz > MaxSpeed) Hz = MaxSpeed;
-        timerRepeat = (Hz + 99) / 100;
-        timerPeriod = 1000 * timerRepeat / Hz;
+    public void setSpeed(int hertz) {
+        if (hertz > MAX_SPEED_HZ) hertz = MAX_SPEED_HZ;
+        if (hertz <= 0) hertz = 1;
+        // Aim for around 100 ticks per second for responsiveness
+        int ticksPerSecond = 100;
+        this.instructionsPerTick = (hertz + ticksPerSecond - 1) / ticksPerSecond;
+        this.timerPeriodMs = 1000 * instructionsPerTick / hertz;
     }
 
-    /**
-     * Execute the timer tick until the stopPredicate / Breakpoint / Halt is reached.
-     * @param stopPredicate Stop if predicate passes.
-     */
-    private void timerTickUntil(Predicate<Machine> stopPredicate) {
-        for (int i = 0; i < timerRepeat; i++) {
+    public boolean isRunning() {
+        return executionTimer != null;
+    }
+
+    public boolean hasChanged() {
+        boolean changed = hasChanged;
+        hasChanged = false;
+        return changed;
+    }
+
+    public void start() {
+        // Start with a condition that is never met, so it runs indefinitely.
+        runUntil(m -> false);
+    }
+
+    public void runToAddress(int stopAddress) {
+        runUntil(m -> m.registers.getPC() == stopAddress);
+    }
+
+
+
+    public void stepOut() {
+        Integer returnAddress = machine.getAddressBelowLastJSUB();
+        if (returnAddress != null) {
+            runUntil(m -> m.registers.getPC() == returnAddress);
+        }
+    }
+
+    public void stop() {
+        if (!isRunning()) return;
+        executionTimer.cancel();
+        executionTimer = null;
+        if (shouldPrintStats) {
+            GWT.log("Instructions executed: " + machine.getInstructionCount());
+        }
+    }
+
+    public void step() {
+        if (isRunning()) return;
+
+        boolean wereDataBreakpointsEnabled = dataBreakpoints.isEnabled();
+        dataBreakpoints.disable();
+
+        try {
+            machine.execute();
+        } catch (DataBreakpointException ex) {
+            // This should not be triggered as we disabled the breakpoints,
+            // but we log it just in case.
+            GWT.log("DataBreakpointException was caught during a step operation: " + ex.getMessage());
+        }
+
+        if (wereDataBreakpointsEnabled) {
+            dataBreakpoints.enable();
+        }
+        hasChanged = true;
+    }
+
+    private void runUntil(StopCondition stopCondition) {
+        if (isRunning()) return;
+
+        executionTimer = new Timer() {
+            @Override
+            public void run() {
+                executeTick(stopCondition);
+            }
+        };
+        executionTimer.scheduleRepeating(timerPeriodMs);
+    }
+
+    private void executeTick(StopCondition stopCondition) {
+        for (int i = 0; i < instructionsPerTick; i++) {
             int oldPC = machine.registers.getPC();
 
             try {
                 machine.execute();
-
+                // Re-enable data breakpoints if they were triggered and disabled on the previous cycle.
                 if (!dataBreakpoints.isEnabled()) {
-                    // Enable data breakpoints in case they got disabled because they were triggered.
                     dataBreakpoints.enable();
                 }
             } catch (DataBreakpointException ex) {
-                machine.registers.setPC(oldPC); // reset PC to old one - instruction didn't execute anyway
-                hasChanged = true;
-                stop();
-                if (onBreakpoint != null) onBreakpoint.actionPerformed(null);
-                break;
+                // Instruction failed, so reset PC to its state before the attempt.
+                machine.registers.setPC(oldPC);
+                handleBreakpointHit();
+                return; // Stop this tick
             }
 
             hasChanged = true;
-            // check if the same instruction: halt J halt
+
+            // Check for HALT condition (PC did not advance)
             if (oldPC == machine.registers.getPC()) {
                 stop();
-                if (printStats) {
-                    System.out.printf("Instructions executed: %d\n", machine.getInstructionCount());
-                }
-                break;
+                return; // Stop this tick
             }
-            // check breakpoints
+
+            // Check for execution breakpoint
             if (breakpoints.has(machine.registers.getPC())) {
-                stop();
-                if (onBreakpoint != null) onBreakpoint.actionPerformed(null);
-                break;
+                handleBreakpointHit();
+                return; // Stop this tick
             }
 
-            if (stopPredicate.test(machine)) {
+            // Check for custom stop condition
+            if (stopCondition.test(machine)) {
                 stop();
-                break;
+                return; // Stop this tick
             }
         }
     }
 
-    /**
-     * Run until the stopPredicate / Breakpoint / Halt is reached.
-     * @param stopPredicate Stop if predicate passes.
-     */
-    private void runUntil(Predicate<Machine> stopPredicate) {
-        if (timer != null) return;
-        timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override
-            public void run() {
-                timerTickUntil(stopPredicate);
-            }
-        }, 0, timerPeriod);
-    }
-
-    public void start() {
-        Predicate<Machine> stopPredicate = x -> false; // Never stop - no additional stop condition
-        runUntil(stopPredicate);
-    }
-
-    public void stop() {
-        if (timer == null) return;
-        timer.cancel();
-        timer = null;
-    }
-
-    public void step() {
-        if (!isRunning()) {
-
-            boolean dataBpEnabledBefore = dataBreakpoints.isEnabled();
-            dataBreakpoints.disable();
-
-            try {
-                machine.execute();
-            } catch (DataBreakpointException ex) {
-                // Shouldn't be triggered when breakpoints are disabled
-            }
-
-            if (dataBpEnabledBefore) dataBreakpoints.enable();
-
-            hasChanged = true;
+    private void handleBreakpointHit() {
+        hasChanged = true;
+        stop();
+        if (breakpointListener != null) {
+            breakpointListener.onBreakpointHit();
         }
-    }
-
-    public boolean isRunning() {
-        return timer != null;
-    }
-
-    public boolean hasChanged() {
-        boolean c = hasChanged;
-        hasChanged = false;
-        return c;
-    }
-
-    /**
-     * Start the machine and run until the given address is reached in PC (or breakpoint or halt).
-     * @param stopAddress Address to stop at.
-     */
-    public void runToAddress(int stopAddress) {
-        runUntil(machine -> machine.registers.getPC() == stopAddress);
-    }
-
-    /**
-     * Step out of the current sub procedure
-     */
-    public void stepOut() {
-        Integer addressAfterLastJSUB = machine.getAddressBelowLastJSUB();
-        if (addressAfterLastJSUB == null) return;
-        runUntil(machine -> machine.registers.getPC() == addressAfterLastJSUB);
     }
 }

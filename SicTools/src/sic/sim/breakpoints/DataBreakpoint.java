@@ -1,10 +1,11 @@
 package sic.sim.breakpoints;
 
+import com.google.gwt.user.client.rpc.IsSerializable;
 import sic.common.Conversion;
+import java.lang.IllegalArgumentException;
 
-import java.security.InvalidParameterException;
-
-public class DataBreakpoint {
+// FIX: Add the IsSerializable marker interface
+public class DataBreakpoint implements IsSerializable {
 
     private int from;
     private int to;
@@ -17,9 +18,11 @@ public class DataBreakpoint {
     // ----------------------
     // |    Constructor     |
     // ----------------------
+    public DataBreakpoint() {}
+
     private DataBreakpoint(int from, int to) {
         if (from > to) {
-            throw new InvalidParameterException("Range should be from lower address to higher address!");
+            throw new IllegalArgumentException("Range should be from lower address to higher address!");
         }
 
         this.from = from;
@@ -67,7 +70,7 @@ public class DataBreakpoint {
 
     public void setRange(int from, int to) {
         if (from > to) {
-            throw new InvalidParameterException("Range should be from lower address to higher address!");
+            throw new IllegalArgumentException("Range should be from lower address to higher address!");
         }
 
         this.from = from;

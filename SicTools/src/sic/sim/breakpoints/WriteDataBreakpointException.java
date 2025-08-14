@@ -6,4 +6,6 @@ public class WriteDataBreakpointException extends DataBreakpointException {
         super(breakpoint, address);
     }
 
+    public WriteDataBreakpointException() {
+    }
 }

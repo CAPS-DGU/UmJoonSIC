@@ -53,15 +53,15 @@ public class Asm {
         if (args.length > 0) {
             if ("-help".equals(args[0]) || "-h".equals(args[0])) {
                 printHelp();
-                System.exit(0);
+                return;
             }
             if ("-refshort".equals(args[0])) {
                 new Mnemonics().printReferenceShort();
-                System.exit(0);
+                return;
             }
             if ("-reflong".equals(args[0]) || "-ref".equals(args[0])) {
                 new Mnemonics().printReferenceLong();
-                System.exit(0);
+                return;
             }
         }
         // assembler flags

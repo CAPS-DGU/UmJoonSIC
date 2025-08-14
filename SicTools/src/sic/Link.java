@@ -1,11 +1,7 @@
 package sic;
 
 import sic.link.*;
-import sic.link.ui.LinkListener;
 import sic.link.ui.LinkerCli;
-import sic.link.ui.LinkerGui;
-
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,17 +33,6 @@ public class Link {
                 inputs.add(args[i]);
 
             if (options.isGraphical()) {
-                LinkerGui linkerGui = new LinkerGui(options, inputs, new LinkListener() {
-                    @Override
-                    public void onLinked(File f, String message) {
-                        if (f != null) {
-                            LinkerGui.showSuccess(f.getAbsolutePath());
-                        } else {
-                            LinkerGui.showError(message);
-                        }
-                    }
-                });
-                linkerGui.gui();
             } else {
                 LinkerCli.link(options, inputs);
             }
