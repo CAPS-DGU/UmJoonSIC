@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC "-//Google Inc.//DTD Google Web Toolkit 2.8.0//EN"
+        "http://gwtproject.org/doctype/2.8.0/gwt-module.dtd">
+<!-- 'rename-to' determines the name of the output JS file -->
+<module rename-to="sictools">
+    <inherits name="com.google.gwt.core.Core"/>
+
+    <!--
+      This tells GWT to look for source files in the 'sic' package
+      and all its sub-packages, while excluding specific files and directories.
+    -->
+    <source path="">
+        <!-- FIX: Exclude unsupported UI toolkits using standard rules -->
+        <exclude name="**/swing/**"/>
+        <exclude name="**/awt/**"/>
+        <exclude name="**/javafx/**"/>
+
+        <!-- FIX: Exclude project-specific UI classes using standard rules -->
+        <exclude name="**/common/GUI.java"/>
+        <exclude name="**/link/ui/**"/>
+        <exclude name="**/sim/views/**"/>
+        <exclude name="**/sim/MainView.java"/>
+    </source>
+
+    <!-- The entry point class required by the compiler -->
+    <entry-point class="sic.gwt.LibraryEntryPoint"/>
+
+</module>
