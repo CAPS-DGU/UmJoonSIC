@@ -1,0 +1,3 @@
+[submodule "simulator/SicTools"]
+	path = simulator/SicTools
+	url = https://github.com/jurem/SicTools
