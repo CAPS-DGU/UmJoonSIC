@@ -5,7 +5,7 @@ interface RegisterValueProps {
 
 export default function RegisterValue({ registerData }: RegisterValueProps) {
   return (
-    <section className="flex flex-col px-2">
+    <div className="flex flex-col px-2">
       <h2 className='text-lg font-bold'>레지스터 값</h2>
       <div className='w-full mt-2 flex flex-col gap-2'>
         {Object.entries(registerData).map(([key, value]) => (
@@ -17,6 +17,6 @@ export default function RegisterValue({ registerData }: RegisterValueProps) {
           </div>
         ))}
       </div>
-    </section>
+    </div>
   )
 };
