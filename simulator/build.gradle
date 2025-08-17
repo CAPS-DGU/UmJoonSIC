@@ -1,0 +1,47 @@
+// Apply plugins for Java and for creating a runnable application
+plugins {
+    id 'java'
+    id 'application'
+}
+
+// Define the main class of your application
+application {
+    mainClass = 'com.sicserver.Main'
+}
+
+// Set the Java version
+sourceCompatibility = 17
+targetCompatibility = 17
+
+// Define where to download dependencies from
+repositories {
+    mavenCentral()
+}
+
+// Define your project's dependencies
+dependencies {
+    // Spark Java framework
+    implementation 'com.sparkjava:spark-core:2.9.4'
+
+    // A library for easy JSON conversion
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Logging framework that Spark uses
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
+}
+
+// IMPORTANT: This tells Gradle to include the SicTools source code in the build
+sourceSets {
+    main {
+        java {
+            srcDir 'src/main/java'
+            srcDir 'SicTools/src' // Add SicTools source directory
+        }
+    }
+}
+
+// Configure the run task to pass arguments if needed
+run {
+    standardInput = System.in
+}
+
