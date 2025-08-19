@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, Menu } from "electron";
 const path = require("node:path");
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import { menuList } from "./menu";
+import "./ipc/file";
 
 function createWindow(): void {
   // Create the browser window.

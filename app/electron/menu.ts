@@ -1,4 +1,4 @@
-const { Menu } = require('electron');
+import { shell } from "electron";
 
 export const menuList = [
   {
@@ -20,7 +20,12 @@ export const menuList = [
       {
         label: 'New Project',
         click: () => {
-          console.log('New Project');
+          // 모든 브라우저 윈도우에 새 프로젝트 생성 이벤트 전송
+          const { BrowserWindow } = require('electron');
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach(window => {
+            window.webContents.send('create-new-project');
+          });
         }
       },
       {
@@ -83,7 +88,6 @@ export const menuList = [
       {
         label: 'Learn More',
         click: async () => {
-          const { shell } = require('electron');
           await shell.openExternal('https://www.dongguk.edu/');
         }
       }
