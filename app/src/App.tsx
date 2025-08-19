@@ -2,7 +2,7 @@ import SideBar from "@/components/common/SideBar";
 import ToolBar from "@/components/common/ToolBar";
 import UnderStatusBar from "@/components/common/UnderStatusBar";
 import CodeEditor from "@/components/editor/CodeEditor";
-import Debug from "@/components/editor/Debug";
+import Debug from "@/components/debug";
 
 
 function App() {
