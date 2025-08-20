@@ -43,7 +43,7 @@ function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
 // 에디터 컴포넌트
 export default function CodeEditor() {
   const monaco = useMonaco();
-  const { tabs, getActiveTab, setFileContent, setCursor } = useEditorTabStore();
+  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
@@ -61,10 +61,35 @@ export default function CodeEditor() {
     editor.onDidChangeModelContent(() => {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab) {
+        setIsModified(currentActiveTab.idx, true);
         setFileContent(currentActiveTab.idx, editor.getValue());
       }
     });
   }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        console.log('Ctrl+S pressed in React');
+        const activeTab = getActiveTab();
+        if (activeTab) {
+          console.log("Save file in", projectPath + "/" + activeTab.filePath);
+          window.api.saveFile(projectPath + "/" + activeTab.filePath, activeTab.fileContent).then((res: { success: boolean; message?: string }) => {
+            if (res.success) {
+              setIsModified(activeTab.idx, false);
+              console.log("File saved");
+            } else {
+              console.error("Failed to save file:", res.message);
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (activeTab && activeTab.filePath && projectPath) {

@@ -167,3 +167,17 @@ ipcMain.handle("readFile", async (event, filePath: string) => {
     };
   }
 });
+
+ipcMain.handle("saveFile", async (event, filePath: string, content: string) => {
+  try {
+    fs.writeFileSync(filePath, content);
+    return {
+      success: true
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+});

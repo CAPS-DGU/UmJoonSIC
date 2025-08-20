@@ -23,6 +23,9 @@ const api = {
   },
   readFile: (path: string): IpcApiResponse<string> => {
     return ipcRenderer.invoke("readFile", path);
+  },
+  saveFile: (path: string, content: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke("saveFile", path, content);
   }
 }
 // 새 프로젝트 생성 이벤트 리스너

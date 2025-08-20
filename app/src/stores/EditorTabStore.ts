@@ -22,8 +22,8 @@ interface EditorTabState {
     setActiveTab: (idx: number) => void;
     setCursor: (idx: number, cursor: { line: number; column: number }) => void;
     setFileContent: (idx: number, fileContent: string) => void;
-    loadFile: (idx: number) => void;
     clearTabs: () => void;
+    setIsModified: (idx: number, isModified: boolean) => void;
 }
 
 const defaultTab: EditorTab = {
@@ -71,10 +71,5 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
     setCursor: (idx, cursor) => set((state) => ({ tabs: state.tabs.map((tab, i) => ({ ...tab, cursor: i === idx ? cursor : tab.cursor })) })),
     setFileContent: (idx, fileContent) => set((state) => ({ tabs: state.tabs.map((tab, i) => ({ ...tab, fileContent: i === idx ? fileContent : tab.fileContent })) })),
     clearTabs: () => set(() => ({ tabs: [] })),
-    loadFile: (idx) => {
-        const tab = get().tabs[idx];
-        if (tab) {
-            tab.fileContent = tab.fileContent;
-        }
-    }
+    setIsModified: (idx, isModified) => set((state) => ({ tabs: state.tabs.map((tab, i) => ({ ...tab, isModified: i === idx ? isModified : tab.isModified })) })),
 }));

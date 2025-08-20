@@ -26,6 +26,10 @@ declare global {
                 data?: string;
                 message?: string;
             }>;
+            saveFile: (filePath: string, content: string) => Promise<{
+                success: boolean;
+                message?: string;
+            }>;
         };
     }
 }
