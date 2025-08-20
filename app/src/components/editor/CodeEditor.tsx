@@ -85,21 +85,30 @@ export default function CodeEditor() {
     registerAssemblyLanguage(monaco);
   }, [monaco]);
 
-  return (
-    <Editor
-      height="400px"
-      theme="asmTheme" // 추가한 테마를 적용합니다.
-      defaultLanguage="asm" // 기본 언어를 'asm'으로 설정합니다.
-      value={activeTab?.fileContent}
-      onMount={handleEditorDidMount}
+  if(tabs.length === 0) {
+    return <div className="flex flex-col items-center justify-center h-full">
+      <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
+      <p className="text-sm text-gray-500">파일을 열어 새로운 탭을 만드세요</p>
+    </div>;
+  }
 
-      // value={activeTab?.fileContent}
-      // onChange={(value) => {
-      //   console.log(value);
-      //   if (activeTab && typeof value === 'string') {
-      //     setFileContent(activeTab.idx, value);
-      //   }
-      // }}
-    />
+  return (
+    <>
+      <Editor
+        height="400px"
+        theme="asmTheme" // 추가한 테마를 적용합니다.
+        defaultLanguage="asm" // 기본 언어를 'asm'으로 설정합니다.
+        value={activeTab?.fileContent}
+        onMount={handleEditorDidMount}
+
+        // value={activeTab?.fileContent}
+        // onChange={(value) => {
+        //   console.log(value);
+        //   if (activeTab && typeof value === 'string') {
+        //     setFileContent(activeTab.idx, value);
+        //   }
+        // }}
+      />
+    </>
   );
 }

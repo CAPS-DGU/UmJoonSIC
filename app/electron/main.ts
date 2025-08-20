@@ -19,8 +19,27 @@ function createWindow(): void {
       nodeIntegration: true,
     },
   });
+
+  const splash = new BrowserWindow({
+    width: 500,
+    height: 300,
+    autoHideMenuBar: true,
+    // transparent: true,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    fullscreenable: false,
+    maximizable: false,
+  });
+
   mainWindow.on("ready-to-show", () => {
-    mainWindow.show();
+    splash.loadFile(path.join(__dirname, "../renderer/splash.html"));
+    splash.center();
+    setTimeout(() => {
+      splash.close();
+      mainWindow.show();
+    }, 3000);
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

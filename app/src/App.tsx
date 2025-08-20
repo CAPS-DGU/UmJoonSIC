@@ -26,9 +26,9 @@ function App() {
 
   if (projectName === "") {
     return (
-      <div className="flex h-screen w-screen flex-col">
-        아직 프로젝트를 생성하지 않았습니다.
-        File &gt; New Project 를 클릭하여 프로젝트를 생성해주세요.
+      <div className="flex flex-col items-center justify-center h-full">
+        <h1 className="text-2xl font-bold">아직 프로젝트를 생성하지 않았습니다.</h1>
+        <p className="text-sm text-gray-500">File &gt; New Project 를 클릭하여 프로젝트를 생성해주세요.</p>
       </div>
     );
   }
