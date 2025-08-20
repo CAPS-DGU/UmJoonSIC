@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useProjectStore } from "@/stores/ProjectStore";
+import { Plus, FolderPlus, RefreshCcw, ChevronRight, ChevronDown, File, Folder } from "lucide-react";
+import { useEditorTabStore } from "@/stores/EditorTabStore";
 
 type FileItem = {
   type: "file";
   name: string;
+  relativePath: string;
 };
 
 type FolderItem = {
   type: "folder";
   name: string;
   children: FileStructure[];
+  relativePath: string;
 };
 
 type FileStructure = FileItem | FolderItem;
@@ -18,15 +22,17 @@ const fileStructure: FileStructure[] = [
   {
     type: "folder",
     name: "src",
+    relativePath: "src",
     children: [
-      { type: "file", name: "file.c" },
-      { type: "file", name: "file.cpp" },
-      { type: "file", name: "file.asm" },
+      { type: "file", name: "file.c", relativePath: "src/file.c" },
+      { type: "file", name: "file.cpp", relativePath: "src/file.cpp" },
+      { type: "file", name: "file.asm", relativePath: "src/file.asm" },
     ],
   },
   {
     type: "folder",
     name: "path",
+    relativePath: "path",
     children: [],
   },
 ];
@@ -68,19 +74,22 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
     }
   });
 
-  // 재귀적으로 FileStructure[]로 변환
-  function toFileStructure(obj: Record<string, any>): FileStructure[] {
+  // 재귀적으로 FileStructure[]로 변환 (상대경로 누적)
+  function toFileStructure(obj: Record<string, any>, parentPath = ""): FileStructure[] {
     return Object.entries(obj).map(([name, value]) => {
+      const currentPath = parentPath ? `${parentPath}/${name}` : name;
       if (value.__type === "folder") {
         return {
           type: "folder",
           name,
-          children: toFileStructure(value.__children),
+          children: toFileStructure(value.__children, currentPath),
+          relativePath: currentPath,
         };
       } else {
         return {
           type: "file",
           name,
+          relativePath: currentPath,
         };
       }
     });
@@ -91,8 +100,9 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
 
 export default function SideBar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const { name, fileTree } = useProjectStore();
-
+  const { projectName, fileTree, refreshFileTree } = useProjectStore();
+  const { tabs, addTab } = useEditorTabStore();
+  
   const fileTreeStructure: FileStructure[] = convertToFileStructure(fileTree);
 
   const toggleFolder = (name: string) => {
@@ -109,13 +119,8 @@ export default function SideBar() {
               className="flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200"
               onClick={() => toggleFolder(item.name)}
             >
-              <span className="text-xs w-3">{isOpen ? "˅" : ">"}</span>
-              <img
-                src="public/components/SideBar/Folder.png"
-                alt="Folder"
-                width={16}
-                height={16}
-              />
+              <span className="text-xs w-3">{isOpen ? <ChevronDown width={16} height={16} /> : <ChevronRight width={16} height={16} />}</span>
+              {/* <Folder width={16} height={16} /> */}
               <span>{item.name}</span>
             </div>
             {isOpen && <div className="ml-6">{renderItems(item.children)}</div>}
@@ -127,13 +132,22 @@ export default function SideBar() {
         <div
           key={index}
           className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100"
+          onClick={() => {
+            addTab({
+              idx: tabs.length,
+              title: item.name,
+              filePath: item.relativePath,
+              isModified: false,
+              fileContent: "",
+              isActive: true,
+              cursor: {
+                line: 0,
+                column: 0
+              }
+            });
+          }}
         >
-          <img
-            src="public/components/SideBar/File.png"
-            alt="File"
-            width={16}
-            height={16}
-          />
+          <File width={16} height={16} />
           <span>{item.name}</span>
         </div>
       );
@@ -144,23 +158,16 @@ export default function SideBar() {
     <div className="w-60 bg-white border-r border-gray-300 flex flex-col">
       {/* 상단 헤더 */}
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
-        <span className="font-bold">{name}</span>
+        <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">
           <button className="p-1 rounded hover:bg-gray-200">
-            <img
-              src="public/components/SideBar/AddFile.png"
-              alt="Add File"
-              width={16}
-              height={16}
-            />
+            <Plus width={16} height={16} />
           </button>
           <button className="p-1 rounded hover:bg-gray-200">
-            <img
-              src="public/components/SideBar/AddFolder.png"
-              alt="Add Folder"
-              width={16}
-              height={16}
-            />
+            <FolderPlus width={16} height={16} />
+          </button>
+          <button className="p-1 rounded hover:bg-gray-200" onClick={() => refreshFileTree()}>
+            <RefreshCcw width={16} height={16} />
           </button>
         </div>
       </div>

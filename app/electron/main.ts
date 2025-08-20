@@ -11,7 +11,7 @@ function createWindow(): void {
     width: 1200,
     height: 640,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     ...(process.platform === "linux" ? {} : {}), //app-icon
     webPreferences: {
       preload: preloadPath,

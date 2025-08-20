@@ -21,13 +21,18 @@ declare global {
                 };
                 message?: string;
             }>;
+            readFile: (filePath: string) => Promise<{
+                success: boolean;
+                data?: string;
+                message?: string;
+            }>;
         };
     }
 }
 
 interface ProjectState {
-    name: string;
-    path: string;
+    projectName: string;
+    projectPath: string;
     settings: {
         asm: string[];
         main: string;
@@ -40,15 +45,15 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
-    name: "",
-    path: "",
+    projectName: "",
+    projectPath: "",
     settings: {
         asm: [],
         main: "",
     },
     fileTree: [],
     refreshFileTree: () => {
-        const currentPath = useProjectStore.getState().path;
+        const currentPath = useProjectStore.getState().projectPath;
 
         if (!currentPath) {
             console.warn("Project path is empty");
@@ -70,14 +75,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
             });
     },
     refreshSettings: () => set({ settings: { asm: [], main: "" } }),
-    setProject: (project: ProjectState) => set({ name: project.name, path: project.path, settings: project.settings }),
+    setProject: (project: ProjectState) => set({ projectName: project.projectName, projectPath: project.projectPath, settings: project.settings }),
     createNewProject: () => {
         window.api.createNewProject()
             .then((res) => {
                 if (res.success && res.data) {
                     set({ 
-                        name: res.data.name, 
-                        path: res.data.path, 
+                        projectName: res.data.name, 
+                        projectPath: res.data.path, 
                         settings: res.data.settings,
                         fileTree: []
                     });

@@ -20,6 +20,9 @@ const api = {
     };
   }> => {
     return ipcRenderer.invoke("createNewProject");
+  },
+  readFile: (path: string): IpcApiResponse<string> => {
+    return ipcRenderer.invoke("readFile", path);
   }
 }
 // 새 프로젝트 생성 이벤트 리스너
