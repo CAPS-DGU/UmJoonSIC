@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useProjectStore } from "@/stores/ProjectStore";
 
 type FileItem = {
   type: "file";
@@ -30,8 +31,69 @@ const fileStructure: FileStructure[] = [
   },
 ];
 
+function convertToFileStructure(fileTree: string[]): FileStructure[] {
+  // 파일/폴더를 트리 구조로 변환
+  const root: Record<string, any> = {};
+
+  fileTree.forEach((path) => {
+    // 폴더 경로 끝에 "/"가 붙어있으면 폴더로 간주
+    const isFolder = path.endsWith("/");
+    // 마지막 "/" 기준으로 분리
+    const parts = path.split("/").filter(Boolean);
+
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+
+      if (isLast) {
+        if (isFolder) {
+          // 폴더
+          if (!current[part]) {
+            current[part] = { __type: "folder", __children: {} };
+          }
+        } else {
+          // 파일
+          if (!current[part]) {
+            current[part] = { __type: "file" };
+          }
+        }
+      } else {
+        // 중간 폴더
+        if (!current[part]) {
+          current[part] = { __type: "folder", __children: {} };
+        }
+        current = current[part].__children;
+      }
+    }
+  });
+
+  // 재귀적으로 FileStructure[]로 변환
+  function toFileStructure(obj: Record<string, any>): FileStructure[] {
+    return Object.entries(obj).map(([name, value]) => {
+      if (value.__type === "folder") {
+        return {
+          type: "folder",
+          name,
+          children: toFileStructure(value.__children),
+        };
+      } else {
+        return {
+          type: "file",
+          name,
+        };
+      }
+    });
+  }
+
+  return toFileStructure(root);
+}
+
 export default function SideBar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const { name, fileTree } = useProjectStore();
+
+  const fileTreeStructure: FileStructure[] = convertToFileStructure(fileTree);
 
   const toggleFolder = (name: string) => {
     setExpanded((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -82,7 +144,7 @@ export default function SideBar() {
     <div className="w-60 bg-white border-r border-gray-300 flex flex-col">
       {/* 상단 헤더 */}
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
-        <span className="font-bold">파일 탐색기</span>
+        <span className="font-bold">{name}</span>
         <div className="flex gap-2">
           <button className="p-1 rounded hover:bg-gray-200">
             <img
@@ -104,7 +166,7 @@ export default function SideBar() {
       </div>
 
       {/* 파일 구조 */}
-      <div className="flex-1 overflow-y-auto">{renderItems(fileStructure)}</div>
+      <div className="flex-1 overflow-y-auto">{renderItems(fileTreeStructure)}</div>
     </div>
   );
 }
