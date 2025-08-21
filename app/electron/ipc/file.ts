@@ -2,7 +2,7 @@ import { ipcMain, dialog } from 'electron';
 import * as fs from 'fs';
 import * as pathModule from 'path';
 
-// 재귀적으로 모든 파일을 상대경로로 가져오는 함수
+// 재귀적으로 모든 파일과 폴더를 상대경로로 가져오는 함수
 function getAllFilesRecursive(dirPath: string, basePath: string): string[] {
   const files: string[] = [];
 
@@ -15,13 +15,21 @@ function getAllFilesRecursive(dirPath: string, basePath: string): string[] {
       const stat = fs.statSync(fullPath);
 
       if (stat.isDirectory()) {
-        // 디렉토리인 경우 재귀적으로 하위 파일들도 가져오기
+        // 디렉토리인 경우 경로 끝에 '/'를 붙여서 추가
+        files.push(relativePath + '/');
+        // 재귀적으로 하위 파일들도 가져오기
         const subFiles = getAllFilesRecursive(fullPath, basePath);
         files.push(...subFiles);
       } else {
         // 파일인 경우 상대경로로 추가
         files.push(relativePath);
       }
+    }
+
+    // 더미데이터로 폴더와 파일 추가
+    if (dirPath === basePath) {
+      files.push('dummy-folder/');
+      files.push('dummy-folder/dummy-file.txt');
     }
   } catch (error) {
     console.error(`Error reading directory ${dirPath}:`, error);
@@ -47,23 +55,23 @@ async function createNewProject(projectPath: string, projectName: string) {
 
     const mainAsmContent = `. Tests: base-relative, directives BASE, NOBASE
 
-base	START	0xA000
+base  START 0xA000
 
 . load B register and notify assembler
-		+LDB	#b
-        BASE	b
+    +LDB  #b
+        BASE  b
 
-        LDA		#b			base-relative addressing: (B)+0
-        LDA		#b			but pc-relative addressing prefered: (PC)+2047
-        RESB    2047
-b       BYTE    C'FOO'         b displaced by 2048 bytes
+        LDA   #b      base-relative addressing: (B)+0
+        LDA   #b      but pc-relative addressing prefered: (PC)+2047
+        RESB    2047
+b       BYTE    C'FOO'         b displaced by 2048 bytes
 
 . ********** other **********
-        LDA		#c			base-relative (since c-b < 4096)
-        NOBASE
-       +LDA		#c			direct extended, LDA #c would fail here
-        RESB    2048
-c       BYTE    C'BAR'
+        LDA   #c      base-relative (since c-b < 4096)
+        NOBASE
+       +LDA   #c      direct extended, LDA #c would fail here
+        RESB    2048
+c       BYTE    C'BAR'
 `;
 
     fs.writeFileSync(mainAsmPath, mainAsmContent);
@@ -71,8 +79,8 @@ c       BYTE    C'BAR'
     // project.sic 파일 생성
     const projectSicPath = pathModule.join(projectPath, 'project.sic');
     const projectSicContent = `{
-  "asm": ["main.asm"],
-  "main": "main.asm"
+  "asm": ["main.asm"],
+  "main": "main.asm"
 }`;
 
     fs.writeFileSync(projectSicPath, projectSicContent);
@@ -171,6 +179,22 @@ ipcMain.handle('readFile', async (event, filePath: string) => {
 ipcMain.handle('saveFile', async (event, filePath: string, content: string) => {
   try {
     fs.writeFileSync(filePath, content);
+    return {
+      success: true,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// 새 폴더를 만드는 핸들러
+ipcMain.handle('createFolder', async (event, parentPath: string, folderName: string) => {
+  try {
+    const fullPath = pathModule.join(parentPath, folderName);
+    fs.mkdirSync(fullPath, { recursive: true });
     return {
       success: true,
     };

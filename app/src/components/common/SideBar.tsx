@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useProjectStore } from '@/stores/ProjectStore';
 import {
-  Plus,
   FolderPlus,
   RefreshCcw,
   ChevronRight,
   ChevronDown,
   File,
   Folder,
+  FilePlus,
+  Settings,
 } from 'lucide-react';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 
@@ -26,33 +27,11 @@ type FolderItem = {
 
 type FileStructure = FileItem | FolderItem;
 
-const fileStructure: FileStructure[] = [
-  {
-    type: 'folder',
-    name: 'src',
-    relativePath: 'src',
-    children: [
-      { type: 'file', name: 'file.c', relativePath: 'src/file.c' },
-      { type: 'file', name: 'file.cpp', relativePath: 'src/file.cpp' },
-      { type: 'file', name: 'file.asm', relativePath: 'src/file.asm' },
-    ],
-  },
-  {
-    type: 'folder',
-    name: 'path',
-    relativePath: 'path',
-    children: [],
-  },
-];
-
 function convertToFileStructure(fileTree: string[]): FileStructure[] {
-  // 파일/폴더를 트리 구조로 변환
   const root: Record<string, any> = {};
 
   fileTree.forEach(path => {
-    // 폴더 경로 끝에 "/"가 붙어있으면 폴더로 간주
     const isFolder = path.endsWith('/');
-    // 마지막 "/" 기준으로 분리
     const parts = path.split('/').filter(Boolean);
 
     let current = root;
@@ -62,18 +41,15 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
 
       if (isLast) {
         if (isFolder) {
-          // 폴더
           if (!current[part]) {
             current[part] = { __type: 'folder', __children: {} };
           }
         } else {
-          // 파일
           if (!current[part]) {
             current[part] = { __type: 'file' };
           }
         }
       } else {
-        // 중간 폴더
         if (!current[part]) {
           current[part] = { __type: 'folder', __children: {} };
         }
@@ -82,7 +58,6 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
     }
   });
 
-  // 재귀적으로 FileStructure[]로 변환 (상대경로 누적)
   function toFileStructure(obj: Record<string, any>, parentPath = ''): FileStructure[] {
     return Object.entries(obj).map(([name, value]) => {
       const currentPath = parentPath ? `${parentPath}/${name}` : name;
@@ -111,7 +86,10 @@ export default function SideBar() {
   const { projectName, fileTree, refreshFileTree } = useProjectStore();
   const { tabs, addTab } = useEditorTabStore();
 
-  const fileTreeStructure: FileStructure[] = convertToFileStructure(fileTree);
+  // 더미 데이터 추가
+  const dummyFileTree = [...fileTree, 'src/', 'dummy-folder/', 'dummy-folder/dummy-file.txt'];
+
+  const fileTreeStructure: FileStructure[] = convertToFileStructure(dummyFileTree);
 
   const toggleFolder = (name: string) => {
     setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
@@ -134,13 +112,20 @@ export default function SideBar() {
                   <ChevronRight width={16} height={16} />
                 )}
               </span>
-              {/* <Folder width={16} height={16} /> */}
+              <Folder width={16} height={16} />
               <span>{item.name}</span>
             </div>
             {isOpen && <div className="ml-6">{renderItems(item.children)}</div>}
           </div>
         );
       }
+
+      const getFileIcon = (fileName: string) => {
+        if (fileName.toLowerCase() === 'project.sic') {
+          return <Settings width={16} height={16} />;
+        }
+        return <File width={16} height={16} />;
+      };
 
       return (
         <div
@@ -161,7 +146,7 @@ export default function SideBar() {
             });
           }}
         >
-          <File width={16} height={16} />
+          {getFileIcon(item.name)}
           <span>{item.name}</span>
         </div>
       );
@@ -170,12 +155,11 @@ export default function SideBar() {
 
   return (
     <div className="w-60 bg-white border-r border-gray-300 flex flex-col">
-      {/* 상단 헤더 */}
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
         <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">
           <button className="p-1 rounded hover:bg-gray-200">
-            <Plus width={16} height={16} />
+            <FilePlus width={16} height={16} />
           </button>
           <button className="p-1 rounded hover:bg-gray-200">
             <FolderPlus width={16} height={16} />
@@ -186,7 +170,6 @@ export default function SideBar() {
         </div>
       </div>
 
-      {/* 파일 구조 */}
       <div className="flex-1 overflow-y-auto">{renderItems(fileTreeStructure)}</div>
     </div>
   );
