@@ -30,6 +30,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, "index.html"),
+          splash: path.resolve(__dirname, "src/splash.html"),
         },
       },
     },

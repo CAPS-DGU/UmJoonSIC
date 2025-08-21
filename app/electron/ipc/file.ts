@@ -45,18 +45,25 @@ async function createNewProject(projectPath: string, projectName: string) {
       fs.mkdirSync(mainAsmDir, { recursive: true });
     }
     
-    const mainAsmContent = `; Main Assembly File
-; Project: ${projectName}
-; Created: ${new Date().toISOString()}
+    const mainAsmContent = `. Tests: base-relative, directives BASE, NOBASE
 
-.global _start
+base	START	0xA000
 
-.section .text
-_start:
-    ; Your assembly code here
-    mov r0, #0      ; Exit code 0
-    mov r7, #1      ; Exit syscall
-    svc #0          ; Make syscall
+. load B register and notify assembler
+		+LDB	#b
+        BASE	b
+
+        LDA		#b			base-relative addressing: (B)+0
+        LDA		#b			but pc-relative addressing prefered: (PC)+2047
+        RESB    2047
+b       BYTE    C'FOO'         b displaced by 2048 bytes
+
+. ********** other **********
+        LDA		#c			base-relative (since c-b < 4096)
+        NOBASE
+       +LDA		#c			direct extended, LDA #c would fail here
+        RESB    2048
+c       BYTE    C'BAR'
 `;
     
     fs.writeFileSync(mainAsmPath, mainAsmContent);
@@ -138,6 +145,35 @@ ipcMain.handle("createNewProject", async (event) => {
         message: createResult.message
       };
     }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+});
+
+ipcMain.handle("readFile", async (event, filePath: string) => {
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    return {
+      success: true,
+      data: content
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
+});
+
+ipcMain.handle("saveFile", async (event, filePath: string, content: string) => {
+  try {
+    fs.writeFileSync(filePath, content);
+    return {
+      success: true
+    };
   } catch (error) {
     return {
       success: false,
