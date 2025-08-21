@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
 interface AppStatusState {
   isLoading: boolean;
@@ -7,9 +7,9 @@ interface AppStatusState {
   setIsBackendConnected: (isBackendConnected: boolean) => void;
 }
 
-export const useAppStatusStore = create<AppStatusState>((set) => ({
+export const useAppStatusStore = create<AppStatusState>(set => ({
   isLoading: false,
   isBackendConnected: false,
-  setIsLoading: (isLoading) => set({ isLoading }),
-  setIsBackendConnected: (isBackendConnected) => set({ isBackendConnected }),
+  setIsLoading: isLoading => set({ isLoading }),
+  setIsBackendConnected: isBackendConnected => set({ isBackendConnected }),
 }));

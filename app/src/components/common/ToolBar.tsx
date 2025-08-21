@@ -1,5 +1,5 @@
 /** 상단 툴바 */
-import "../../styles/ToolBar.css";
+import '../../styles/ToolBar.css';
 
 export default function ToolBar() {
   return (
@@ -9,11 +9,7 @@ export default function ToolBar() {
       <button className="toolbar-button">보기</button>
       <button className="toolbar-button">도움말</button>
 
-      <input
-        type="text"
-        placeholder="Currunt File Path"
-        className="toolbar-search"
-      />
+      <input type="text" placeholder="Currunt File Path" className="toolbar-search" />
     </div>
   );
 }

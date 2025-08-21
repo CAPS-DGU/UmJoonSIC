@@ -48,10 +48,13 @@ export default function CodeEditor() {
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
 
-  const handleEditorDidMount = (editor: monaco_editor.editor.IStandaloneCodeEditor, monaco: typeof monaco_editor | null) => {
+  const handleEditorDidMount = (
+    editor: monaco_editor.editor.IStandaloneCodeEditor,
+    monaco: typeof monaco_editor | null,
+  ) => {
     editorRef.current = editor;
 
-    editor.onDidChangeCursorPosition((e) => {
+    editor.onDidChangeCursorPosition(e => {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab) {
         setCursor(currentActiveTab.idx, { line: e.position.lineNumber, column: e.position.column });
@@ -65,7 +68,7 @@ export default function CodeEditor() {
         setFileContent(currentActiveTab.idx, editor.getValue());
       }
     });
-  }
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -74,15 +77,17 @@ export default function CodeEditor() {
         console.log('Ctrl+S pressed in React');
         const activeTab = getActiveTab();
         if (activeTab) {
-          console.log("Save file in", projectPath + "/" + activeTab.filePath);
-          window.api.saveFile(projectPath + "/" + activeTab.filePath, activeTab.fileContent).then((res: { success: boolean; message?: string }) => {
-            if (res.success) {
-              setIsModified(activeTab.idx, false);
-              console.log("File saved");
-            } else {
-              console.error("Failed to save file:", res.message);
-            }
-          });
+          console.log('Save file in', projectPath + '/' + activeTab.filePath);
+          window.api
+            .saveFile(projectPath + '/' + activeTab.filePath, activeTab.fileContent)
+            .then((res: { success: boolean; message?: string }) => {
+              if (res.success) {
+                setIsModified(activeTab.idx, false);
+                console.log('File saved');
+              } else {
+                console.error('Failed to save file:', res.message);
+              }
+            });
         }
       }
     };
@@ -93,16 +98,19 @@ export default function CodeEditor() {
 
   useEffect(() => {
     if (activeTab && activeTab.filePath && projectPath) {
-      console.log("Loading file:", projectPath + "/" + activeTab.filePath);
+      console.log('Loading file:', projectPath + '/' + activeTab.filePath);
       console.log(tabs);
-      window.api.readFile(projectPath + "/" + activeTab.filePath).then((res: { success: boolean; data?: string; message?: string }) => {
-        if (res.success && res.data) {
-          console.log("File loaded:", res.data);
-          setFileContent(activeTab.idx, res.data);
-        } else {
-          console.error("Failed to load file:", res.message);
-        }
-      }).catch(console.error);
+      window.api
+        .readFile(projectPath + '/' + activeTab.filePath)
+        .then((res: { success: boolean; data?: string; message?: string }) => {
+          if (res.success && res.data) {
+            console.log('File loaded:', res.data);
+            setFileContent(activeTab.idx, res.data);
+          } else {
+            console.error('Failed to load file:', res.message);
+          }
+        })
+        .catch(console.error);
     }
   }, [activeTab?.idx, activeTab?.filePath, projectPath]);
 
@@ -110,11 +118,13 @@ export default function CodeEditor() {
     registerAssemblyLanguage(monaco);
   }, [monaco]);
 
-  if(tabs.length === 0) {
-    return <div className="flex flex-col items-center justify-center h-full">
-      <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
-      <p className="text-sm text-gray-500">파일을 열어 새로운 탭을 만드세요</p>
-    </div>;
+  if (tabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
+        <p className="text-sm text-gray-500">파일을 열어 새로운 탭을 만드세요</p>
+      </div>
+    );
   }
 
   return (

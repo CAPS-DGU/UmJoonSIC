@@ -1,18 +1,18 @@
-import { shell } from "electron";
+import { shell } from 'electron';
 
 export const menuList = [
   {
     label: 'Application',
     submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'services' },
-        { role: 'quit' },
-    ]
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'services' },
+      { role: 'quit' },
+    ],
   },
   {
     label: 'File',
@@ -26,28 +26,25 @@ export const menuList = [
           windows.forEach(window => {
             window.webContents.send('create-new-project');
           });
-        }
+        },
       },
       {
         label: 'Open Project',
         click: () => {
           console.log('Open Project');
-        }
+        },
       },
       {
         label: 'Open Recent',
-        submenu: [
-          { role: 'clearRecentDocuments' },
-          { role: 'recentDocuments' },
-        ]
+        submenu: [{ role: 'clearRecentDocuments' }, { role: 'recentDocuments' }],
       },
       {
         label: 'Close Project',
         click: () => {
           console.log('Close Project');
-        }
+        },
       },
-    ]
+    ],
   },
   {
     label: 'Edit',
@@ -58,8 +55,8 @@ export const menuList = [
       { role: 'cut' },
       { role: 'copy' },
       { role: 'paste' },
-      { role: 'selectAll' }
-    ]
+      { role: 'selectAll' },
+    ],
   },
   {
     label: 'View',
@@ -72,15 +69,12 @@ export const menuList = [
       { role: 'zoomIn' },
       { role: 'zoomOut' },
       { type: 'separator' },
-      { role: 'togglefullscreen' }
-    ]
+      { role: 'togglefullscreen' },
+    ],
   },
   {
     label: 'Window',
-    submenu: [
-      { role: 'minimize' },
-      { role: 'close' }
-    ]
+    submenu: [{ role: 'minimize' }, { role: 'close' }],
   },
   {
     label: 'Help',
@@ -89,8 +83,8 @@ export const menuList = [
         label: 'Learn More',
         click: async () => {
           await shell.openExternal('https://www.dongguk.edu/');
-        }
-      }
-    ]
-  }
+        },
+      },
+    ],
+  },
 ];

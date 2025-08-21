@@ -1,15 +1,13 @@
-import SideBar from "@/components/common/SideBar";
-import ToolBar from "@/components/common/ToolBar";
-import UnderStatusBar from "@/components/common/UnderStatusBar";
-import Debug from "@/components/debug";
-import EditorContainer from "./components/editor/EditorContainer";
-import { useProjectStore } from "./stores/ProjectStore";
-import { useEffect } from "react";
-
+import SideBar from '@/components/common/SideBar';
+import ToolBar from '@/components/common/ToolBar';
+import UnderStatusBar from '@/components/common/UnderStatusBar';
+import Debug from '@/components/debug';
+import EditorContainer from './components/editor/EditorContainer';
+import { useProjectStore } from './stores/ProjectStore';
+import { useEffect } from 'react';
 
 function App() {
   const { createNewProject, projectName } = useProjectStore();
-
 
   useEffect(() => {
     // 새 프로젝트 생성 이벤트 리스너
@@ -24,11 +22,13 @@ function App() {
     };
   }, [createNewProject]);
 
-  if (projectName === "") {
+  if (projectName === '') {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <h1 className="text-2xl font-bold">아직 프로젝트를 생성하지 않았습니다.</h1>
-        <p className="text-sm text-gray-500">File &gt; New Project 를 클릭하여 프로젝트를 생성해주세요.</p>
+        <p className="text-sm text-gray-500">
+          File &gt; New Project 를 클릭하여 프로젝트를 생성해주세요.
+        </p>
       </div>
     );
   }
