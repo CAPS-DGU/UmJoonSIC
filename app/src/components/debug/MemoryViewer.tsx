@@ -1,5 +1,7 @@
+import type { MemoryNodeData, MemoryNodeStatus } from '@/types/debug/memoryData';
+
 interface MemoryViewerProps {
-  memoryData: Record<string, string[]>;
+  memoryData: Record<string, MemoryNodeData[]>;
 }
 
 export default function MemoryViewer({ memoryData }: MemoryViewerProps) {
@@ -17,15 +19,13 @@ export default function MemoryViewer({ memoryData }: MemoryViewerProps) {
   );
 }
 
-function ValueColumn({ values }: { values: string[][] }) {
+function ValueColumn({ values }: { values: MemoryNodeData[][] }) {
   return (
     <div className="flex flex-col gap-2 pl-4">
-      {values.map((v, i) => (
-        <div key={i} className="flex gap-2">
-          {v.map((val, index) => (
-            <span key={index} className="font-mono">
-              {val}
-            </span>
+      {values.map((row, rowIndex) => (
+        <div key={rowIndex} className="flex">
+          {row.map((nodeData, nodeIndex) => (
+            <MemoryNode key={nodeIndex} val={nodeData.value} status={nodeData.status} />
           ))}
         </div>
       ))}
@@ -43,4 +43,15 @@ function KeyColumn({ keys }: { keys: string[] }) {
       ))}
     </div>
   );
+}
+
+function MemoryNode({ val, status }: { val: string; status?: MemoryNodeStatus }) {
+  const statusClasses = {
+    normal: '',
+    highlighted: 'bg-yellow-200',
+    underlined: 'underline text-orange-500',
+    'red bold': 'text-red-500 font-bold',
+  };
+
+  return <span className={`font-mono px-1 ${statusClasses[status || 'normal']}`}>{val}</span>;
 }

@@ -7,6 +7,8 @@ import StopIcon from '@/assets/icons/debug/stop.svg';
 import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 
+import type { MemoryNodeData } from '@/types/debug/memoryData';
+
 export default function Debug() {
   return (
     <div className="flex flex-col w-max border border-gray-200">
@@ -25,30 +27,117 @@ export default function Debug() {
         </div>
       </section>
       <section className="border-b border-gray-200 py-3">
-        <RegisterValue registerData={DUMMY_REGISTER_DATA} />
+        <RegisterValue registerData={MOCK_REGISTER_DATA} />
       </section>
       <section className="border-b border-gray-200 py-3">
-        <MemoryViewer memoryData={DUMMY_MEMORY_DATA} />
+        <MemoryViewer memoryData={MOCK_MEMORY_DATA} />
       </section>
     </div>
   );
 }
 
-const DUMMY_REGISTER_DATA = {
-  PC: '0x0000',
-  SP: '0x0000',
-  LR: '0x0000',
-  CPSR: '0x0000',
+const MOCK_REGISTER_DATA = {
+  A: '0x0000',
+  X: '0x0000',
+  L: '0x0000',
+  S: '0x0000',
+  T: '0x0000',
+  B: '0x0000',
+  SW: '0x0000',
+  F: '0x0000',
+  'F(double)': '0.0',
+  PC: '00A000',
 };
 
-const DUMMY_MEMORY_DATA = {
-  1000: ['48', '65', '6C', '6C', '6F', '2C', '20', '41'],
-  1010: ['20', '4C', '65', '74', '27', '73', '20', '68'],
-  1020: ['74', '68', '69', '73', '2E', '00', '36', '5F'],
-  1030: ['48', '65', '6C', '6C', '6F', '2C', '20', '41'],
-  1040: ['20', '4C', '65', '74', '27', '73', '20', '68'],
-  1050: ['74', '68', '69', '73', '2E', '00', '36', '5F'],
-  1060: ['48', '65', '6C', '6C', '6F', '2C', '20', '41'],
-  1070: ['20', '4C', '65', '74', '27', '73', '20', '68'],
-  1080: ['74', '68', '69', '73', '2E', '00', '36', '5F'],
+const MOCK_MEMORY_DATA: Record<string, MemoryNodeData[]> = {
+  1000: [
+    { value: '48', status: 'highlighted' },
+    { value: '65', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6F', status: 'red bold' },
+    { value: '2C', status: 'normal' },
+    { value: '20', status: 'normal' },
+    { value: '41', status: 'underlined' },
+  ],
+  1010: [
+    { value: '20', status: 'normal' },
+    { value: '4C', status: 'underlined' },
+    { value: '65', status: 'underlined' },
+    { value: '74', status: 'underlined' },
+    { value: '27', status: 'normal' },
+    { value: '73', status: 'normal' },
+    { value: '20', status: 'normal' },
+    { value: '68', status: 'normal' },
+  ],
+  1020: [
+    { value: '74', status: 'normal' },
+    { value: '68', status: 'normal' },
+    { value: '69', status: 'normal' },
+    { value: '73', status: 'normal' },
+    { value: '2E', status: 'normal' },
+    { value: '00', status: 'normal' },
+    { value: '36', status: 'normal' },
+    { value: '5F', status: 'normal' },
+  ],
+  1030: [
+    { value: '48', status: 'normal' },
+    { value: '65', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6F', status: 'highlighted' },
+    { value: '2C', status: 'highlighted' },
+    { value: '20', status: 'highlighted' },
+    { value: '41', status: 'highlighted' },
+  ],
+  1040: [
+    { value: '20', status: 'normal' },
+    { value: '4C', status: 'normal' },
+    { value: '65', status: 'normal' },
+    { value: '74', status: 'normal' },
+    { value: '27', status: 'normal' },
+    { value: '73', status: 'normal' },
+    { value: '20', status: 'normal' },
+    { value: '68', status: 'normal' },
+  ],
+  1050: [
+    { value: '74', status: 'red bold' },
+    { value: '68', status: 'red bold' },
+    { value: '69', status: 'red bold' },
+    { value: '73', status: 'normal' },
+    { value: '2E', status: 'normal' },
+    { value: '00', status: 'normal' },
+    { value: '36', status: 'normal' },
+    { value: '5F', status: 'normal' },
+  ],
+  1060: [
+    { value: '48', status: 'normal' },
+    { value: '65', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6C', status: 'normal' },
+    { value: '6F', status: 'normal' },
+    { value: '2C', status: 'normal' },
+    { value: '20', status: 'normal' },
+    { value: '41', status: 'normal' },
+  ],
+  1070: [
+    { value: '20', status: 'normal' },
+    { value: '4C', status: 'normal' },
+    { value: '65', status: 'normal' },
+    { value: '74', status: 'normal' },
+    { value: '27', status: 'normal' },
+    { value: '73', status: 'normal' },
+    { value: '20', status: 'normal' },
+    { value: '68', status: 'normal' },
+  ],
+  1080: [
+    { value: '74', status: 'normal' },
+    { value: '68', status: 'normal' },
+    { value: '69', status: 'normal' },
+    { value: '73', status: 'normal' },
+    { value: '2E', status: 'normal' },
+    { value: '00', status: 'normal' },
+    { value: '36', status: 'normal' },
+    { value: '5F', status: 'normal' },
+  ],
 };
