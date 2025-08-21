@@ -1,5 +1,5 @@
 {
-  "name": "UmJoonSIC",
+  "name": "umjoonsic",
   "description": "UmJoonSIC",
   "author": "CAPS",
   "private": true,
@@ -11,6 +11,7 @@
     "start": "electron-forge start",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "format": "prettier --write .",
     "preview": "vite preview",
     "prebuild": "electron-vite build",
     "package": "electron-forge package",
@@ -25,6 +26,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "lucide-react": "^0.540.0",
     "monaco-editor": "^0.52.2",
+    "prettier": "^3.6.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tailwindcss": "^4.1.11",

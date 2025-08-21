@@ -10,29 +10,29 @@ import MemoryViewer from './MemoryViewer';
 export default function Debug() {
   return (
     <div className="flex flex-col w-max border border-gray-200">
-      <section className='flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2'>
-        <h2 className='text-lg font-bold'>실행 및 디버그</h2>
-        <div className='flex space-x-2'>
-          <button className='hover:bg-gray-100 p-2 rounded-md transition-colors'>
-            <img src={RunIcon} alt="Run" className='w-4 h-4' />
+      <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
+        <h2 className="text-lg font-bold">실행 및 디버그</h2>
+        <div className="flex space-x-2">
+          <button className="hover:bg-gray-100 p-2 rounded-md transition-colors">
+            <img src={RunIcon} alt="Run" className="w-4 h-4" />
           </button>
-          <button className='hover:bg-gray-100 p-2 rounded-md transition-colors'>
-            <img src={ReRunIcon} alt="ReRun" className='w-4 h-4' />
+          <button className="hover:bg-gray-100 p-2 rounded-md transition-colors">
+            <img src={ReRunIcon} alt="ReRun" className="w-4 h-4" />
           </button>
-          <button className='hover:bg-gray-100 p-2 rounded-md transition-colors'>
-            <img src={StopIcon} alt="Stop" className='w-4 h-4' />
+          <button className="hover:bg-gray-100 p-2 rounded-md transition-colors">
+            <img src={StopIcon} alt="Stop" className="w-4 h-4" />
           </button>
         </div>
       </section>
-      <section className='border-b border-gray-200 py-3'>
+      <section className="border-b border-gray-200 py-3">
         <RegisterValue registerData={DUMMY_REGISTER_DATA} />
       </section>
-      <section className='border-b border-gray-200 py-3'>
+      <section className="border-b border-gray-200 py-3">
         <MemoryViewer memoryData={DUMMY_MEMORY_DATA} />
       </section>
     </div>
-  )
-};
+  );
+}
 
 const DUMMY_REGISTER_DATA = {
   PC: '0x0000',
