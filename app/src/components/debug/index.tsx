@@ -25,7 +25,7 @@ export default function Debug() {
         </div>
       </section>
       <section className="border-b border-gray-200 py-3">
-        <RegisterValue registerData={MOCK_REGISTER_DATA} />
+        <RegisterValue />
       </section>
       <section className="border-b border-gray-200 py-3">
         <MemoryViewer />
@@ -33,16 +33,3 @@ export default function Debug() {
     </div>
   );
 }
-
-const MOCK_REGISTER_DATA = {
-  A: '0x0000',
-  X: '0x0000',
-  L: '0x0000',
-  S: '0x0000',
-  T: '0x0000',
-  B: '0x0000',
-  SW: '0x0000',
-  F: '0x0000',
-  'F(double)': '0.0',
-  PC: '00A000',
-};
