@@ -9,6 +9,7 @@ import {
   Folder,
   FilePlus,
   Settings,
+  List, // Import the List icon for .lst files
 } from 'lucide-react';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 
@@ -86,8 +87,14 @@ export default function SideBar() {
   const { projectName, fileTree, refreshFileTree } = useProjectStore();
   const { tabs, addTab } = useEditorTabStore();
 
-  // 더미 데이터 추가
-  const dummyFileTree = [...fileTree, 'src/', 'dummy-folder/', 'dummy-folder/dummy-file.txt'];
+  // Add the new file to the dummy data
+  const dummyFileTree = [
+    ...fileTree,
+    'src/',
+    'dummy-folder/',
+    'dummy-folder/dummy-file.txt',
+    'test.lst',
+  ];
 
   const fileTreeStructure: FileStructure[] = convertToFileStructure(dummyFileTree);
 
@@ -123,6 +130,10 @@ export default function SideBar() {
       const getFileIcon = (fileName: string) => {
         if (fileName.toLowerCase() === 'project.sic') {
           return <Settings width={16} height={16} />;
+        }
+        // Check for .lst extension and return the new icon
+        if (fileName.toLowerCase().endsWith('.lst')) {
+          return <List width={16} height={16} />;
         }
         return <File width={16} height={16} />;
       };
