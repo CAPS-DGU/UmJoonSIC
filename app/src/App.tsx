@@ -1,16 +1,19 @@
+// src/App.tsx
 import SideBar from '@/components/common/SideBar';
 import ToolBar from '@/components/common/ToolBar';
 import UnderStatusBar from '@/components/common/UnderStatusBar';
 import Debug from '@/components/debug';
 import EditorContainer from './components/editor/EditorContainer';
+import ListContainer from './components/assembleList/ListContainer';
 import { useProjectStore } from './stores/ProjectStore';
+import { useEditorTabStore } from './stores/EditorTabStore';
 import { useEffect } from 'react';
 
 function App() {
   const { createNewProject, projectName } = useProjectStore();
+  const { tabs, activeTabIdx } = useEditorTabStore();
 
   useEffect(() => {
-    // 새 프로젝트 생성 이벤트 리스너
     const handleCreateNewProject = () => {
       createNewProject();
     };
@@ -33,12 +36,17 @@ function App() {
     );
   }
 
+  const activeTab = tabs[activeTabIdx];
+  const isLstFile = activeTab?.filePath?.toLowerCase().endsWith('.lst');
+
   return (
     <div className="flex h-screen w-screen flex-col">
       {/* <ToolBar /> */}
       <div className="flex w-full h-full">
         <SideBar />
-        <EditorContainer />
+        <div className="flex flex-1 overflow-hidden">
+          {isLstFile ? <ListContainer /> : <EditorContainer />}
+        </div>
         <Debug />
       </div>
       <UnderStatusBar />

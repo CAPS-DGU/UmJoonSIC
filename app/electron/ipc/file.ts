@@ -16,17 +16,15 @@ function getAllFilesRecursive(dirPath: string, basePath: string): string[] {
 
       if (stat.isDirectory()) {
         // 디렉토리인 경우 경로 끝에 '/'를 붙여서 추가
-        files.push(relativePath + '/');
-        // 재귀적으로 하위 파일들도 가져오기
+        files.push(relativePath + '/'); // 재귀적으로 하위 파일들도 가져오기
         const subFiles = getAllFilesRecursive(fullPath, basePath);
         files.push(...subFiles);
       } else {
         // 파일인 경우 상대경로로 추가
         files.push(relativePath);
       }
-    }
+    } // 더미데이터로 폴더와 파일 추가
 
-    // 더미데이터로 폴더와 파일 추가
     if (dirPath === basePath) {
       files.push('dummy-folder/');
       files.push('dummy-folder/dummy-file.txt');
@@ -44,9 +42,8 @@ async function createNewProject(projectPath: string, projectName: string) {
     // 프로젝트 디렉토리 생성
     if (!fs.existsSync(projectPath)) {
       fs.mkdirSync(projectPath, { recursive: true });
-    }
+    } // src/main.asm 파일 생성
 
-    // src/main.asm 파일 생성
     const mainAsmPath = pathModule.join(projectPath, 'src', 'main.asm');
     const mainAsmDir = pathModule.dirname(mainAsmPath);
     if (!fs.existsSync(mainAsmDir)) {
@@ -74,16 +71,18 @@ b       BYTE    C'FOO'         b displaced by 2048 bytes
 c       BYTE    C'BAR'
 `;
 
-    fs.writeFileSync(mainAsmPath, mainAsmContent);
+    fs.writeFileSync(mainAsmPath, mainAsmContent); // project.sic 파일 생성
 
-    // project.sic 파일 생성
     const projectSicPath = pathModule.join(projectPath, 'project.sic');
     const projectSicContent = `{
   "asm": ["main.asm"],
   "main": "main.asm"
 }`;
 
-    fs.writeFileSync(projectSicPath, projectSicContent);
+    fs.writeFileSync(projectSicPath, projectSicContent); // test.lst 파일 생성
+
+    const testLstPath = pathModule.join(projectPath, 'test.lst');
+    fs.writeFileSync(testLstPath, ''); // 빈 파일로 생성
 
     return {
       success: true,
@@ -107,9 +106,8 @@ c       BYTE    C'BAR'
 ipcMain.handle('getFileList', async (event, dirPath: string) => {
   try {
     // 절대경로로 변환
-    const absolutePath = pathModule.resolve(dirPath);
+    const absolutePath = pathModule.resolve(dirPath); // 재귀적으로 모든 파일 가져오기
 
-    // 재귀적으로 모든 파일 가져오기
     const allFiles = getAllFilesRecursive(absolutePath, absolutePath);
 
     return {
@@ -140,9 +138,8 @@ ipcMain.handle('createNewProject', async event => {
     }
 
     const projectPath = result.filePaths[0];
-    const projectName = pathModule.basename(projectPath);
+    const projectName = pathModule.basename(projectPath); // 새 프로젝트 생성
 
-    // 새 프로젝트 생성
     const createResult = await createNewProject(projectPath, projectName);
 
     if (createResult.success) {

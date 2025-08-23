@@ -13,8 +13,10 @@ export interface EditorTab {
   };
 }
 
+// Add activeTabIdx to the state interface
 interface EditorTabState {
   tabs: EditorTab[];
+  activeTabIdx: number; // New property to track the active tab's index
   getActiveTab: () => EditorTab | undefined;
   addTab: (tab: EditorTab) => void;
   closeTab: (idx: number) => void;
@@ -40,39 +42,58 @@ const defaultTab: EditorTab = {
 
 export const useEditorTabStore = create<EditorTabState>((set, get) => ({
   tabs: [],
+  activeTabIdx: -1, // default value (e.g., -1 for no active tab)
   getActiveTab: () => get().tabs.find(tab => tab.isActive),
   addTab: newTab =>
     set(state => {
-      // 탭이 이미 열려 있으면 중복 추가 방지
       const exists = state.tabs.some(tab => tab.filePath === newTab.filePath);
       if (exists) {
+        const newActiveTabIdx = state.tabs.findIndex(tab => tab.filePath === newTab.filePath);
         return {
           tabs: state.tabs.map(tab => ({
             ...tab,
             isActive: tab.filePath === newTab.filePath ? true : false,
           })),
+          activeTabIdx: newActiveTabIdx,
         };
       }
-      // 새로운 탭 추가하고 활성화 설정
+      const newIdx = state.tabs.length;
       return {
         tabs: [
           ...state.tabs.map(tab => ({ ...tab, isActive: false })),
-          { ...newTab, isActive: true },
+          { ...newTab, isActive: true, idx: newIdx },
         ],
+        activeTabIdx: newIdx,
       };
     }),
   closeTab: idx =>
     set(state => {
-      let updatedTabs = state.tabs.filter(tab => tab.idx !== idx);
-      // 닫은 탭이 활성화 탭이면, 마지막 탭을 활성화
-      const wasActiveClosed = state.tabs.find(tab => tab.idx === idx)?.isActive;
-      if (wasActiveClosed && updatedTabs.length > 0) {
-        updatedTabs = updatedTabs.map((tab, idx) => ({
-          ...tab,
-          isActive: idx === updatedTabs.length - 1,
-        }));
+      const closedTabIsActive = state.tabs[idx]?.isActive;
+      const updatedTabs = state.tabs.filter(tab => tab.idx !== idx);
+
+      const reindexedTabs = updatedTabs.map((tab, i) => ({ ...tab, idx: i }));
+
+      let newActiveTabIdx = -1;
+      if (reindexedTabs.length > 0) {
+        if (closedTabIsActive) {
+          newActiveTabIdx = reindexedTabs.length - 1;
+        } else {
+          const currentActiveTab = state.tabs.find(tab => tab.isActive);
+          newActiveTabIdx = currentActiveTab
+            ? reindexedTabs.findIndex(tab => tab.filePath === currentActiveTab.filePath)
+            : -1;
+        }
       }
-      return { tabs: updatedTabs };
+
+      const finalTabs = reindexedTabs.map((tab, i) => ({
+        ...tab,
+        isActive: i === newActiveTabIdx,
+      }));
+
+      return {
+        tabs: finalTabs,
+        activeTabIdx: newActiveTabIdx,
+      };
     }),
   setActiveTab: idx =>
     set(state => ({
@@ -80,24 +101,25 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         ...tab,
         isActive: tab.idx === idx,
       })),
+      activeTabIdx: idx,
     })),
   setCursor: (idx, cursor) =>
     set(state => ({
-      tabs: state.tabs.map((tab, i) => ({ ...tab, cursor: i === idx ? cursor : tab.cursor })),
+      tabs: state.tabs.map(tab => ({ ...tab, cursor: tab.idx === idx ? cursor : tab.cursor })),
     })),
   setFileContent: (idx, fileContent) =>
     set(state => ({
-      tabs: state.tabs.map((tab, i) => ({
+      tabs: state.tabs.map(tab => ({
         ...tab,
-        fileContent: i === idx ? fileContent : tab.fileContent,
+        fileContent: tab.idx === idx ? fileContent : tab.fileContent,
       })),
     })),
-  clearTabs: () => set(() => ({ tabs: [] })),
+  clearTabs: () => set(() => ({ tabs: [], activeTabIdx: -1 })),
   setIsModified: (idx, isModified) =>
     set(state => ({
-      tabs: state.tabs.map((tab, i) => ({
+      tabs: state.tabs.map(tab => ({
         ...tab,
-        isModified: i === idx ? isModified : tab.isModified,
+        isModified: tab.idx === idx ? isModified : tab.isModified,
       })),
     })),
 }));
