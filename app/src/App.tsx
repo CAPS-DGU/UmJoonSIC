@@ -1,4 +1,6 @@
 // src/App.tsx
+
+import React, { useState, useEffect, useRef } from 'react';
 import SideBar from '@/components/common/SideBar';
 import ToolBar from '@/components/common/ToolBar';
 import UnderStatusBar from '@/components/common/UnderStatusBar';
@@ -7,11 +9,20 @@ import EditorContainer from './components/editor/EditorContainer';
 import ListContainer from './components/assembleList/ListContainer';
 import { useProjectStore } from './stores/ProjectStore';
 import { useEditorTabStore } from './stores/EditorTabStore';
-import { useEffect } from 'react';
+
+import WarningPanel from './components/warning/WarningPanel';
+import Resizer from './components/common/Resizer';
+
+const STATUS_BAR_HEIGHT = 40;
 
 function App() {
   const { createNewProject, projectName } = useProjectStore();
   const { tabs, activeTabIdx } = useEditorTabStore();
+
+  const [panelHeight, setPanelHeight] = useState(0);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const appRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleCreateNewProject = () => {
@@ -24,6 +35,31 @@ function App() {
       window.removeEventListener('create-new-project', handleCreateNewProject);
     };
   }, [createNewProject]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !appRef.current) return;
+
+      const appRect = appRef.current.getBoundingClientRect();
+      const newPanelHeight = appRect.bottom - STATUS_BAR_HEIGHT - e.clientY;
+
+      setPanelHeight(Math.max(0, newPanelHeight));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   if (projectName === '') {
     return (
@@ -41,13 +77,23 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col">
-      {/* <ToolBar /> */}
-      <div className="flex w-full h-full">
-        <SideBar />
-        <div className="flex flex-1 overflow-hidden">
-          {isLstFile ? <ListContainer /> : <EditorContainer />}
+      <ToolBar />
+      <div className="flex flex-1 overflow-hidden" ref={appRef}>
+        <div className="w-64">
+          <SideBar />
         </div>
-        <Debug />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden">
+            {isLstFile ? <ListContainer /> : <EditorContainer />}
+          </div>
+          <Resizer onMouseDown={() => setIsResizing(true)} />
+          <div className="transition-all duration-200 ease-in-out" style={{ height: panelHeight }}>
+            <WarningPanel />
+          </div>
+        </div>
+        <div className="min-w-64 max-w-xs flex-shrink-0 overflow-y-auto overflow-x-hidden">
+          <Debug />
+        </div>
       </div>
       <UnderStatusBar />
     </div>
