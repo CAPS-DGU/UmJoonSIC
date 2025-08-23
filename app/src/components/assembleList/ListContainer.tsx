@@ -1,30 +1,14 @@
 // src/components/editor/ListContainer.tsx
 import React, { useState, useEffect } from 'react';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
+import { useListFileStore } from '@/stores/ListFileStore';
+import type { ListFileRow } from '@/stores/ListFileStore';
 import TabBar from '../editor/TabBar';
 import List from './List';
-
-// Define the type for a row in the list view
-export interface ListViewItem {
-  addressHex: string;
-  rawCodeHex: string;
-  rawCodeBinary: string;
-  label: string;
-  instr: string;
-  instrHex: string;
-  instrBin: string; // New: instruction binary
-  nixbpe: string;
-  operand: string;
-  comment: string;
-  labelWidth: number;
-  nameWidth: number;
-  isCommentRow: boolean;
-}
-
 const dummyJsonData = {
   listViewArray: [
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: 'func',
@@ -39,7 +23,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -54,7 +38,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -69,7 +53,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -84,7 +68,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '03100000',
       rawCodeBinary: '00000011 00010000 00000000 00000000',
       label: '',
@@ -99,7 +83,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00004',
+      addressHex: 4,
       rawCodeHex: '190005  ',
       rawCodeBinary: '00011001 00000000 00000101',
       label: '',
@@ -114,7 +98,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00007',
+      addressHex: 7,
       rawCodeHex: '0F100000',
       rawCodeBinary: '00001111 00010000 00000000 00000000',
       label: '',
@@ -129,7 +113,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '0000B',
+      addressHex: 11,
       rawCodeHex: '4B100000',
       rawCodeBinary: '01001011 00010000 00000000 00000000',
       label: '',
@@ -144,7 +128,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '0000F',
+      addressHex: 15,
       rawCodeHex: '4F0000  ',
       rawCodeBinary: '01001111 00000000 00000000',
       label: '',
@@ -159,7 +143,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: 'ref2',
@@ -174,7 +158,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -189,7 +173,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -204,7 +188,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -219,7 +203,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -234,7 +218,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -249,7 +233,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '03100000',
       rawCodeBinary: '00000011 00010000 00000000 00000000',
       label: '',
@@ -264,7 +248,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00004',
+      addressHex: 4,
       rawCodeHex: '190005  ',
       rawCodeBinary: '00011001 00000000 00000101',
       label: '',
@@ -279,7 +263,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00007',
+      addressHex: 7,
       rawCodeHex: '0F100000',
       rawCodeBinary: '00001111 00010000 00000000 00000000',
       label: '',
@@ -294,7 +278,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '0000B',
+      addressHex: 11,
       rawCodeHex: '03100000',
       rawCodeBinary: '00000011 00010000 00000000 00000000',
       label: '',
@@ -309,7 +293,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '0000F',
+      addressHex: 15,
       rawCodeHex: '190003  ',
       rawCodeBinary: '00011001 00000000 00000011',
       label: '',
@@ -324,7 +308,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00012',
+      addressHex: 18,
       rawCodeHex: '0F100000',
       rawCodeBinary: '00001111 00010000 00000000 00000000',
       label: '',
@@ -339,7 +323,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00016',
+      addressHex: 22,
       rawCodeHex: '0F2003  ',
       rawCodeBinary: '00001111 00100000 00000011',
       label: '',
@@ -354,7 +338,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00019',
+      addressHex: 25,
       rawCodeHex: '4F0000  ',
       rawCodeBinary: '01001111 00000000 00000000',
       label: '',
@@ -369,7 +353,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -385,7 +369,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '0001C',
+      addressHex: 28,
       rawCodeHex: '000001  ',
       rawCodeBinary: '00000000 00000000 00000001',
       label: 'ref1',
@@ -400,7 +384,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -415,7 +399,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: 'neki',
@@ -430,7 +414,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '1B0000  ',
       rawCodeBinary: '00011011 00000000 00000000',
       label: '',
@@ -445,7 +429,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00003',
+      addressHex: 3,
       rawCodeHex: '1B0000  ',
       rawCodeBinary: '00011011 00000000 00000000',
       label: '',
@@ -460,7 +444,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00006',
+      addressHex: 6,
       rawCodeHex: '4F0000  ',
       rawCodeBinary: '01001111 00000000 00000000',
       label: '',
@@ -475,7 +459,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -490,7 +474,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: 'data',
@@ -505,7 +489,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -520,7 +504,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -535,7 +519,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '',
+      addressHex: 0,
       rawCodeHex: '',
       rawCodeBinary: '',
       label: '',
@@ -550,7 +534,7 @@ const dummyJsonData = {
       isCommentRow: true,
     },
     {
-      addressHex: '00000',
+      addressHex: 0,
       rawCodeHex: '000000  ',
       rawCodeBinary: '00000000 00000000 00000000',
       label: 'data1',
@@ -565,7 +549,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00003',
+      addressHex: 3,
       rawCodeHex: '000000  ',
       rawCodeBinary: '00000000 00000000 00000000',
       label: 'data2',
@@ -580,7 +564,7 @@ const dummyJsonData = {
       isCommentRow: false,
     },
     {
-      addressHex: '00012',
+      addressHex: 18,
       rawCodeHex: '        ',
       rawCodeBinary: '',
       label: '',
@@ -594,23 +578,41 @@ const dummyJsonData = {
       nameWidth: 6,
       isCommentRow: false,
     },
-  ],
+  ] as ListFileRow[],
 };
 
 export default function ListContainer() {
   const { tabs, activeTabIdx } = useEditorTabStore();
+  const { listFile, setListFile } = useListFileStore();
   const activeTab = tabs[activeTabIdx];
-  const [listViewData, setListViewData] = useState<ListViewItem[]>([]);
   const [breakpoints, setBreakpoints] = useState<Set<number>>(new Set());
-
+  /*
   useEffect(() => {
-    if (activeTab?.filePath?.endsWith('.lst')) {
-      setListViewData(dummyJsonData.listViewArray);
-    } else {
-      setListViewData([]);
-    }
-  }, [activeTab]);
+    const fetchFileData = async () => {
+      if (activeTab?.filePath?.endsWith('.lst')) {
+        try {
+          // 백엔드(Electron Main Process)에 파일 내용 요청
+          const result = await window.electronAPI.readFile(activeTab.filePath);
+          if (result.success) {
+            // 성공적으로 데이터를 받으면, 스토어에 저장합니다.
+            setListFile(result.data as ListFileRow[]);
+          } else {
+            console.error('Failed to read .lst file:', result.message);
+            setListFile([]);
+          }
+        } catch (error) {
+          console.error('Error fetching file data:', error);
+          setListFile([]);
+        }
+      } else {
+        // .lst 파일이 아니면 스토어 데이터를 초기화합니다.
+        setListFile([]);
+      }
+    };
 
+    fetchFileData();
+  }, [activeTab, setListFile]);
+*/
   const toggleBreakpoint = (index: number) => {
     setBreakpoints(prev => {
       const newBreakpoints = new Set(prev);
@@ -627,7 +629,7 @@ export default function ListContainer() {
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
       <List
-        data={listViewData}
+        data={listFile} // 스토어에서 가져온 listFile을 사용합니다.
         activeTabTitle={activeTab?.title}
         breakpoints={breakpoints}
         onBreakpointToggle={toggleBreakpoint}

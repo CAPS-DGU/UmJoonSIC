@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface ListFileRow {
+export interface ListFileRow {
   addressHex: number;
   rawCodeHex: string;
   rawCodeBinary: string;
