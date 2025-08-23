@@ -1,33 +1,27 @@
 import { useMemoryViewStore } from '@/stores/MemoryViewStore';
 import type { MemoryNodeData, MemoryNodeStatus, MemoryLabel } from '@/types/debug/memoryData';
 
-function getAddressRange({ start, end }: { start: number; end: number }, step = 8): number[] {
-  const addresses: number[] = [];
-  for (let addr = start; addr <= end; addr += step) {
-    addresses.push(addr);
-  }
-  return addresses;
-}
-
 export default function MemoryViewer() {
-  const memoryRange = useMemoryViewStore(state => state.memoryRange);
-  // 여기서는 store 대신 MOCK 데이터 사용 (디버깅용)
-  const memoryData = MOCK_MEMORY_DATA;
-  const range = { start: 1000, end: 1060 };
-  const addresses = getAddressRange(range, 8);
+  const memoryRange = { start: 1010, end: 1060 }; // useMemoryViewStore(state => state.memoryRange);
+  const memoryValues = MOCK_MEMORY_DATA; // useMemoryViewStore(state => state.memoryValues);
+  const labels = MOCK_LABELS; //useMemoryViewStore(state => state.labels);
+  const ROW_SIZE = 8;
 
-  // 8개씩 묶어서 행(row) 만들기
+  // 8바이트 단위로 묶기
   const rows: MemoryNodeData[][] = [];
-  for (let i = 0; i < memoryData.length; i += 8) {
-    rows.push(memoryData.slice(i, i + 8));
+  for (let i = 0; i < memoryValues.length; i += ROW_SIZE) {
+    rows.push(memoryValues.slice(i, i + ROW_SIZE));
   }
+  const addresses = Array.from({ length: rows.length }, (_, i) => memoryRange.start + i * ROW_SIZE);
 
   return (
     <section className="flex flex-col px-2">
       <h2 className="text-lg font-bold">메모리 뷰어</h2>
       <div className="w-full mt-2 flex justify-start items-start px-2">
         <KeyColumn addresses={addresses} />
-        <ValueColumn rows={rows} />
+        <div className="flex flex-col">
+          <ValueColumn rows={rows} labels={labels} rowStartAddresses={addresses} />
+        </div>
       </div>
     </section>
   );
@@ -37,7 +31,7 @@ function KeyColumn({ addresses }: { addresses: number[] }) {
   return (
     <div className="flex flex-col gap-2 pr-4 border-r border-gray-300">
       {addresses.map(addr => (
-        <p key={addr} className="text-base font-normal font-mono">
+        <p key={addr} className="text-sm font-normal font-mono mb-2">
           {addr.toString(16).toUpperCase().padStart(4, '0')}
         </p>
       ))}
@@ -45,21 +39,77 @@ function KeyColumn({ addresses }: { addresses: number[] }) {
   );
 }
 
-function ValueColumn({ rows }: { rows: MemoryNodeData[][] }) {
+function ValueColumn({
+  rows,
+  labels,
+  rowStartAddresses,
+}: {
+  rows: MemoryNodeData[][];
+  labels: MemoryLabel[];
+  rowStartAddresses: number[];
+}) {
   return (
-    <div className="flex flex-col gap-2 pl-4">
-      {rows.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex gap-2">
-          {row.map((nodeData, nodeIndex) => (
-            <MemoryNode key={nodeIndex} val={nodeData.value} status={nodeData.status} />
-          ))}
-        </div>
-      ))}
+    <div className="flex flex-col gap-2 pl-4 relative">
+      {rows.map((row, rowIndex) => {
+        const rowStartIndex = rowStartAddresses[rowIndex];
+        const rowEndIndex = rowStartIndex + row.length - 1;
+
+        // 이 행에 포함되는 라벨만
+        const rowLabels = labels
+          .filter(l => l.end >= rowStartIndex && l.start <= rowEndIndex)
+          .map(l => ({
+            ...l,
+            start: Math.max(l.start, rowStartIndex) - rowStartIndex,
+            end: Math.min(l.end, rowEndIndex) - rowStartIndex,
+          }));
+
+        return (
+          <div key={rowIndex} className="flex flex-col space-y-1 relative">
+            {/* 값 */}
+            <div className="flex relative mb-2">
+              {row.map((node, idx) => {
+                const label = rowLabels.find(l => idx >= l.start && idx <= l.end);
+                return (
+                  <MemoryNode
+                    key={idx}
+                    val={node.value}
+                    status={node.status}
+                    labelHighlight={!!label}
+                  />
+                );
+              })}
+
+              {/* 라벨 밑줄 & 이름 */}
+              {rowLabels.map((label, idx) => {
+                const left = label.start * 24; // w-6 + gap
+                const width = (label.end - label.start + 1) * 24;
+                return (
+                  <div
+                    key={idx}
+                    className="absolute -bottom-4 border-t-2 border-orange-500 text-xs text-orange-500 text-center font-mono"
+                    style={{ left, width }}
+                  >
+                    {label.name}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function MemoryNode({ val, status }: { val: string; status?: MemoryNodeStatus }) {
+function MemoryNode({
+  val,
+  status,
+  labelHighlight,
+}: {
+  val: string;
+  status?: MemoryNodeStatus;
+  labelHighlight?: boolean;
+}) {
   const statusClasses = {
     normal: '',
     highlighted: 'bg-yellow-200',
@@ -67,91 +117,24 @@ function MemoryNode({ val, status }: { val: string; status?: MemoryNodeStatus })
   };
 
   return (
-    <span className={`font-mono text-sm px-1 w-6 text-center ${statusClasses[status || 'normal']}`}>
+    <span
+      className={`font-mono text-sm px-1 w-6 text-center ${
+        statusClasses[status || 'normal']
+      } ${labelHighlight ? '!text-orange-500 font-semibold' : ''}`}
+    >
       {val}
     </span>
   );
 }
 
-const MOCK_MEMORY_DATA: MemoryNodeData[] = [
-  { value: '48', status: 'highlighted' },
-  { value: '65', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6F', status: 'red bold' },
-  { value: '2C', status: 'normal' },
-  { value: '20', status: 'normal' },
-  { value: '41', status: 'normal' },
+const MOCK_MEMORY_DATA: MemoryNodeData[] = Array.from({ length: 64 }, (_, i) => ({
+  value: (i + 0x20).toString(16).toUpperCase().padStart(2, '0'),
+  status: i % 5 === 0 ? 'highlighted' : 'normal',
+}));
 
-  { value: '20', status: 'normal' },
-  { value: '4C', status: 'normal' },
-  { value: '65', status: 'normal' },
-  { value: '74', status: 'normal' },
-  { value: '27', status: 'normal' },
-  { value: '73', status: 'normal' },
-  { value: '20', status: 'normal' },
-  { value: '68', status: 'normal' },
-
-  { value: '74', status: 'normal' },
-  { value: '68', status: 'normal' },
-  { value: '69', status: 'normal' },
-  { value: '73', status: 'normal' },
-  { value: '2E', status: 'normal' },
-  { value: '00', status: 'normal' },
-  { value: '36', status: 'normal' },
-  { value: '5F', status: 'normal' },
-
-  { value: '48', status: 'normal' },
-  { value: '65', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6F', status: 'highlighted' },
-  { value: '2C', status: 'highlighted' },
-  { value: '20', status: 'highlighted' },
-  { value: '41', status: 'highlighted' },
-
-  { value: '20', status: 'normal' },
-  { value: '4C', status: 'normal' },
-  { value: '65', status: 'normal' },
-  { value: '74', status: 'normal' },
-  { value: '27', status: 'normal' },
-  { value: '73', status: 'normal' },
-  { value: '20', status: 'normal' },
-  { value: '68', status: 'normal' },
-
-  { value: '74', status: 'red bold' },
-  { value: '68', status: 'red bold' },
-  { value: '69', status: 'red bold' },
-  { value: '73', status: 'normal' },
-  { value: '2E', status: 'normal' },
-  { value: '00', status: 'normal' },
-  { value: '36', status: 'normal' },
-  { value: '5F', status: 'normal' },
-
-  { value: '48', status: 'normal' },
-  { value: '65', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6C', status: 'normal' },
-  { value: '6F', status: 'normal' },
-  { value: '2C', status: 'normal' },
-  { value: '20', status: 'normal' },
-  { value: '41', status: 'normal' },
-
-  { value: '20', status: 'normal' },
-  { value: '4C', status: 'normal' },
-  { value: '65', status: 'normal' },
-  { value: '74', status: 'normal' },
-  { value: '27', status: 'normal' },
-  { value: '73', status: 'normal' },
-  { value: '20', status: 'normal' },
-  { value: '68', status: 'normal' },
-
-  { value: '74', status: 'normal' },
-  { value: '68', status: 'normal' },
-  { value: '69', status: 'normal' },
-  { value: '73', status: 'normal' },
-  { value: '2E', status: 'normal' },
-  { value: '00', status: 'normal' },
-  { value: '36', status: 'normal' },
-  { value: '5F', status: 'normal' },
+const MOCK_LABELS: MemoryLabel[] = [
+  { start: 1012, end: 1015, name: 'playerHP' }, // 4 bytes
+  { start: 1020, end: 1025, name: 'score' }, // 6 bytes
+  { start: 1030, end: 1037, name: 'inventory' }, // 8 bytes
+  { start: 1048, end: 1052, name: 'position' }, // 5 bytes. 다음 행에 걸쳐 있음
 ];
