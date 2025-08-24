@@ -9,6 +9,15 @@ declare global {
       openProject: () => Promise<{ success: boolean; data?: { name: string; path: string; settings: { asm: string[]; main: string } }; message?: string }>;
       readFile: (filePath: string) => Promise<{ success: boolean; data?: string; message?: string }>;
       saveFile: (filePath: string, content: string) => Promise<{ success: boolean; message?: string }>;
+            loadAsm: (
+        port: number,
+        filePath: string
+      ) => Promise<{
+        success: boolean;
+        status?: number;
+        data?: any;
+        message?: string;
+      }>;
     };
   }
 }

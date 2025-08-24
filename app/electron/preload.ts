@@ -35,6 +35,12 @@ const api = {
   }> => {
     return ipcRenderer.invoke('openProject');
   },
+    loadAsm: (port: number, filePath: string): IpcApiResponse<{
+    status?: number;
+    data?: any;
+  }> => {
+    return ipcRenderer.invoke('loadAsm', { port, filePath });
+  },
 };
 
 // 새 프로젝트 생성 이벤트 리스너

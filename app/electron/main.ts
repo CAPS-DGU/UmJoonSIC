@@ -1,9 +1,9 @@
-// electron/main.ts
-import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, shell, BrowserWindow, Menu } from 'electron';
 const path = require('node:path');
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';
 import { menuList } from './menu';
 import './ipc/file';
+import './ipc/server';
 
 function createWindow(): void {
   // Create the browser window.
@@ -13,7 +13,7 @@ function createWindow(): void {
     height: 640,
     show: false,
     autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? {} : {}), //app-icon
+    ...(process.platform === 'linux' ? {} : {}), // app-icon
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -25,7 +25,6 @@ function createWindow(): void {
     width: 500,
     height: 300,
     autoHideMenuBar: true,
-    // transparent: true,
     frame: false,
     resizable: false,
     alwaysOnTop: true,
@@ -48,7 +47,7 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
-  // HMR for renderer base on electron-vite cli.
+  // HMR for renderer based on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);

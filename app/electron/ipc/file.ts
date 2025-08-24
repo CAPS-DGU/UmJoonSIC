@@ -98,31 +98,22 @@ async function createNewProjectInteractive() {
 
     // Required layout:
     // <root>/main.asm
-    // <root>/additional/sub.asm
     // <root>/.out/
     // <root>/project.sic
-    const additionalDir = pathModule.join(projectPath, 'additional');
     const outDir = pathModule.join(projectPath, '.out');
-    ensureDir(additionalDir);
     ensureDir(outDir);
 
     const mainAsmPath = pathModule.join(projectPath, 'main.asm');
-    const subAsmPath = pathModule.join(additionalDir, 'sub.asm');
 
     fs.writeFileSync(
       mainAsmPath,
       `; main.asm (root)\n; put your assembly here\n`,
       'utf8'
     );
-    fs.writeFileSync(
-      subAsmPath,
-      `; additional/sub.asm\n; sample file (you can delete later)\n`,
-      'utf8'
-    );
 
     // NOTE: asm entries are RELATIVE; main has NO extension
     const sic = {
-      asm: ['main.asm', 'additional/sub.asm'],
+      asm: ['main.asm'],
       main: 'main',
     };
     fs.writeFileSync(pathModule.join(projectPath, 'project.sic'), JSON.stringify(sic, null, 2), 'utf8');
