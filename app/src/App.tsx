@@ -16,7 +16,10 @@ import Resizer from './components/common/Resizer';
 const STATUS_BAR_HEIGHT = 40;
 
 function App() {
-  const { createNewProject, projectName } = useProjectStore();
+  const createNewProject = useProjectStore(s => s.createNewProject);
+  const openProject = useProjectStore(s => s.openProject);
+  const projectName = useProjectStore(s => s.projectName);
+
   const { tabs, activeTabIdx } = useEditorTabStore();
 
   const [panelHeight, setPanelHeight] = useState(0);
@@ -35,6 +38,16 @@ function App() {
       window.removeEventListener('create-new-project', handleCreateNewProject);
     };
   }, [createNewProject]);
+
+    useEffect(() => {
+    const handleOpenProject = () => {
+      openProject();
+    };
+    window.addEventListener('open-project', handleOpenProject);
+    return () => {
+      window.removeEventListener('open-project', handleOpenProject);
+    };
+  }, [openProject]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

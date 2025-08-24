@@ -89,11 +89,7 @@ export default function SideBar() {
 
   // Add the new file to the dummy data
   const dummyFileTree = [
-    ...fileTree,
-    'src/',
-    'dummy-folder/',
-    'dummy-folder/dummy-file.txt',
-    'test.lst',
+    ...fileTree
   ];
 
   const fileTreeStructure: FileStructure[] = convertToFileStructure(dummyFileTree);

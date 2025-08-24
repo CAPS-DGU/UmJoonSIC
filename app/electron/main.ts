@@ -1,3 +1,4 @@
+// electron/main.ts
 import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron';
 const path = require('node:path');
 import { electronApp, optimizer, is } from '@electron-toolkit/utils';

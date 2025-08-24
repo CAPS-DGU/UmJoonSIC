@@ -1,98 +1,138 @@
+// electron/ipc/file.ts
 import { ipcMain, dialog } from 'electron';
 import * as fs from 'fs';
 import * as pathModule from 'path';
 
-// 재귀적으로 모든 파일과 폴더를 상대경로로 가져오는 함수
-function getAllFilesRecursive(dirPath: string, basePath: string): string[] {
-  const files: string[] = [];
-
-  try {
-    const items = fs.readdirSync(dirPath);
-
-    for (const item of items) {
-      const fullPath = pathModule.join(dirPath, item);
-      const relativePath = pathModule.relative(basePath, fullPath);
-      const stat = fs.statSync(fullPath);
-
-      if (stat.isDirectory()) {
-        // 디렉토리인 경우 경로 끝에 '/'를 붙여서 추가
-        files.push(relativePath + '/'); // 재귀적으로 하위 파일들도 가져오기
-        const subFiles = getAllFilesRecursive(fullPath, basePath);
-        files.push(...subFiles);
-      } else {
-        // 파일인 경우 상대경로로 추가
-        files.push(relativePath);
-      }
-    } // 더미데이터로 폴더와 파일 추가
-
-    if (dirPath === basePath) {
-      files.push('dummy-folder/');
-      files.push('dummy-folder/dummy-file.txt');
-    }
-  } catch (error) {
-    console.error(`Error reading directory ${dirPath}:`, error);
-  }
-
-  return files;
+function ensureDir(p: string) {
+  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
-// 새 프로젝트 생성 함수
-async function createNewProject(projectPath: string, projectName: string) {
+function readProjectSic(projectRoot: string): { asm: string[]; main: string } | null {
+  const sicPath = pathModule.join(projectRoot, 'project.sic');
+  if (!fs.existsSync(sicPath)) return null;
   try {
-    // 프로젝트 디렉토리 생성
-    if (!fs.existsSync(projectPath)) {
-      fs.mkdirSync(projectPath, { recursive: true });
-    } // src/main.asm 파일 생성
+    const raw = fs.readFileSync(sicPath, 'utf8');
+    const json = JSON.parse(raw);
+    const asm: string[] = Array.isArray(json.asm) ? json.asm : [];
+    const main: string = typeof json.main === 'string' ? json.main : '';
+    return { asm, main };
+  } catch {
+    return null;
+  }
+}
 
-    const mainAsmPath = pathModule.join(projectPath, 'src', 'main.asm');
-    const mainAsmDir = pathModule.dirname(mainAsmPath);
-    if (!fs.existsSync(mainAsmDir)) {
-      fs.mkdirSync(mainAsmDir, { recursive: true });
+function listOutDirRelative(projectRoot: string): string[] {
+  const outRoot = pathModule.join(projectRoot, '.out');
+  const rels: string[] = [];
+  if (!fs.existsSync(outRoot)) return rels;
+
+  const walk = (abs: string) => {
+    const rel = pathModule.relative(projectRoot, abs);
+    const stat = fs.statSync(abs);
+    if (stat.isDirectory()) {
+      rels.push(rel.endsWith('/') ? rel : rel + '/');
+      for (const name of fs.readdirSync(abs)) {
+        walk(pathModule.join(abs, name));
+      }
+    } else {
+      rels.push(rel);
     }
+  };
 
-    const mainAsmContent = `. Tests: base-relative, directives BASE, NOBASE
+  // always include directory node even if empty
+  rels.push('.out/');
+  for (const name of fs.readdirSync(outRoot)) {
+    walk(pathModule.join(outRoot, name));
+  }
+  return rels;
+}
 
-base  START 0xA000
+// Build a tree-ish flat list that includes intermediate folders for the asm files
+function buildAsmTreeEntries(projectRoot: string, asmRelFiles: string[]): string[] {
+  const set = new Set<string>();
+  for (const rel of asmRelFiles) {
+    const norm = rel.replace(/^\.?\/*/, ''); // normalize: remove leading ./ or /
+    const parts = norm.split('/');
+    // add intermediate dirs
+    let acc = '';
+    for (let i = 0; i < parts.length - 1; i++) {
+      acc = acc ? pathModule.join(acc, parts[i]) : parts[i];
+      set.add(acc + '/');
+    }
+    // add file
+    set.add(norm);
+  }
+  return Array.from(set);
+}
 
-. load B register and notify assembler
-    +LDB  #b
-        BASE  b
+// NEW: createNewProject now asks parent dir AND project name, then creates <parent>/<name>/*
+async function createNewProjectInteractive() {
+  // 1) Ask for parent directory
+  const parentPick = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Choose parent folder for the new project',
+  });
+  if (parentPick.canceled || parentPick.filePaths.length === 0) {
+    return { success: false, message: 'Project creation canceled.' };
+  }
+  const parentDir = parentPick.filePaths[0];
 
-        LDA   #b      base-relative addressing: (B)+0
-        LDA   #b      but pc-relative addressing prefered: (PC)+2047
-        RESB    2047
-b       BYTE    C'FOO'         b displaced by 2048 bytes
+  // 2) Ask for project name (using a save dialog to capture a name as a path)
+  const savePick = await dialog.showSaveDialog({
+    title: 'Enter project name',
+    buttonLabel: 'Create Project',
+    defaultPath: pathModule.join(parentDir, 'NewProject'),
+    properties: ['showOverwriteConfirmation'],
+  });
+  if (savePick.canceled || !savePick.filePath) {
+    return { success: false, message: 'Project name input canceled.' };
+  }
 
-. ********** other **********
-        LDA   #c      base-relative (since c-b < 4096)
-        NOBASE
-       +LDA   #c      direct extended, LDA #c would fail here
-        RESB    2048
-c       BYTE    C'BAR'
-`;
+  // Treat the chosen filePath as the project folder path
+  const projectPath = savePick.filePath;
+  const projectName = pathModule.basename(projectPath);
 
-    fs.writeFileSync(mainAsmPath, mainAsmContent); // project.sic 파일 생성
+  try {
+    // Ensure project root
+    ensureDir(projectPath);
 
-    const projectSicPath = pathModule.join(projectPath, 'project.sic');
-    const projectSicContent = `{
-  "asm": ["main.asm"],
-  "main": "main.asm"
-}`;
+    // Required layout:
+    // <root>/main.asm
+    // <root>/additional/sub.asm
+    // <root>/.out/
+    // <root>/project.sic
+    const additionalDir = pathModule.join(projectPath, 'additional');
+    const outDir = pathModule.join(projectPath, '.out');
+    ensureDir(additionalDir);
+    ensureDir(outDir);
 
-    fs.writeFileSync(projectSicPath, projectSicContent); // test.lst 파일 생성
+    const mainAsmPath = pathModule.join(projectPath, 'main.asm');
+    const subAsmPath = pathModule.join(additionalDir, 'sub.asm');
 
-    const testLstPath = pathModule.join(projectPath, 'test.lst');
-    fs.writeFileSync(testLstPath, ''); // 빈 파일로 생성
+    fs.writeFileSync(
+      mainAsmPath,
+      `; main.asm (root)\n; put your assembly here\n`,
+      'utf8'
+    );
+    fs.writeFileSync(
+      subAsmPath,
+      `; additional/sub.asm\n; sample file (you can delete later)\n`,
+      'utf8'
+    );
+
+    // NOTE: asm entries are RELATIVE; main has NO extension
+    const sic = {
+      asm: ['main.asm', 'additional/sub.asm'],
+      main: 'main',
+    };
+    fs.writeFileSync(pathModule.join(projectPath, 'project.sic'), JSON.stringify(sic, null, 2), 'utf8');
 
     return {
       success: true,
       data: {
         name: projectName,
         path: projectPath,
-        settings: {
-          asm: ['src/main.asm'],
-          main: 'src/main.asm',
-        },
+        settings: sic,
       },
     };
   } catch (error) {
@@ -103,16 +143,64 @@ c       BYTE    C'BAR'
   }
 }
 
-ipcMain.handle('getFileList', async (event, dirPath: string) => {
+// IPC: returns ONLY files under project.sic "asm", plus .out/ content; includes folder nodes
+ipcMain.handle('getFileList', async (_event, dirPath: string) => {
   try {
-    // 절대경로로 변환
-    const absolutePath = pathModule.resolve(dirPath); // 재귀적으로 모든 파일 가져오기
+    const projectRoot = pathModule.resolve(dirPath);
+    const sic = readProjectSic(projectRoot);
+    const asmRel = sic?.asm ?? [];
 
-    const allFiles = getAllFilesRecursive(absolutePath, absolutePath);
+    const asmEntries = buildAsmTreeEntries(projectRoot, asmRel);
+    const outEntries = listOutDirRelative(projectRoot);
+
+    // final list: asm structure + .out (constant behavior)
+    return {
+      success: true,
+      data: [...asmEntries, ...outEntries],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+// IPC: create new project (interactive, asks for parent dir + name)
+ipcMain.handle('createNewProject', async () => {
+  return await createNewProjectInteractive();
+});
+
+// IPC: open existing project by picking a .sic file and loading it
+ipcMain.handle('openProject', async () => {
+  try {
+    const pick = await dialog.showOpenDialog({
+      title: 'Open project (.sic)',
+      properties: ['openFile'],
+      filters: [{ name: 'SIC Project', extensions: ['sic'] }],
+    });
+    if (pick.canceled || pick.filePaths.length === 0) {
+      return { success: false, message: 'Open project canceled.' };
+    }
+
+    const sicPath = pick.filePaths[0];
+    const projectRoot = pathModule.dirname(sicPath);
+    const projectName = pathModule.basename(projectRoot);
+
+    const sicRaw = fs.readFileSync(sicPath, 'utf8');
+    const sic = JSON.parse(sicRaw);
+
+    // Normalize fields
+    const asm: string[] = Array.isArray(sic.asm) ? sic.asm : [];
+    const main: string = typeof sic.main === 'string' ? sic.main : '';
 
     return {
       success: true,
-      data: allFiles,
+      data: {
+        name: projectName,
+        path: projectRoot,
+        settings: { asm, main },
+      },
     };
   } catch (error) {
     return {
@@ -122,83 +210,30 @@ ipcMain.handle('getFileList', async (event, dirPath: string) => {
   }
 });
 
-ipcMain.handle('createNewProject', async event => {
-  try {
-    // 폴더 선택 다이얼로그 표시
-    const result = await dialog.showOpenDialog({
-      properties: ['openDirectory', 'createDirectory'],
-      title: '새 프로젝트 폴더 선택',
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-      return {
-        success: false,
-        message: '폴더 선택이 취소되었습니다.',
-      };
-    }
-
-    const projectPath = result.filePaths[0];
-    const projectName = pathModule.basename(projectPath); // 새 프로젝트 생성
-
-    const createResult = await createNewProject(projectPath, projectName);
-
-    if (createResult.success) {
-      return createResult;
-    } else {
-      return {
-        success: false,
-        message: createResult.message,
-      };
-    }
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-});
-
-ipcMain.handle('readFile', async (event, filePath: string) => {
+ipcMain.handle('readFile', async (_event, filePath: string) => {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    return {
-      success: true,
-      data: content,
-    };
+    return { success: true, data: content };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
   }
 });
 
-ipcMain.handle('saveFile', async (event, filePath: string, content: string) => {
+ipcMain.handle('saveFile', async (_event, filePath: string, content: string) => {
   try {
     fs.writeFileSync(filePath, content);
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
   }
 });
 
-// 새 폴더를 만드는 핸들러
-ipcMain.handle('createFolder', async (event, parentPath: string, folderName: string) => {
+ipcMain.handle('createFolder', async (_event, parentPath: string, folderName: string) => {
   try {
     const fullPath = pathModule.join(parentPath, folderName);
     fs.mkdirSync(fullPath, { recursive: true });
-    return {
-      success: true,
-    };
+    return { success: true };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
   }
 });

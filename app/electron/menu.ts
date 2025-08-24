@@ -1,3 +1,4 @@
+// electron/menu.ts
 import { shell } from 'electron';
 
 export const menuList = [
@@ -31,7 +32,11 @@ export const menuList = [
       {
         label: 'Open Project',
         click: () => {
-          console.log('Open Project');
+          const { BrowserWindow } = require('electron');
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((window: any) => {
+            window.webContents.send('open-project');
+          });
         },
       },
       {
