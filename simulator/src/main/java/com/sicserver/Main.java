@@ -19,6 +19,14 @@ import com.sicserver.api.Simulation;
  * - Numbers that represent addresses may be decimal or hex strings like `"0x1000"`.
  * - On malformed input, you get `{ ok:false, message:"..." }`.
  *
+ * ### Server startup
+ * - By default the server listens on **127.0.0.1:9090**.
+ * - You can override the port by passing it as the first argument:
+ *   ```bash
+ *   java -jar simulator.jar 8080   # runs on port 8080
+ *   java -jar simulator.jar        # runs on default port 9090
+ *   ```
+ *
  * ---
  * ## Endpoints
  *
@@ -156,9 +164,18 @@ public class Main {
     static final class MemoryReq { Object addr; Object start; Object end; }
 
     public static void main(String[] args) {
+        int portNum = 9090; // default
+        if (args != null && args.length > 0) {
+            try {
+                portNum = Integer.parseInt(args[0]);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid port argument \"" + args[0] + "\", using default " + portNum);
+            }
+        }
+
         ipAddress("127.0.0.1");
-        port(8080);
-        System.out.println("Server running on http://127.0.0.1:8080");
+        port(portNum);
+        System.out.println("Server running on http://127.0.0.1:" + portNum);
 
         // Global response type
         after((req, res) -> res.type("application/json; charset=UTF-8"));
