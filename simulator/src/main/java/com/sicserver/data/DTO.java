@@ -17,6 +17,21 @@ public final class DTO {
     private DTO() {} // no instances
 
     /* =========================
+     * Registers
+     * ========================= */
+    public static final class Registers {
+        public int A;
+        public int X;
+        public int L;
+        public int S;
+        public int T;
+        public int B;
+        public int SW;
+        public int PC;
+        public String F; // keep as String, same as /step
+    }
+
+    /* =========================
      * Errors
      * ========================= */
     public static final class CompileError {
@@ -69,6 +84,7 @@ public final class DTO {
         public boolean ok;                 // true iff all files produced a listing and linking (if any) succeeded
         public String message;             // optional human-readable summary
         public List<FileLoadResult> files; // per-file outcomes
+        public Registers registers;
     }
 
     /* =========================

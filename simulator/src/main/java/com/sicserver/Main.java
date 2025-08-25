@@ -69,12 +69,14 @@ import com.sicserver.api.Simulation;
  *       "compileErrors": null,
  *       "linkerError": null
  *     }
- *   ]
+ *   ],
+ *   "registers": { "A":0, "X":0, "L":0, "S":0, "T":0, "B":0, "SW":0, "PC":4096, "F":"0.0" }
  * }
  * ```
  *
  * **Notes:**
  * - Exactly one of `listing`, `compileErrors`, `linkerError` is populated per file.
+ * - `registers` is a snapshot of the machine state **after** loading (and linking, when applicable).
  * - Raw `.obj` inputs are **rejected** by the API (see error in response).
  *
  * ---

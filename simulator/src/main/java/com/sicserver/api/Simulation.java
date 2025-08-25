@@ -133,6 +133,7 @@ public class Simulation {
         if (filePaths == null || filePaths.length == 0) {
             aggregate.ok = false;
             aggregate.message = "No input files.";
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
@@ -143,6 +144,7 @@ public class Simulation {
         } catch (IOException ioe) {
             aggregate.ok = false;
             aggregate.message = "Invalid output directory: " + ioe.getMessage();
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
@@ -153,6 +155,7 @@ public class Simulation {
         } catch (IOException ioe) {
             aggregate.ok = false;
             aggregate.message = "Invalid linker output directory: " + ioe.getMessage();
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
@@ -307,6 +310,7 @@ public class Simulation {
                 }
                 aggregate.ok = false;
                 aggregate.message = "Linking failed.";
+                aggregate.registers = snapshotRegisters();
                 return gson.toJson(aggregate);
             }
         }
@@ -323,6 +327,7 @@ public class Simulation {
         if (aggregate.message == null) {
             aggregate.message = okAll ? "OK" : "Completed with errors.";
         }
+        aggregate.registers = snapshotRegisters();
         return gson.toJson(aggregate);
     }
 
@@ -449,4 +454,17 @@ public class Simulation {
         return gson.toJson(out);
     }
 
+    private Registers snapshotRegisters() {
+        Registers r = new Registers();
+        r.A  = machine.registers.getA();
+        r.X  = machine.registers.getX();
+        r.L  = machine.registers.getL();
+        r.S  = machine.registers.getS();
+        r.T  = machine.registers.getT();
+        r.B  = machine.registers.getB();
+        r.SW = machine.registers.getSW();
+        r.PC = machine.registers.getPC();
+        r.F  = String.valueOf(machine.registers.getF());
+        return r;
+    }
 }
