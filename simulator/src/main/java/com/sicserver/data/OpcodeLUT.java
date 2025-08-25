@@ -1,4 +1,4 @@
-package com.sicserver.api;
+package com.sicserver.data;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

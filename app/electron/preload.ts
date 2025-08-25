@@ -35,11 +35,20 @@ const api = {
   }> => {
     return ipcRenderer.invoke('openProject');
   },
-    loadAsm: (port: number, filePath: string): IpcApiResponse<{
+  loadAsm: (
+    port: number,
+    filePath: string,
+  ): IpcApiResponse<{
     status?: number;
     data?: any;
   }> => {
     return ipcRenderer.invoke('loadAsm', { port, filePath });
+  },
+  createNewFile: (folderPath: string, fileName: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('createNewFile', { folderPath, fileName });
+  },
+  createNewFolder: (folderPath: string, folderName: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('createNewFolder', { folderPath, folderName });
   },
 };
 
@@ -52,6 +61,11 @@ ipcRenderer.on('create-new-project', () => {
 // 프로젝트 열기 이벤트 리스너
 ipcRenderer.on('open-project', () => {
   window.dispatchEvent(new CustomEvent('open-project'));
+});
+
+// 프로젝트 닫기 이벤트 리스너
+ipcRenderer.on('close-project', () => {
+  window.dispatchEvent(new CustomEvent('close-project'));
 });
 
 // Use `contextBridge` APIs to expose Electron APIs to

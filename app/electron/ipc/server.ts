@@ -11,9 +11,7 @@ ipcMain.handle('loadAsm', async (_event, args: { port: number; filePath: string 
     });
 
     const contentType = res.headers.get('content-type') || '';
-    const body = contentType.includes('application/json')
-      ? await res.json()
-      : await res.text();
+    const body = contentType.includes('application/json') ? await res.json() : await res.text();
 
     return {
       success: res.ok,
