@@ -23,9 +23,11 @@ interface MemoryViewState {
   setMemoryRange: (memoryRange: { start: number; end: number }) => void;
   setMemoryValues: (memoryValues: MemoryNodeData[]) => void;
   setLabels: (labels: MemoryLabel[]) => void;
+  updateMemoryNode: (index: number, patch: MemoryNodeData) => void;
+  fetchMemoryValues: () => void;
 }
 
-export const useMemoryViewStore = create<MemoryViewState>(set => ({
+export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   memoryRange: {
     start: 0,
     end: 0,
@@ -41,4 +43,19 @@ export const useMemoryViewStore = create<MemoryViewState>(set => ({
       newValues[index] = { ...newValues[index], ...patch };
       return { memoryValues: newValues };
     }),
+  fetchMemoryValues: async () => {
+    const { memoryRange } = get();
+    const res = await fetch('http://localhost:9090/memory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        start: memoryRange.start,
+        end: memoryRange.end,
+      }),
+    });
+    const data = await res.json();
+    set({ memoryValues: data.values });
+  },
 }));

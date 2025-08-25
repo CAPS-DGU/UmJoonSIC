@@ -53,12 +53,12 @@ function buildAsmTreeEntries(projectRoot: string, asmRelFiles: string[]): string
   for (const rel of asmRelFiles) {
     const norm = rel.replace(/^\.?\/*/, ''); // normalize: remove leading ./ or /
     const fullPath = pathModule.join(projectRoot, norm);
-    
+
     // 실제 파일이 존재하는지 확인
     if (!fs.existsSync(fullPath)) {
       continue; // 파일이 존재하지 않으면 건너뛰기
     }
-    
+
     const parts = norm.split('/');
     // add intermediate dirs
     let acc = '';
@@ -214,10 +214,10 @@ ipcMain.handle('getFileList', async (_event, dirPath: string) => {
 
     // 실제 파일 시스템에서 .asm 파일들 찾기
     const actualAsmFiles = getAllAsmFiles(projectRoot);
-    
+
     // project.sic에 등록된 파일들과 실제 파일들을 합치고 중복 제거
     const allAsmFiles = [...new Set([...asmRel, ...actualAsmFiles])];
-    
+
     const asmEntries = buildAsmTreeEntries(projectRoot, allAsmFiles);
     const outEntries = listOutDirRelative(projectRoot);
     const sicEntries = ['project.sic'];

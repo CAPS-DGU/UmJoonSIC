@@ -65,7 +65,7 @@ function createWindow(): void {
     // jar 서버 실행 (예시)
     const javaPath = getJavaPath();
     if (javaPath) {
-      server = spawn(javaPath, ['-jar', getServerPath()]);
+      server = spawn(javaPath, ['-jar', getServerPath(), '9090']);
     } else {
       console.error('Java 경로를 찾을 수 없습니다.');
       app.quit();

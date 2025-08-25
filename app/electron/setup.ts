@@ -340,7 +340,7 @@ export function getServerPath() {
 }
 
 export async function initServer() {
-  const res = await fetch('http://localhost:8080/begin', {
+  const res = await fetch('http://localhost:9090/begin', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
