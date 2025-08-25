@@ -88,9 +88,7 @@ export default function SideBar() {
   const { tabs, addTab } = useEditorTabStore();
 
   // Add the new file to the dummy data
-  const dummyFileTree = [
-    ...fileTree
-  ];
+  const dummyFileTree = [...fileTree];
 
   const fileTreeStructure: FileStructure[] = convertToFileStructure(dummyFileTree);
 

@@ -6,6 +6,7 @@ export interface EditorTab {
   filePath: string;
   isModified: boolean;
   fileContent: string;
+  breakpoints: number[];
   isActive: boolean;
   cursor: {
     line: number;
@@ -25,6 +26,11 @@ interface EditorTabState {
   setFileContent: (idx: number, fileContent: string) => void;
   clearTabs: () => void;
   setIsModified: (idx: number, isModified: boolean) => void;
+  // Breakpoint 관련 함수들
+  addBreakpoint: (idx: number, lineNumber: number) => void;
+  removeBreakpoint: (idx: number, lineNumber: number) => void;
+  toggleBreakpoint: (idx: number, lineNumber: number) => void;
+  clearBreakpoints: (idx: number) => void;
 }
 
 const defaultTab: EditorTab = {
@@ -33,6 +39,7 @@ const defaultTab: EditorTab = {
   filePath: './main.asm',
   isModified: false,
   fileContent: 'hello',
+  breakpoints: [],
   isActive: false,
   cursor: {
     line: 0,
@@ -52,6 +59,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         return {
           tabs: state.tabs.map(tab => ({
             ...tab,
+            breakpoints: tab.breakpoints || [],
             isActive: tab.filePath === newTab.filePath ? true : false,
           })),
           activeTabIdx: newActiveTabIdx,
@@ -60,8 +68,17 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
       const newIdx = state.tabs.length;
       return {
         tabs: [
-          ...state.tabs.map(tab => ({ ...tab, isActive: false })),
-          { ...newTab, isActive: true, idx: newIdx },
+          ...state.tabs.map(tab => ({
+            ...tab,
+            breakpoints: tab.breakpoints || [],
+            isActive: false,
+          })),
+          {
+            ...newTab,
+            breakpoints: newTab.breakpoints || [],
+            isActive: true,
+            idx: newIdx,
+          },
         ],
         activeTabIdx: newIdx,
       };
@@ -121,5 +138,55 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         ...tab,
         isModified: tab.idx === idx ? isModified : tab.isModified,
       })),
+    })),
+  // Breakpoint 관련 함수들
+  addBreakpoint: (idx, lineNumber) =>
+    set(state => ({
+      tabs: state.tabs.map(tab => {
+        if (tab.idx === idx) {
+          const breakpoints = tab.breakpoints || [];
+          if (!breakpoints.includes(lineNumber)) {
+            return {
+              ...tab,
+              breakpoints: [...breakpoints, lineNumber].sort((a, b) => a - b),
+            };
+          }
+        }
+        return tab;
+      }),
+    })),
+  removeBreakpoint: (idx, lineNumber) =>
+    set(state => ({
+      tabs: state.tabs.map(tab => {
+        if (tab.idx === idx) {
+          const breakpoints = tab.breakpoints || [];
+          return {
+            ...tab,
+            breakpoints: breakpoints.filter(bp => bp !== lineNumber),
+          };
+        }
+        return tab;
+      }),
+    })),
+  toggleBreakpoint: (idx, lineNumber) => {
+    const { tabs } = get();
+    const tab = tabs.find(t => t.idx === idx);
+    if (tab && tab.breakpoints && tab.breakpoints.includes(lineNumber)) {
+      get().removeBreakpoint(idx, lineNumber);
+    } else {
+      get().addBreakpoint(idx, lineNumber);
+    }
+  },
+  clearBreakpoints: idx =>
+    set(state => ({
+      tabs: state.tabs.map(tab => {
+        if (tab.idx === idx) {
+          return {
+            ...tab,
+            breakpoints: [],
+          };
+        }
+        return tab;
+      }),
     })),
 }));

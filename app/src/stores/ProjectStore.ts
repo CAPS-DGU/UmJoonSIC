@@ -4,14 +4,29 @@ import { create } from 'zustand';
 declare global {
   interface Window {
     api: {
-      getFileList: (path: string) => Promise<{ success: boolean; data?: string[]; message?: string }>;
-      createNewProject: () => Promise<{ success: boolean; data?: { name: string; path: string; settings: { asm: string[]; main: string } }; message?: string }>;
-      openProject: () => Promise<{ success: boolean; data?: { name: string; path: string; settings: { asm: string[]; main: string } }; message?: string }>;
-      readFile: (filePath: string) => Promise<{ success: boolean; data?: string; message?: string }>;
-      saveFile: (filePath: string, content: string) => Promise<{ success: boolean; message?: string }>;
-            loadAsm: (
+      getFileList: (
+        path: string,
+      ) => Promise<{ success: boolean; data?: string[]; message?: string }>;
+      createNewProject: () => Promise<{
+        success: boolean;
+        data?: { name: string; path: string; settings: { asm: string[]; main: string } };
+        message?: string;
+      }>;
+      openProject: () => Promise<{
+        success: boolean;
+        data?: { name: string; path: string; settings: { asm: string[]; main: string } };
+        message?: string;
+      }>;
+      readFile: (
+        filePath: string,
+      ) => Promise<{ success: boolean; data?: string; message?: string }>;
+      saveFile: (
+        filePath: string,
+        content: string,
+      ) => Promise<{ success: boolean; message?: string }>;
+      loadAsm: (
         port: number,
-        filePath: string
+        filePath: string,
       ) => Promise<{
         success: boolean;
         status?: number;
@@ -32,6 +47,7 @@ interface ProjectState {
   setProject: (project: ProjectState) => void;
   createNewProject: () => void;
   openProject: () => void;
+  closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
 }
 
@@ -114,6 +130,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       .catch((error: unknown) => {
         console.error('Error opening project:', error);
       });
+  },
+
+  closeProject: () => {
+    set({
+      projectName: '',
+      projectPath: '',
+      settings: { asm: [], main: '' },
+      fileTree: [],
+    });
   },
 
   getAsmAbsolutePaths: () => {
