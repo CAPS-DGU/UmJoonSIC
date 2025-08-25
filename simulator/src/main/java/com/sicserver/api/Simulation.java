@@ -102,8 +102,28 @@ public class Simulation {
      *      - On linker failure: per-file results switch to linkerError.
      * Also writes .obj files to outputDirPath for each assembled .asm.
      * Raw .obj inputs are NOT allowed.
+     *
+     * @param filePaths       array of .asm paths to assemble
+     * @param outputDirPath   base output directory ('.' if null)
+     * @param outputName      linker output filename (e.g., "out.obj"); defaults to "out.obj" if null/blank
+     * @param mainSymbol      optional entry symbol for the linker (applied only when non-blank)
+     * @param keep            keep intermediates; default false if null
+     * @param graphical       graphical flag; default false if null
+     * @param editing         editing flag; default false if null
+     * @param force           force flag; default false if null
+     * @param verbose         verbose flag; default true if null
      */
-    public String load(String[] filePaths, String outputDirPath) {
+    public String load(
+            String[] filePaths,
+            String outputDirPath,
+            String outputName,
+            String mainSymbol,
+            Boolean keep,
+            Boolean graphical,
+            Boolean editing,
+            Boolean force,
+            Boolean verbose
+    ) {
         // keep actual Listing objects so we can relocate them after link
         Map<String, Listing> builtListings = new HashMap<>();
 
@@ -116,6 +136,7 @@ public class Simulation {
             return gson.toJson(aggregate);
         }
 
+        // Base output dir for .obj files from assembly
         File outDir = new File(outputDirPath == null ? "." : outputDirPath);
         try {
             ensureDir(outDir);
@@ -124,6 +145,21 @@ public class Simulation {
             aggregate.message = "Invalid output directory: " + ioe.getMessage();
             return gson.toJson(aggregate);
         }
+
+        // Resolve linker output directory: <outDir>/.out/linker/
+        File linkerOutDir = new File(new File(outDir, ".out"), "linker");
+        try {
+            ensureDir(linkerOutDir);
+        } catch (IOException ioe) {
+            aggregate.ok = false;
+            aggregate.message = "Invalid linker output directory: " + ioe.getMessage();
+            return gson.toJson(aggregate);
+        }
+
+        final String resolvedOutputName =
+                (outputName == null || outputName.isBlank()) ? "out.obj" : outputName;
+        final String resolvedOutputPath =
+                new File(linkerOutDir, resolvedOutputName).getAbsolutePath();
 
         boolean multi = filePaths.length > 1;
 
@@ -197,9 +233,7 @@ public class Simulation {
                     // Raw .obj inputs are not allowed in this API
                     perFile.compileErrors = new ArrayList<>();
                     CompileError ce = new CompileError();
-                    ce.row = 0;
-                    ce.col = 0;
-                    ce.message = ".obj files cannot be loaded directly; include only .asm files.";
+                    ce.row = 0; ce.col = 0; ce.message = ".obj files cannot be loaded directly; include only .asm files.";
                     ce.nonbreaking = false;
                     perFile.compileErrors.add(ce);
 
@@ -226,7 +260,21 @@ public class Simulation {
 
         if (multi && !anyCompileErrors && !generatedObjPaths.isEmpty()) {
             try {
-                Options options = new Options(); // set options if needed
+                Options options = new Options();
+                options.setOutputName(resolvedOutputName);
+                options.setOutputPath(resolvedOutputPath);
+
+                // Defaults if nulls are passed
+                options.setKeep(Boolean.TRUE.equals(keep));
+                options.setGraphical(Boolean.TRUE.equals(graphical));
+                options.setEditing(Boolean.TRUE.equals(editing));
+                options.setForce(Boolean.TRUE.equals(force));
+                options.setVerbose(verbose == null ? true : verbose);
+
+                if (mainSymbol != null && !mainSymbol.isBlank()) {
+                    options.setMain(mainSymbol);
+                }
+
                 Linker linker = new Linker(generatedObjPaths, options);
 
                 // Perform link

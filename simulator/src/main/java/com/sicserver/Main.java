@@ -37,6 +37,18 @@ import com.sicserver.api.Simulation;
  * ```json
  * {
  *   "filePaths": ["/abs/foo.asm", "/abs/bar.asm"],
+ *   "outputDir": "/abs/out",      // optional; default "."
+ *   "outputName": "out.obj",       // optional; default "out.obj"
+ *   "main": "ENTRY",               // optional; omit or null if not needed
+ *   "keep": false,                  // optional; default false
+ *   "graphical": false,             // optional; default false
+ *   "editing": false,               // optional; default false
+ *   "force": false,                 // optional; default false
+ *   "verbose": true                 // optional; default true
+ * }
+ * ```json
+ * {
+ *   "filePaths": ["/abs/foo.asm", "/abs/bar.asm"],
  *   "outputDir": "/abs/out"   // optional; default "."
  * }
  * ```
@@ -139,23 +151,14 @@ public class Main {
     }
 
     // ---------- Request DTOs ----------
-    static final class LoadReq { String[] filePaths; String outputDir; }
+    static final class LoadReq { String[] filePaths; String outputDir; String outputName; String main; Boolean keep; Boolean graphical; Boolean editing; Boolean force; Boolean verbose; }
     static final class SyntaxReq { String[] texts; String[] fileNames; }
     static final class MemoryReq { Object addr; Object start; Object end; }
 
     public static void main(String[] args) {
-        int portNum = 9090; // default
-        if (args != null && args.length > 0) {
-            try {
-                portNum = Integer.parseInt(args[0]);
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid port argument \"" + args[0] + "\", using default " + portNum);
-            }
-        }
-
         ipAddress("127.0.0.1");
-        port(portNum);
-        System.out.println("Server running on http://127.0.0.1:" + portNum);
+        port(8080);
+        System.out.println("Server running on http://127.0.0.1:8080");
 
         // Global response type
         after((req, res) -> res.type("application/json; charset=UTF-8"));
@@ -172,7 +175,18 @@ public class Main {
             LoadReq body = safeFromJson(req.body(), LoadReq.class);
             if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with filePaths (array)."));
             if (body.filePaths == null || body.filePaths.length == 0) return gson.toJson(new Msg(false, "filePaths must be a non-empty array."));
-            return SIM.load(body.filePaths, body.outputDir); // already JSON
+            // main is optional; pass through as-is (Simulation.load handles null/blank)
+            return SIM.load(
+                    body.filePaths,
+                    body.outputDir,
+                    body.outputName,
+                    body.main,
+                    body.keep,
+                    body.graphical,
+                    body.editing,
+                    body.force,
+                    body.verbose
+            ); // already JSON
         });
 
         // Syntax check (no link)
