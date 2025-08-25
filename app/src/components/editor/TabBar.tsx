@@ -15,7 +15,7 @@ export default function TabBar() {
   };
 
   return (
-    <div className="flex flex-row bg-gray-100 border-b border-gray-300 overflow-x-auto">
+    <div className="flex flex-row bg-white border-b border-gray-300 overflow-x-auto">
       {tabs.map(tab => (
         <div
           key={tab.filePath}
