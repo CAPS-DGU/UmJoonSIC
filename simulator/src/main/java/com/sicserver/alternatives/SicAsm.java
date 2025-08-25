@@ -1,16 +1,13 @@
-package com.sicserver.api;
+package com.sicserver.alternatives;
 
+import com.sicserver.data.Listing;
 import sic.asm.AsmError;
 import sic.asm.Assembler;
 import sic.asm.ErrorCatcher;
-import sic.asm.visitors.WriteProgram;
 import sic.ast.Program;
 import sic.common.Utils;
-import sic.loader.Loader;
 
 import java.io.File;
-import java.io.Reader;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 
@@ -70,10 +67,6 @@ public class SicAsm {
         return writer.toString();
     }
 
-    public String lisTest(){
-        var lis = new Listing(program);
-        return lis.toString();
-    }
     /**
      * Generates an object file string from the last successfully assembled program.
      * @return The object file content, or null if no program has been assembled.

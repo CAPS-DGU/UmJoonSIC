@@ -1,23 +1,29 @@
-package com.sicserver.api;
+package com.sicserver.data;
 
 import sic.asm.ErrorCatcher;
 import sic.asm.visitors.WriteVisitor;
-import sic.ast.Command;
-import sic.ast.Comment;
-import sic.ast.Program;
+import sic.ast.*;
 import sic.common.Conversion;
 
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class Listing extends WriteVisitor {
-
+    public String codeFileName;
     public final List<Row> rows = new ArrayList<>();
+    public HashMap<Integer, StorageSymbol> variableWatch;
+    public int startAddress;
+    public int programLength;
 
-    public Listing(Program program) {
+    public Listing(Program program, String codeFileName) {
         super(program, new ErrorCatcher(), new StringWriter());
         this.visitCommands();
+        this.variableWatch = program.getDataLabels();
+        this.startAddress = program.start();
+        this.programLength = program.section().size();
+        this.codeFileName = codeFileName;
     }
 
     // Struct-like holder
@@ -186,6 +192,76 @@ public class Listing extends WriteVisitor {
                 ""               // nixbpe
         ));
     }
+
+    public void relocate(Relocations relocations) {
+        if (relocations == null || relocations.getControlSections().isEmpty()) return;
+
+        // 1) Find this program's control section to get the relocation base
+        String sectionName = program.section().name;
+        Relocations.ControlSectionInfo match = null;
+        for (Relocations.ControlSectionInfo csi : relocations.getControlSections()) {
+            if (csi.name != null && csi.name.equalsIgnoreCase(sectionName)) {
+                match = csi;
+                break;
+            }
+        }
+        if (match == null) return; // no relocation info for this program
+
+        long base = match.start;
+
+        // 2) Relocate each listing row's address (keep comments as-is)
+        List<Row> relocatedRows = new ArrayList<>(rows.size());
+        for (Row r : rows) {
+            if (r.isCommentRow || r.addressHex == null || r.addressHex.isEmpty()) {
+                relocatedRows.add(r);
+                continue;
+            }
+            try {
+                int oldAddr = Integer.parseInt(r.addressHex, 16);
+                int newAddr = (int) (oldAddr + base);
+                String newAddrHex = String.format("%06X", newAddr);
+
+                // Recreate row with adjusted address; keep all other fields identical
+                relocatedRows.add(new Row(
+                        newAddrHex,
+                        r.rawCodeHex,
+                        r.rawCodeBinary,
+                        r.label,
+                        r.instr,
+                        r.operand,
+                        r.comment,
+                        r.labelWidth,
+                        r.nameWidth,
+                        r.isCommentRow,
+                        r.instrHex,
+                        r.instrBin,
+                        r.nixbpe
+                ));
+            } catch (NumberFormatException nfe) {
+                // If address was malformed, keep original row unchanged
+                relocatedRows.add(r);
+            }
+        }
+        rows.clear();
+        rows.addAll(relocatedRows);
+
+        // 3) Relocate variableWatch by shifting map KEYS (do NOT mutate StorageSymbol)
+        if (variableWatch != null && !variableWatch.isEmpty()) {
+            HashMap<Integer, StorageSymbol> shifted = new HashMap<>(variableWatch.size());
+            for (var e : variableWatch.entrySet()) {
+                int oldKey = e.getKey();
+                int newKey = (int) (oldKey + base);
+                // The StorageSymbol itself remains the same; its internal value is assembler-relative.
+                shifted.put(newKey, e.getValue());
+            }
+            variableWatch = shifted;
+        }
+
+        // 4) Update metadata: start address moves; program length stays the same
+        startAddress = (int) (startAddress + base);
+        // programLength unchanged
+    }
+
 
     // Concatenate all formatted lines. (We do NOT print rawCodeBinary/instrHex/instrBin/nixbpe here.)
     @Override
