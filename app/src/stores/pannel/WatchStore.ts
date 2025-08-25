@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface WatchRow {
+export interface WatchRow {
   name: string;
   address: number;
   dataType: string;
