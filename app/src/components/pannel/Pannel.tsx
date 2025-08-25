@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import WatchPannel from '@/components/pannel/WatchPannel';
 import WarningPanel from '@/components/pannel/WarningPanel';
 import Console from '@/components/pannel/Console';
 
@@ -18,7 +19,7 @@ export default function Pannel() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as typeof activeTab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`px-4 py-2 text-sm font-medium transition-colors flex justify-center items-center ${
               activeTab === tab.key
                 ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -31,6 +32,7 @@ export default function Pannel() {
 
       {/* 탭 내용 */}
       <div className="flex-1 overflow-auto">
+        {activeTab === 'watch' && <WatchPannel />}
         {activeTab === 'warnings' && <WarningPanel />}
         {activeTab === 'console' && <Console />}
       </div>
