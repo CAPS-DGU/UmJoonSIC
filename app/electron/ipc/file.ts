@@ -65,6 +65,37 @@ function buildAsmTreeEntries(projectRoot: string, asmRelFiles: string[]): string
   return Array.from(set);
 }
 
+// Get all directories in the project root (excluding .out)
+function getAllDirectories(projectRoot: string): string[] {
+  const dirs: string[] = [];
+
+  const walk = (currentPath: string, relativePath: string = '') => {
+    try {
+      const items = fs.readdirSync(currentPath);
+
+      for (const item of items) {
+        // Skip .out directory to avoid duplication
+        if (item === '.out') continue;
+
+        const fullPath = pathModule.join(currentPath, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          const relPath = relativePath ? `${relativePath}/${item}/` : `${item}/`;
+          dirs.push(relPath);
+          walk(fullPath, relPath);
+        }
+      }
+    } catch (error) {
+      // Skip directories that can't be read
+      console.warn(`Cannot read directory: ${currentPath}`, error);
+    }
+  };
+
+  walk(projectRoot);
+  return dirs;
+}
+
 // NEW: createNewProject now asks parent dir AND project name, then creates <parent>/<name>/*
 async function createNewProjectInteractive() {
   // 1) Ask for parent directory
@@ -105,18 +136,18 @@ async function createNewProjectInteractive() {
 
     const mainAsmPath = pathModule.join(projectPath, 'main.asm');
 
-    fs.writeFileSync(
-      mainAsmPath,
-      `; main.asm (root)\n; put your assembly here\n`,
-      'utf8'
-    );
+    fs.writeFileSync(mainAsmPath, `; main.asm (root)\n; put your assembly here\n`, 'utf8');
 
     // NOTE: asm entries are RELATIVE; main has NO extension
     const sic = {
       asm: ['main.asm'],
       main: 'main',
     };
-    fs.writeFileSync(pathModule.join(projectPath, 'project.sic'), JSON.stringify(sic, null, 2), 'utf8');
+    fs.writeFileSync(
+      pathModule.join(projectPath, 'project.sic'),
+      JSON.stringify(sic, null, 2),
+      'utf8',
+    );
 
     return {
       success: true,
@@ -134,7 +165,7 @@ async function createNewProjectInteractive() {
   }
 }
 
-// IPC: returns ONLY files under project.sic "asm", plus .out/ content; includes folder nodes
+// IPC: returns asm files, .out content, and all directories
 ipcMain.handle('getFileList', async (_event, dirPath: string) => {
   try {
     const projectRoot = pathModule.resolve(dirPath);
@@ -143,11 +174,17 @@ ipcMain.handle('getFileList', async (_event, dirPath: string) => {
 
     const asmEntries = buildAsmTreeEntries(projectRoot, asmRel);
     const outEntries = listOutDirRelative(projectRoot);
+    const sicEntries = ['project.sic'];
+    const allDirectories = getAllDirectories(projectRoot);
 
-    // final list: asm structure + .out (constant behavior)
+    // Combine all entries and remove duplicates
+    const allEntries = [...asmEntries, ...outEntries, ...allDirectories, ...sicEntries];
+    const uniqueEntries = [...new Set(allEntries)];
+
+    // final list: asm structure + .out + all directories
     return {
       success: true,
-      data: [...asmEntries, ...outEntries],
+      data: uniqueEntries,
     };
   } catch (error) {
     return {
@@ -219,12 +256,42 @@ ipcMain.handle('saveFile', async (_event, filePath: string, content: string) => 
   }
 });
 
-ipcMain.handle('createFolder', async (_event, parentPath: string, folderName: string) => {
-  try {
-    const fullPath = pathModule.join(parentPath, folderName);
-    fs.mkdirSync(fullPath, { recursive: true });
-    return { success: true };
-  } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
-  }
-});
+ipcMain.handle(
+  'createNewFile',
+  async (_event, { folderPath, fileName }: { folderPath: string; fileName: string }) => {
+    try {
+      const fullPath = pathModule.join(folderPath, fileName);
+
+      // 파일이 이미 존재하는지 확인
+      if (fs.existsSync(fullPath)) {
+        return { success: false, message: 'File already exists' };
+      }
+
+      // 빈 파일 생성
+      fs.writeFileSync(fullPath, '', 'utf8');
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);
+
+ipcMain.handle(
+  'createNewFolder',
+  async (_event, { folderPath, folderName }: { folderPath: string; folderName: string }) => {
+    try {
+      const fullPath = pathModule.join(folderPath, folderName);
+
+      // 폴더가 이미 존재하는지 확인
+      if (fs.existsSync(fullPath)) {
+        return { success: false, message: 'Folder already exists' };
+      }
+
+      // 폴더 생성
+      fs.mkdirSync(fullPath, { recursive: true });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);
