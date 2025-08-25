@@ -11,17 +11,19 @@ import { useRunningStore } from '@/stores/RunningStore';
 import { Redo, StepForward } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
 import { useMemoryViewStore } from '@/stores/MemoryViewStore';
+import { useWatchStore } from '@/stores/pannel/WatchStore';
 
 export default function Debug() {
   const isRunning = useRunningStore(s => s.isRunning);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
-
+  const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   const handleRun = async (time?: number) => {
     fetchLoad();
     toggleIsRunning();
     fetchMemory();
+    fetchVarMemoryValue();
   };
 
   return (
@@ -69,7 +71,7 @@ function RunningButton() {
   const stopRunning = useRunningStore(s => s.stopRunning);
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
-
+  const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   return (
     <>
       <button
@@ -83,6 +85,7 @@ function RunningButton() {
         onClick={() => {
           fetchRegisters();
           fetchMemory();
+          fetchVarMemoryValue();
         }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Step Over"

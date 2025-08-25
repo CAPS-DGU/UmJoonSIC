@@ -2,16 +2,19 @@ import { useEffect } from 'react';
 import { useWatchStore } from '@/stores/pannel/WatchStore';
 import type { WatchRow } from '@/stores/pannel/WatchStore';
 
-const toHex = (value: number) => {
-  if (typeof value !== 'number' || !Number.isInteger(value)) return '';
-  return value.toString(16).toUpperCase().padStart(2, '0');
+const toHex = (value: number[]) => {
+  if (!Array.isArray(value)) return '';
+  return value.map(v => v.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 };
 
-const toChar = (value: number) => {
-  if (typeof value !== 'number' || value < 32 || value > 126) {
-    return '.';
-  }
-  return String.fromCharCode(value);
+const toChar = (value: number[]) => {
+  if (!Array.isArray(value)) return '';
+  return value.map(v => {
+    if (v < 32 || v > 126) {
+      return '.';
+    }
+    return String.fromCharCode(v);
+  }).join(' ');
 };
 
 export default function WatchPannel() {
@@ -39,9 +42,9 @@ export default function WatchPannel() {
               {/* Using py-2 for vertical padding and no border classes */}
               <th className="py-2 font-semibold w-1/3">File</th>
               <th className="py-2 font-semibold w-1/3">Name</th>
-              <th className="py-2 font-semibold w-1/3">Address</th>
               <th className="py-2 font-semibold w-1/4">Type</th>
-              <th className="py-2 font-semibold w-1/4">Size</th>
+              <th className="py-2 font-semibold w-1/3">Address</th>
+              <th className="py-2 font-semibold w-1/4">DEC</th>
               <th className="py-2 font-semibold w-1/4">HEX</th>
               <th className="py-2 font-semibold w-1/4">CHAR</th>
             </tr>
@@ -51,16 +54,17 @@ export default function WatchPannel() {
             {watch.map(row => (
               <tr key={row.name} className="hover:bg-gray-100 dark:hover:bg-gray-800">
                 {/* Using py-1 for vertical padding and no border classes */}
-                <td className="py-1 font-mono">{row.filePath}</td>
+                <td className="py-1 font-mono">{row.filePath.split('/').pop()}</td>
                 <td className="py-1 font-mono">{row.name}</td>
+
+                <td className="py-1 font-mono">{row.dataType}</td>
                 <td className="py-1 font-mono">
                   {/* Displaying address in uppercase hexadecimal format */}
                   {'0x' + row.address.toString(16).toUpperCase()}
                 </td>
-                <td className="py-1 font-mono">{row.dataType}</td>
-                <td className="py-1 font-mono">{row.elementCount}</td>
-                <td className="py-1 font-mono">{toHex(row.address)}</td>
-                <td className="py-1 font-mono">{toChar(row.address)}</td>
+                <td className="py-1 font-mono">{parseInt(toHex(row.value ?? []).replaceAll(' ', ''), 16)}</td>
+                <td className="py-1 font-mono">{toHex(row.value ?? [])}</td>
+                <td className="py-1 font-mono">{toChar(row.value ?? [])}</td>
               </tr>
             ))}
           </tbody>
