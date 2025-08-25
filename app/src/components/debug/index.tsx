@@ -9,6 +9,7 @@ import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 import { useRunMenu } from '@/hooks/RunMenu';
 import { useRunningStore } from '@/stores/RunningStore';
+import { Redo } from 'lucide-react';
 
 export default function Debug() {
   const { run, rerun, stop } = useRunMenu();
@@ -46,14 +47,16 @@ function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<vo
   return (
     <>
       <button
-        onClick={() => handleRun(5000)}
+        onClick={() => handleRun(1000)}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="1초 타임아웃으로 실행"
       >
         <img src={TimerIcon} alt="Timer" className="w-4 h-4" />
       </button>
       <button
         onClick={() => handleRun()}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="실행"
       >
         <img src={RunIcon} alt="Run" className="w-4 h-4" />
       </button>
@@ -64,10 +67,25 @@ function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<vo
 function RunningButton({ rerun, stop }: { rerun: () => void; stop: () => void }) {
   return (
     <>
-      <button onClick={rerun} className="hover:bg-gray-100 p-2 rounded-md transition-colors">
+      <button
+        onClick={rerun}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="Step Over"
+      >
+        <Redo className="w-4 h-4" />
+      </button>
+      <button
+        onClick={rerun}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="재실행"
+      >
         <img src={ReRunIcon} alt="ReRun" className="w-4 h-4" />
       </button>
-      <button onClick={stop} className="hover:bg-gray-100 p-2 rounded-md transition-colors">
+      <button
+        onClick={stop}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="실행 중지"
+      >
         <img src={StopIcon} alt="Stop" className="w-4 h-4" />
       </button>
     </>
