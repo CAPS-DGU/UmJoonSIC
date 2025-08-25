@@ -44,6 +44,12 @@ const api = {
   }> => {
     return ipcRenderer.invoke('loadAsm', { port, filePath });
   },
+  createNewFile: (folderPath: string, fileName: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('createNewFile', { folderPath, fileName });
+  },
+  createNewFolder: (folderPath: string, folderName: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('createNewFolder', { folderPath, folderName });
+  },
 };
 
 // 새 프로젝트 생성 이벤트 리스너
