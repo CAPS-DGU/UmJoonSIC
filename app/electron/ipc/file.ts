@@ -52,6 +52,13 @@ function buildAsmTreeEntries(projectRoot: string, asmRelFiles: string[]): string
   const set = new Set<string>();
   for (const rel of asmRelFiles) {
     const norm = rel.replace(/^\.?\/*/, ''); // normalize: remove leading ./ or /
+    const fullPath = pathModule.join(projectRoot, norm);
+    
+    // 실제 파일이 존재하는지 확인
+    if (!fs.existsSync(fullPath)) {
+      continue; // 파일이 존재하지 않으면 건너뛰기
+    }
+    
     const parts = norm.split('/');
     // add intermediate dirs
     let acc = '';
@@ -94,6 +101,39 @@ function getAllDirectories(projectRoot: string): string[] {
 
   walk(projectRoot);
   return dirs;
+}
+
+// Get all .asm files in the project root (excluding .out)
+function getAllAsmFiles(projectRoot: string): string[] {
+  const asmFiles: string[] = [];
+
+  const walk = (currentPath: string, relativePath: string = '') => {
+    try {
+      const items = fs.readdirSync(currentPath);
+
+      for (const item of items) {
+        // Skip .out directory
+        if (item === '.out') continue;
+
+        const fullPath = pathModule.join(currentPath, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          const relPath = relativePath ? `${relativePath}/${item}` : item;
+          walk(fullPath, relPath);
+        } else if (item.toLowerCase().endsWith('.asm')) {
+          const relPath = relativePath ? `${relativePath}/${item}` : item;
+          asmFiles.push(relPath);
+        }
+      }
+    } catch (error) {
+      // Skip directories that can't be read
+      console.warn(`Cannot read directory: ${currentPath}`, error);
+    }
+  };
+
+  walk(projectRoot);
+  return asmFiles;
 }
 
 // NEW: createNewProject now asks parent dir AND project name, then creates <parent>/<name>/*
@@ -172,7 +212,13 @@ ipcMain.handle('getFileList', async (_event, dirPath: string) => {
     const sic = readProjectSic(projectRoot);
     const asmRel = sic?.asm ?? [];
 
-    const asmEntries = buildAsmTreeEntries(projectRoot, asmRel);
+    // 실제 파일 시스템에서 .asm 파일들 찾기
+    const actualAsmFiles = getAllAsmFiles(projectRoot);
+    
+    // project.sic에 등록된 파일들과 실제 파일들을 합치고 중복 제거
+    const allAsmFiles = [...new Set([...asmRel, ...actualAsmFiles])];
+    
+    const asmEntries = buildAsmTreeEntries(projectRoot, allAsmFiles);
     const outEntries = listOutDirRelative(projectRoot);
     const sicEntries = ['project.sic'];
     const allDirectories = getAllDirectories(projectRoot);
@@ -289,6 +335,60 @@ ipcMain.handle(
 
       // 폴더 생성
       fs.mkdirSync(fullPath, { recursive: true });
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);
+
+// 파일 삭제 IPC 핸들러
+ipcMain.handle(
+  'deleteFile',
+  async (_event, { projectPath, relativePath }: { projectPath: string; relativePath: string }) => {
+    try {
+      const fullPath = pathModule.join(projectPath, relativePath);
+
+      // 파일이 존재하는지 확인
+      if (!fs.existsSync(fullPath)) {
+        return { success: false, message: 'File does not exist' };
+      }
+
+      // 파일 삭제
+      fs.unlinkSync(fullPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);
+
+// 폴더 삭제 IPC 핸들러 (재귀적으로 모든 내용 삭제)
+ipcMain.handle(
+  'deleteFolder',
+  async (_event, { projectPath, relativePath }: { projectPath: string; relativePath: string }) => {
+    try {
+      const fullPath = pathModule.join(projectPath, relativePath);
+
+      // 폴더가 존재하는지 확인
+      if (!fs.existsSync(fullPath)) {
+        return { success: false, message: 'Folder does not exist' };
+      }
+
+      // 폴더와 그 안의 모든 내용을 재귀적으로 삭제
+      const deleteRecursive = (path: string) => {
+        if (fs.statSync(path).isDirectory()) {
+          fs.readdirSync(path).forEach(file => {
+            const curPath = pathModule.join(path, file);
+            deleteRecursive(curPath);
+          });
+          fs.rmdirSync(path);
+        } else {
+          fs.unlinkSync(path);
+        }
+      };
+
+      deleteRecursive(fullPath);
       return { success: true };
     } catch (error) {
       return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };

@@ -1,5 +1,9 @@
-import { useMemoryViewStore } from '@/stores/MemoryViewStore';
-import type { MemoryNodeData, MemoryNodeStatus, MemoryLabel } from '@/types/debug/memoryData';
+import {
+  useMemoryViewStore,
+  type MemoryNodeData,
+  type MemoryNodeStatus,
+  type MemoryLabel,
+} from '@/stores/MemoryViewStore';
 
 export default function MemoryViewer() {
   const memoryRange = { start: 1010, end: 1060 }; // useMemoryViewStore(state => state.memoryRange);
@@ -16,7 +20,7 @@ export default function MemoryViewer() {
 
   return (
     <section className="flex flex-col px-2">
-      <h2 className="text-lg font-bold">메모리 뷰어</h2>
+      <h2 className="text-md font-bold">메모리 뷰어</h2>
       <div className="w-full mt-2 flex justify-start items-start px-2">
         <KeyColumn addresses={addresses} />
         <div className="flex flex-col">

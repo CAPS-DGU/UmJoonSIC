@@ -1,50 +1,6 @@
 // src/stores/ProjectStore.ts
 import { create } from 'zustand';
 
-declare global {
-  interface Window {
-    api: {
-      getFileList: (
-        path: string,
-      ) => Promise<{ success: boolean; data?: string[]; message?: string }>;
-      createNewProject: () => Promise<{
-        success: boolean;
-        data?: { name: string; path: string; settings: { asm: string[]; main: string } };
-        message?: string;
-      }>;
-      openProject: () => Promise<{
-        success: boolean;
-        data?: { name: string; path: string; settings: { asm: string[]; main: string } };
-        message?: string;
-      }>;
-      readFile: (
-        filePath: string,
-      ) => Promise<{ success: boolean; data?: string; message?: string }>;
-      saveFile: (
-        filePath: string,
-        content: string,
-      ) => Promise<{ success: boolean; message?: string }>;
-      loadAsm: (
-        port: number,
-        filePath: string,
-      ) => Promise<{
-        success: boolean;
-        status?: number;
-        data?: any;
-        message?: string;
-      }>;
-      createNewFile: (
-        folderPath: string,
-        fileName: string,
-      ) => Promise<{ success: boolean; message?: string }>;
-      createNewFolder: (
-        folderPath: string,
-        folderName: string,
-      ) => Promise<{ success: boolean; message?: string }>;
-    };
-  }
-}
-
 interface ProjectState {
   projectName: string;
   projectPath: string;
@@ -61,7 +17,7 @@ interface ProjectState {
   closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
   addAsmFile: (filePath: string) => void;
-  saveSettings: () => Promise<{ success: boolean, message?: string }>;
+  saveSettings: () => Promise<{ success: boolean; message?: string }>;
   setSettings: (settings: { asm: string[]; main: string }) => void;
 }
 
