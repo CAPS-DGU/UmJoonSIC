@@ -2,15 +2,19 @@
 import React from 'react';
 import type { ListViewItem } from './ListContainer';
 import { List as ListIcon } from 'lucide-react';
+import { useRegisterStore } from '@/stores/RegisterStore';
 
 interface ListProps {
   data: ListViewItem[];
   activeTabTitle: string | undefined;
-  breakpoints: Set<number>;
+  breakpoints: number[];
   onBreakpointToggle: (index: number) => void;
 }
 
 export default function List({ data, activeTabTitle, breakpoints, onBreakpointToggle }: ListProps) {
+  const { PC } = useRegisterStore();
+
+
   const totalColumns = 10;
   return (
     <div className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">
@@ -32,15 +36,15 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                 Instruction
               </th>
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-24">
-                nixbpe
-              </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-24">
                 Operand
               </th>
-              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 flex-1 min-w-80">
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 flex-1 min-w-64">
                 Comment
               </th>
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-64">
+                Raw Code Binary
+              </th>
+              <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-24">
                 Instruction Binary
               </th>
               <th className="px-2 py-2 text-left text-xs font-semibold text-gray-600 w-24">
@@ -61,12 +65,15 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                   );
                 }
                 return (
-                  <tr key={index} className="whitespace-nowrap">
+                  <tr
+                    key={index}
+                    className={`whitespace-nowrap ${PC == parseInt(row.addressHex, 16) ? 'bg-blue-100' : ''}`}
+                  >
                     <td
                       className="px-2 py-1 cursor-pointer w-8"
                       onClick={() => onBreakpointToggle(index)}
                     >
-                      {breakpoints.has(index) ? (
+                      {breakpoints.includes(index) ? (
                         <div className="w-2 h-2 rounded-full bg-red-500 mx-auto"></div>
                       ) : (
                         <div className="w-2 h-2 rounded-full border border-gray-400 mx-auto"></div>
@@ -76,10 +83,10 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                     <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
                     <td className="px-2 py-1 w-24">{row.label}</td>
                     <td className="px-2 py-1 w-24">{row.instr}</td>
-                    <td className="px-2 py-1 w-24">{row.nixbpe}</td>
                     <td className="px-2 py-1 w-24">{row.operand}</td>
-                    <td className="px-2 py-1 flex-1 min-w-80">{row.comment}</td>
-                    <td className="px-2 py-1 w-64">{row.instrBin}</td>
+                    <td className="px-2 py-1 flex-1 min-w-64">{row.comment}</td>
+                    <td className="px-2 py-1 w-64">{row.rawCodeBinary}</td>
+                    <td className="px-2 py-1 w-24">{row.instrBin}</td>
                     <td className="px-2 py-1 w-24">{row.nixbpe}</td>
                   </tr>
                 );

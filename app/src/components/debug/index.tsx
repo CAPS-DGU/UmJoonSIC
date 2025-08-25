@@ -9,14 +9,17 @@ import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 import { useRunMenu } from '@/hooks/RunMenu';
 import { useRunningStore } from '@/stores/RunningStore';
-import { Redo } from 'lucide-react';
+import { Redo, StepForward } from 'lucide-react';
+import { useRegisterStore } from '@/stores/RegisterStore';
 
 export default function Debug() {
   const { run, rerun, stop } = useRunMenu();
   const isRunning = useRunningStore(s => s.isRunning);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
+  const fetchLoad = useRunningStore(s => s.fetchLoad);
 
   const handleRun = async (time?: number) => {
+    fetchLoad();
     toggleIsRunning();
     await run();
   };
@@ -65,10 +68,18 @@ function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<vo
 }
 
 function RunningButton({ rerun, stop }: { rerun: () => void; stop: () => void }) {
+  const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
   return (
     <>
       <button
         onClick={rerun}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="Continue"
+      >
+        <StepForward className="w-4 h-4" />
+      </button>
+      <button
+        onClick={fetchRegisters}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Step Over"
       >

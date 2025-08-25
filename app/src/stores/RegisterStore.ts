@@ -32,6 +32,7 @@ interface RegisterState {
   setPC: (value: number) => void;
   setF: (value: number) => void;
   setAll: (value: Register) => void;
+  fetchRegisters: () => void;
 }
 
 export const useRegisterStore = create<RegisterState>(set => ({
@@ -65,4 +66,30 @@ export const useRegisterStore = create<RegisterState>(set => ({
       PC: value.PC,
       F: value.F,
     }),
+  fetchRegisters: async () => {
+    const res = await fetch('http://localhost:9090/step', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const registers = data.registers;
+      set({
+        A: registers.A,
+        X: registers.X,
+        L: registers.L,
+        S: registers.S,
+        T: registers.T,
+        B: registers.B,
+        SW: registers.SW,
+        PC: registers.PC,
+        F: registers.F,
+      });
+    } else {
+      console.error('Failed to fetch registers');
+    }
+  },
 }));
