@@ -230,8 +230,7 @@ export async function downloadJre() {
 
 export async function downloadServer() {
   const serverPath = 'simulator.jar';
-  const serverUrl =
-    'https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v0.0.1/simulator.jar';
+  const serverUrl = 'https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v0.0.1/simulator.jar';
 
   console.log('server 다운로드');
   return downloadFile(serverPath, serverUrl);
