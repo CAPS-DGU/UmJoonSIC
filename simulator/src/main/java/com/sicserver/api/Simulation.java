@@ -11,6 +11,7 @@ import sic.asm.ErrorCatcher;
 import sic.ast.Program;
 import sic.ast.StorageSymbol;
 import sic.common.Utils;
+import sic.link.section.Section;
 import sic.loader.Loader;
 import sic.sim.Args;
 import sic.sim.Executor;
@@ -149,7 +150,7 @@ public class Simulation {
         }
 
         // Resolve linker output directory: <outDir>/.out/linker/
-        File linkerOutDir = new File(new File(outDir, ".out"), "linker");
+        File linkerOutDir = new File(outDir, "linker");
         try {
             ensureDir(linkerOutDir);
         } catch (IOException ioe) {
@@ -281,7 +282,9 @@ public class Simulation {
                 Linker linker = new Linker(generatedObjPaths, options);
 
                 // Perform link
-                linker.link();
+                Section linkedSection = linker.link();
+                sic.link.utils.Writer writer = new sic.link.utils.Writer(linkedSection, options);
+                File file = writer.write();
 
                 // Apply relocations to each Listing and refresh DTOs
                 Relocations relocs = linker.relocations; // exposed by your Linker
@@ -290,7 +293,13 @@ public class Simulation {
                         if (fr.listing != null) {
                             Listing listingObj = builtListings.get(fr.fileName);
                             if (listingObj != null) {
+                                System.out.println(fr.fileName + " BEFORE relocation");
+                                for(var row : listingObj.rows)
+                                    System.out.println(row.toString());
                                 listingObj.relocate(relocs);
+                                System.out.println(fr.fileName + " AFTER relocation");
+                                for(var row : listingObj.rows)
+                                    System.out.println(row.toString());
                                 fr.listing = listingToDTO(listingObj); // replace with relocated DTO
                             }
                         }

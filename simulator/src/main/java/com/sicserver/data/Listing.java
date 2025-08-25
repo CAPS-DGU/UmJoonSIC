@@ -6,9 +6,7 @@ import sic.ast.*;
 import sic.common.Conversion;
 
 import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class Listing extends WriteVisitor {
     public String codeFileName;
@@ -194,37 +192,173 @@ public class Listing extends WriteVisitor {
     }
 
     public void relocate(Relocations relocations) {
-        if (relocations == null || relocations.getControlSections().isEmpty()) return;
+        if (relocations == null || relocations.getControlSections() == null
+                || relocations.getControlSections().isEmpty()) {
+            return;
+        }
 
-        // 1) Find this program's control section to get the relocation base
-        String sectionName = program.section().name;
-        Relocations.ControlSectionInfo match = null;
+        // Helper
+        final java.util.function.Predicate<Row> hasHex = r ->
+                r != null && r.rawCodeHex != null && !r.rawCodeHex.trim().isEmpty();
+
+        // ---------- 0) Build name -> base map ----------
+        final Map<String, Integer> baseBySection = new HashMap<>();
         for (Relocations.ControlSectionInfo csi : relocations.getControlSections()) {
-            if (csi.name != null && csi.name.equalsIgnoreCase(sectionName)) {
-                match = csi;
-                break;
+            if (csi == null || csi.name == null) continue;
+            baseBySection.put(csi.name.trim().toLowerCase(Locale.ROOT), (int) csi.start);
+        }
+        if (baseBySection.isEmpty()) return;
+
+        // ---------- 1) First pass: detect sections & build addr->section index ----------
+        final Map<Integer, String> sectionByAsmAddress = new HashMap<>();
+        final List<Row> originalRows = new ArrayList<>(rows);
+
+        String currentSection = null;   // canonicalized
+        String firstSectionSeen = null;
+        for (Row r : originalRows) {
+            if (r != null && r.instr != null) {
+                String instr = r.instr.trim().toUpperCase(Locale.ROOT);
+                if (("START".equals(instr) || "CSECT".equals(instr)) && r.label != null && !r.label.isBlank()) {
+                    currentSection = r.label.trim().toLowerCase(Locale.ROOT);
+                    if (firstSectionSeen == null) firstSectionSeen = currentSection;
+                }
+            }
+            // Only index addresses for rows that actually carry raw hex
+            if (hasHex.test(r) && r.addressHex != null && !r.addressHex.isEmpty()) {
+                try {
+                    int asmAddr = Integer.parseInt(r.addressHex, 16);
+                    if (currentSection != null) {
+                        sectionByAsmAddress.putIfAbsent(asmAddr, currentSection);
+                    }
+                } catch (NumberFormatException ignore) { }
             }
         }
-        if (match == null) return; // no relocation info for this program
 
-        long base = match.start;
+        // Snapshot patches (may be empty)
+        final List<Relocations.PatchInfo> patches =
+                (relocations.getPatches() != null) ? relocations.getPatches() : List.of();
 
-        // 2) Relocate each listing row's address (keep comments as-is)
-        List<Row> relocatedRows = new ArrayList<>(rows.size());
-        for (Row r : rows) {
-            if (r.isCommentRow || r.addressHex == null || r.addressHex.isEmpty()) {
-                relocatedRows.add(r);
-                continue;
+        // ---------- 2) Second pass: relocate rows and apply raw-hex patches ----------
+        final List<Row> relocatedRows = new ArrayList<>(rows.size());
+        currentSection = null; // reset and track again during rewrite
+
+        for (Row r : originalRows) {
+            if (r == null) { relocatedRows.add(r); continue; }
+
+            // Track section boundaries while rewriting
+            if (r.instr != null) {
+                String instr = r.instr.trim().toUpperCase(Locale.ROOT);
+                if (("START".equals(instr) || "CSECT".equals(instr)) && r.label != null && !r.label.isBlank()) {
+                    currentSection = r.label.trim().toLowerCase(Locale.ROOT);
+                }
             }
+
+            // Comments: unchanged
+            if (r.isCommentRow) { relocatedRows.add(r); continue; }
+
+            // If row has NO raw hex, leave it unchanged — except END (we still relocate END address)
+            boolean rowHasHex = hasHex.test(r);
+            boolean isEnd = (r.instr != null && "END".equalsIgnoreCase(r.instr.trim()));
+            if (!rowHasHex && !isEnd) { relocatedRows.add(r); continue; }
+
+            // If there's no address, we can't relocate/persist patches safely
+            if (r.addressHex == null || r.addressHex.isEmpty()) { relocatedRows.add(r); continue; }
+
             try {
                 int oldAddr = Integer.parseInt(r.addressHex, 16);
-                int newAddr = (int) (oldAddr + base);
-                String newAddrHex = String.format("%06X", newAddr);
 
-                // Recreate row with adjusted address; keep all other fields identical
+                // choose base from current section, or infer from first-pass addr map
+                String sectKey = currentSection;
+                if (sectKey == null) sectKey = sectionByAsmAddress.get(oldAddr);
+
+                int base = 0;
+                if (sectKey != null) {
+                    Integer b = baseBySection.get(sectKey);
+                    if (b != null) base = b;
+                }
+
+                // SPECIAL CASE: END uses operand section base if present
+                if (isEnd) {
+                    String op = (r.operand == null) ? null : r.operand.trim();
+                    if (op != null && !op.isEmpty()) {
+                        Integer endBase = baseBySection.get(op.toLowerCase(Locale.ROOT));
+                        if (endBase != null) base = endBase;
+                    }
+                }
+
+                int absAddr = oldAddr + base;
+                String newAddrHex = String.format("%06X", absAddr);
+
+                // If row has no hex (only END hits this branch), just relocate the address and keep fields as-is
+                if (!rowHasHex) {
+                    relocatedRows.add(new Row(
+                            newAddrHex,
+                            r.rawCodeHex,     // stays blank
+                            r.rawCodeBinary,
+                            r.label,
+                            r.instr,
+                            r.operand,
+                            r.comment,
+                            r.labelWidth,
+                            r.nameWidth,
+                            r.isCommentRow,
+                            r.instrHex,
+                            r.instrBin,
+                            r.nixbpe
+                    ));
+                    continue;
+                }
+
+                // -------- Apply raw-hex patches to this row, if any overlap --------
+                String newRawHex = r.rawCodeHex;
+                String newInstrHex = r.instrHex;
+
+                if (sectKey != null && newRawHex != null && !newRawHex.isEmpty()) {
+                    final int rowNibbleStart = absAddr * 2;
+                    final int rowNibbleLen   = newRawHex.length(); // nibbles
+                    final int rowNibbleEnd   = rowNibbleStart + rowNibbleLen;
+
+                    StringBuilder rawBuilder = new StringBuilder(newRawHex);
+
+                    boolean patchInstrHex = (newInstrHex != null && newInstrHex.length() == newRawHex.length());
+                    StringBuilder instrBuilder = patchInstrHex ? new StringBuilder(newInstrHex) : null;
+
+                    for (Relocations.PatchInfo p : patches) {
+                        if (p == null) continue;
+                        if (p.sectionName == null || !p.sectionName.trim().equalsIgnoreCase(sectKey)) continue;
+
+                        final int patchNibbleStart = (int) (p.tRecordStartAddr * 2L + p.textOffsetHalfBytes);
+                        final int patchNibbleEnd   = patchNibbleStart + p.lengthHalfBytes;
+
+                        final int overlapStart = Math.max(rowNibbleStart, patchNibbleStart);
+                        final int overlapEnd   = Math.min(rowNibbleEnd,   patchNibbleEnd);
+                        if (overlapStart >= overlapEnd) continue;
+
+                        final int rowLocalStart = overlapStart - rowNibbleStart;
+                        final int rowLocalLen   = overlapEnd   - overlapStart;
+
+                        final int patchLocalStart = overlapStart - patchNibbleStart;
+
+                        if (rowLocalStart < 0 || rowLocalStart + rowLocalLen > rawBuilder.length()) continue;
+                        if (p.afterHex == null) continue;
+                        if (patchLocalStart < 0 || patchLocalStart + rowLocalLen > p.afterHex.length()) continue;
+
+                        String replacement = p.afterHex.substring(patchLocalStart, patchLocalStart + rowLocalLen);
+                        rawBuilder.replace(rowLocalStart, rowLocalStart + rowLocalLen, replacement);
+
+                        if (patchInstrHex) {
+                            instrBuilder.replace(rowLocalStart, rowLocalStart + rowLocalLen, replacement);
+                        }
+                    }
+
+                    newRawHex = rawBuilder.toString();
+                    if (patchInstrHex) newInstrHex = instrBuilder.toString();
+                }
+
+                // Recreate row with adjusted address + patched hex
                 relocatedRows.add(new Row(
                         newAddrHex,
-                        r.rawCodeHex,
+                        newRawHex,
                         r.rawCodeBinary,
                         r.label,
                         r.instr,
@@ -233,35 +367,41 @@ public class Listing extends WriteVisitor {
                         r.labelWidth,
                         r.nameWidth,
                         r.isCommentRow,
-                        r.instrHex,
+                        newInstrHex,
                         r.instrBin,
                         r.nixbpe
                 ));
             } catch (NumberFormatException nfe) {
-                // If address was malformed, keep original row unchanged
                 relocatedRows.add(r);
             }
         }
+
         rows.clear();
         rows.addAll(relocatedRows);
 
-        // 3) Relocate variableWatch by shifting map KEYS (do NOT mutate StorageSymbol)
+        // ---------- 3) Relocate variableWatch per section ----------
         if (variableWatch != null && !variableWatch.isEmpty()) {
             HashMap<Integer, StorageSymbol> shifted = new HashMap<>(variableWatch.size());
             for (var e : variableWatch.entrySet()) {
-                int oldKey = e.getKey();
-                int newKey = (int) (oldKey + base);
-                // The StorageSymbol itself remains the same; its internal value is assembler-relative.
-                shifted.put(newKey, e.getValue());
+                int asmAddr = e.getKey();
+                String sectKey = sectionByAsmAddress.get(asmAddr);
+                int base = 0;
+                if (sectKey != null) {
+                    Integer b = baseBySection.get(sectKey);
+                    if (b != null) base = b;
+                }
+                shifted.put(asmAddr + base, e.getValue());
             }
             variableWatch = shifted;
         }
 
-        // 4) Update metadata: start address moves; program length stays the same
-        startAddress = (int) (startAddress + base);
-        // programLength unchanged
+        // ---------- 4) Update metadata ----------
+        if (firstSectionSeen != null) {
+            Integer b = baseBySection.get(firstSectionSeen);
+            if (b != null) startAddress += b;
+        }
+        // programLength intentionally unchanged
     }
-
 
     // Concatenate all formatted lines. (We do NOT print rawCodeBinary/instrHex/instrBin/nixbpe here.)
     @Override

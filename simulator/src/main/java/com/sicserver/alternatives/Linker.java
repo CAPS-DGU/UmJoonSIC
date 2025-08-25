@@ -8,7 +8,6 @@ import sic.link.section.Section;
 import sic.link.section.Sections;
 import sic.link.utils.Parser;
 import sic.link.visitors.FirstPassVisitor;
-import sic.link.visitors.SecondPassVisitor;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -85,26 +84,28 @@ public class Linker {
         if (sections.getName() == null)
             sections.setName(sections.getSections().get(0).getName());
 
-        // External Symbol table - used in both visitors
+// External Symbol table - used in both visitors
         Map<String, ExtDef> esTable = new HashMap<>();
 
         log("starting first pass");
-        // first pass - changes the addresses of sections, text records and ext definitions
         FirstPassVisitor firstPass = new FirstPassVisitor(esTable);
         firstPass.visit(sections);
         log(sections.getSections(), esTable.values());
 
         log("starting second pass");
-        // second pass - modifies the text records according to the modification records
-        SecondPassVisitor secondPassVisitor = new SecondPassVisitor(sections.getName(), esTable, options);
+        // Ensure relocations exists even if verbosity was off earlier
+        if (this.relocations == null) {
+            this.relocations = new Relocations();
+        }
+        // Pass relocations to the second pass so it can record raw hex patches
+        SecondPassVisitor secondPassVisitor =
+                new SecondPassVisitor(sections.getName(), esTable, options, this.relocations);
         secondPassVisitor.visit(sections);
 
         log("cleaning the output section (R and M records)");
-        // clean out used R records
         sections.clean();
 
         log("combining section into one");
-        // combine all of the sections into one
         Section combined = sections.combine(options.isKeep());
 
         if (options.isVerbose()) {
