@@ -217,7 +217,7 @@ export default function CodeEditor() {
     if (activeTab && activeTab.filePath && projectPath) {
       console.log('Loading file:', projectPath + '/' + activeTab.filePath);
       console.log(tabs);
-      
+
       isLoadingRef.current = true;
       window.api
         .readFile(projectPath + '/' + activeTab.filePath)

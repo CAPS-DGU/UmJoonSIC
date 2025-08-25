@@ -50,6 +50,12 @@ const api = {
   createNewFolder: (folderPath: string, folderName: string): IpcApiResponse<void> => {
     return ipcRenderer.invoke('createNewFolder', { folderPath, folderName });
   },
+  deleteFile: (projectPath: string, relativePath: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('deleteFile', { projectPath, relativePath });
+  },
+  deleteFolder: (projectPath: string, relativePath: string): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('deleteFolder', { projectPath, relativePath });
+  },
 };
 
 // 새 프로젝트 생성 이벤트 리스너

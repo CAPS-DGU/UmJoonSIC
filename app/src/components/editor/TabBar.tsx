@@ -20,9 +20,7 @@ export default function TabBar() {
         <div
           key={tab.filePath}
           className={`flex items-center min-w-0 max-w-48 border-r border-gray-300 ${
-            tab.isActive 
-              ? 'bg-gray-200 border-b-0' 
-              : 'bg-gray-50 hover:bg-gray-200'
+            tab.isActive ? 'bg-gray-200 border-b-0' : 'bg-gray-50 hover:bg-gray-200'
           }`}
         >
           <button
@@ -30,15 +28,11 @@ export default function TabBar() {
             className="flex items-center gap-1 px-3 py-2 min-w-0 flex-1 hover:bg-gray-100 transition-colors"
           >
             {getFileIcon(tab.title)}
-            <span className="truncate text-sm font-medium">
-              {tab.title}
-            </span>
-            {tab.isModified && (
-              <span className="text-red-500 text-xs ml-1">●</span>
-            )}
+            <span className="truncate text-sm font-medium">{tab.title}</span>
+            {tab.isModified && <span className="text-red-500 text-xs ml-1">●</span>}
           </button>
-          <button 
-            onClick={() => closeTab(tab.idx)} 
+          <button
+            onClick={() => closeTab(tab.idx)}
             className="p-1 hover:bg-gray-200 rounded mr-1 transition-colors"
             title="Close tab"
           >

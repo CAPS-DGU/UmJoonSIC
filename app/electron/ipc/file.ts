@@ -295,3 +295,57 @@ ipcMain.handle(
     }
   },
 );
+
+// 파일 삭제 IPC 핸들러
+ipcMain.handle(
+  'deleteFile',
+  async (_event, { projectPath, relativePath }: { projectPath: string; relativePath: string }) => {
+    try {
+      const fullPath = pathModule.join(projectPath, relativePath);
+
+      // 파일이 존재하는지 확인
+      if (!fs.existsSync(fullPath)) {
+        return { success: false, message: 'File does not exist' };
+      }
+
+      // 파일 삭제
+      fs.unlinkSync(fullPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);
+
+// 폴더 삭제 IPC 핸들러 (재귀적으로 모든 내용 삭제)
+ipcMain.handle(
+  'deleteFolder',
+  async (_event, { projectPath, relativePath }: { projectPath: string; relativePath: string }) => {
+    try {
+      const fullPath = pathModule.join(projectPath, relativePath);
+
+      // 폴더가 존재하는지 확인
+      if (!fs.existsSync(fullPath)) {
+        return { success: false, message: 'Folder does not exist' };
+      }
+
+      // 폴더와 그 안의 모든 내용을 재귀적으로 삭제
+      const deleteRecursive = (path: string) => {
+        if (fs.statSync(path).isDirectory()) {
+          fs.readdirSync(path).forEach(file => {
+            const curPath = pathModule.join(path, file);
+            deleteRecursive(curPath);
+          });
+          fs.rmdirSync(path);
+        } else {
+          fs.unlinkSync(path);
+        }
+      };
+
+      deleteRecursive(fullPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+);

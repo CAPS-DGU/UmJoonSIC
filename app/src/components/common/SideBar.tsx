@@ -10,6 +10,7 @@ import {
   FilePlus,
   Settings,
   List, // Import the List icon for .lst files
+  Trash2, // Import the Trash icon for delete functionality
 } from 'lucide-react';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 
@@ -88,19 +89,27 @@ export default function SideBar() {
   const [newFileName, setNewFileName] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+    item: FileStructure | null;
+  }>({ show: false, x: 0, y: 0, item: null });
   const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     projectName,
     projectPath,
     fileTree,
+    settings,
     refreshFileTree,
     selectedFileOrFolder,
     setSelectedFileOrFolder,
     getFolderFromSelectedFileOrFolder,
     addAsmFile,
+    setSettings,
   } = useProjectStore();
-  const { tabs, addTab } = useEditorTabStore();
+  const { tabs, addTab, closeTab } = useEditorTabStore();
 
   // Add the new file to the dummy data
   const dummyFileTree = [...fileTree];
@@ -188,6 +197,124 @@ export default function SideBar() {
     }
   }, [isCreatingFile]);
 
+  // 삭제 확인 다이얼로그
+  const confirmDelete = (item: FileStructure): boolean => {
+    const itemName = item.name;
+    const itemType = item.type === 'file' ? '파일' : '폴더';
+
+    if (item.type === 'folder') {
+      return confirm(
+        `"${itemName}" 폴더와 그 안의 모든 내용을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`,
+      );
+    } else {
+      return confirm(
+        `"${itemName}" ${itemType}을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`,
+      );
+    }
+  };
+
+  // 파일/폴더 삭제 함수
+  const handleDelete = async (item: FileStructure) => {
+    if (!confirmDelete(item)) {
+      return;
+    }
+
+    try {
+      let result;
+      if (item.type === 'file') {
+        result = await window.api.deleteFile(projectPath, item.relativePath);
+
+        // 삭제된 파일이 열려있는 탭이 있다면 닫기
+        const tabToRemove = tabs.find(tab => tab.filePath === item.relativePath);
+        setSettings({
+          asm: settings.asm.filter(asm => asm !== item.relativePath),
+          main: settings.main,
+        });
+        if (tabToRemove) {
+          closeTab(tabToRemove.idx);
+        }
+      } else {
+        result = await window.api.deleteFolder(projectPath, item.relativePath);
+
+        // 삭제된 폴더 내의 파일들이 열려있는 탭들을 닫기
+        const tabsToRemove = tabs.filter(tab => tab.filePath.startsWith(item.relativePath));
+        tabsToRemove.forEach(tab => closeTab(tab.idx));
+        setSettings({
+          asm: settings.asm.filter(asm => !asm.endsWith(item.relativePath)),
+          main: settings.main,
+        });
+      }
+
+      if (result.success) {
+        refreshFileTree();
+        // 선택된 항목이 삭제된 항목이었다면 선택 해제
+        if (
+          selectedFileOrFolder === item.relativePath ||
+          (item.type === 'folder' && selectedFileOrFolder === item.relativePath + '/')
+        ) {
+          setSelectedFileOrFolder('');
+        }
+      } else {
+        alert(`삭제 실패: ${result.message}`);
+      }
+    } catch (error) {
+      alert(`삭제 중 오류가 발생했습니다: ${error}`);
+    }
+  };
+
+  // 키보드 이벤트 핸들러
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Delete' && selectedFileOrFolder) {
+      e.preventDefault();
+
+      // 선택된 항목 찾기
+      const findItem = (items: FileStructure[]): FileStructure | null => {
+        for (const item of items) {
+          if (item.type === 'folder') {
+            if (item.relativePath + '/' === selectedFileOrFolder) {
+              return item;
+            }
+            const found = findItem(item.children);
+            if (found) return found;
+          } else {
+            if (item.relativePath === selectedFileOrFolder) {
+              return item;
+            }
+          }
+        }
+        return null;
+      };
+
+      const itemToDelete = findItem(fileTreeStructure);
+      if (itemToDelete) {
+        handleDelete(itemToDelete);
+      }
+    }
+  };
+
+  // 우클릭 컨텍스트 메뉴 핸들러
+  const handleContextMenu = (e: React.MouseEvent, item: FileStructure) => {
+    e.preventDefault();
+    setContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+      item,
+    });
+  };
+
+  // 컨텍스트 메뉴 닫기
+  const closeContextMenu = () => {
+    setContextMenu({ show: false, x: 0, y: 0, item: null });
+  };
+
+  // 전역 클릭 이벤트로 컨텍스트 메뉴 닫기
+  useEffect(() => {
+    const handleClickOutside = () => closeContextMenu();
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const renderItems = (items: FileStructure[]): React.ReactNode => {
     return items.map((item, index) => {
       if (item.type === 'folder') {
@@ -202,6 +329,7 @@ export default function SideBar() {
               onClick={() => {
                 setSelectedFileOrFolder(item.relativePath + '/');
               }}
+              onContextMenu={e => handleContextMenu(e, item)}
             >
               <span className="text-xs w-3">
                 {isOpen ? (
@@ -253,6 +381,7 @@ export default function SideBar() {
               breakpoints: [],
             });
           }}
+          onContextMenu={e => handleContextMenu(e, item)}
         >
           {getFileIcon(item.name)}
           <span>{item.name}</span>
@@ -262,7 +391,11 @@ export default function SideBar() {
   };
 
   return (
-    <div className="w-60 bg-white border-r border-gray-300 flex flex-col">
+    <div
+      className="w-60 bg-white border-r border-gray-300 flex flex-col"
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
         <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">
@@ -330,6 +463,28 @@ export default function SideBar() {
           </div>
         )}
       </div>
+
+      {/* 컨텍스트 메뉴 */}
+      {contextMenu.show && contextMenu.item && (
+        <div
+          className="fixed bg-white border border-gray-300 rounded shadow-lg z-50"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          <button
+            className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-gray-100 text-red-600"
+            onClick={() => {
+              handleDelete(contextMenu.item!);
+              closeContextMenu();
+            }}
+          >
+            <Trash2 width={16} height={16} />
+            삭제
+          </button>
+        </div>
+      )}
     </div>
   );
 }
