@@ -35,7 +35,10 @@ const api = {
   }> => {
     return ipcRenderer.invoke('openProject');
   },
-    loadAsm: (port: number, filePath: string): IpcApiResponse<{
+  loadAsm: (
+    port: number,
+    filePath: string,
+  ): IpcApiResponse<{
     status?: number;
     data?: any;
   }> => {

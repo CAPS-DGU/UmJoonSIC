@@ -105,18 +105,18 @@ async function createNewProjectInteractive() {
 
     const mainAsmPath = pathModule.join(projectPath, 'main.asm');
 
-    fs.writeFileSync(
-      mainAsmPath,
-      `; main.asm (root)\n; put your assembly here\n`,
-      'utf8'
-    );
+    fs.writeFileSync(mainAsmPath, `; main.asm (root)\n; put your assembly here\n`, 'utf8');
 
     // NOTE: asm entries are RELATIVE; main has NO extension
     const sic = {
       asm: ['main.asm'],
       main: 'main',
     };
-    fs.writeFileSync(pathModule.join(projectPath, 'project.sic'), JSON.stringify(sic, null, 2), 'utf8');
+    fs.writeFileSync(
+      pathModule.join(projectPath, 'project.sic'),
+      JSON.stringify(sic, null, 2),
+      'utf8',
+    );
 
     return {
       success: true,

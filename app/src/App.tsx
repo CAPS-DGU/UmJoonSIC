@@ -39,7 +39,7 @@ function App() {
     };
   }, [createNewProject]);
 
-    useEffect(() => {
+  useEffect(() => {
     const handleOpenProject = () => {
       openProject();
     };
