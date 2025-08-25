@@ -72,7 +72,7 @@ export default function CodeEditor() {
 
       // 클릭된 위치에서 라인 번호 추출
       let lineNumber: number | undefined;
-      
+
       if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
         lineNumber = e.target.position?.lineNumber;
         console.log('Glyph margin clicked at line:', lineNumber);
@@ -87,7 +87,7 @@ export default function CodeEditor() {
       if (lineNumber && activeTab) {
         console.log('Before toggle - activeTab breakpoints:', activeTab.breakpoints);
         console.log('Toggling breakpoint for line:', lineNumber);
-        
+
         toggleBreakpoint(activeTab.idx, lineNumber);
 
         // 상태 업데이트 후 다시 확인
@@ -157,7 +157,7 @@ export default function CodeEditor() {
     console.log('Applied decoration IDs:', newDecorationIds);
   };
 
-    // Breakpoint 시각적 표시를 위한 CSS 추가
+  // Breakpoint 시각적 표시를 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -178,9 +178,9 @@ export default function CodeEditor() {
       }
     `;
     document.head.appendChild(style);
-    
+
     console.log('Breakpoint CSS styles applied');
-    
+
     return () => {
       if (document.head.contains(style)) {
         document.head.removeChild(style);

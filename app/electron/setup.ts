@@ -333,3 +333,25 @@ export function getJavaPath() {
   }
   return null;
 }
+
+export function getServerPath() {
+  const appDataPath = path.join(app.getPath('appData'), 'umjoonsic');
+  return path.join(appDataPath, 'simulator.jar');
+}
+
+export async function initServer() {
+  const res = await fetch('http://localhost:8080/begin', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to initialize server');
+  }
+
+  const data = await res.json();
+  console.log('Server initialized:', data.message);
+}
