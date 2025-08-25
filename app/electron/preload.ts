@@ -57,6 +57,11 @@ ipcRenderer.on('open-project', () => {
   window.dispatchEvent(new CustomEvent('open-project'));
 });
 
+// 프로젝트 닫기 이벤트 리스너
+ipcRenderer.on('close-project', () => {
+  window.dispatchEvent(new CustomEvent('close-project'));
+});
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.

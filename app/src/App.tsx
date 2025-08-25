@@ -19,7 +19,7 @@ function App() {
   const createNewProject = useProjectStore(s => s.createNewProject);
   const openProject = useProjectStore(s => s.openProject);
   const projectName = useProjectStore(s => s.projectName);
-
+  const closeProject = useProjectStore(s => s.closeProject);
   const { tabs, activeTabIdx } = useEditorTabStore();
 
   const [panelHeight, setPanelHeight] = useState(100);
@@ -48,6 +48,16 @@ function App() {
       window.removeEventListener('open-project', handleOpenProject);
     };
   }, [openProject]);
+
+  useEffect(() => {
+    const handleCloseProject = () => {
+      closeProject();
+    };
+    window.addEventListener('close-project', handleCloseProject);
+    return () => {
+      window.removeEventListener('close-project', handleCloseProject);
+    };
+  }, [closeProject]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {

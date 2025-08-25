@@ -39,14 +39,19 @@ export const menuList = [
           });
         },
       },
-      {
-        label: 'Open Recent',
-        submenu: [{ role: 'clearRecentDocuments' }, { role: 'recentDocuments' }],
-      },
+      // {
+      //   label: 'Open Recent',
+      //   submenu: [{ role: 'clearRecentDocuments' }, { role: 'recentDocuments' }],
+      // },
       {
         label: 'Close Project',
         click: () => {
           console.log('Close Project');
+          const { BrowserWindow } = require('electron');
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach((window: any) => {
+            window.webContents.send('close-project');
+          });
         },
       },
     ],

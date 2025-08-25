@@ -47,6 +47,7 @@ interface ProjectState {
   setProject: (project: ProjectState) => void;
   createNewProject: () => void;
   openProject: () => void;
+  closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
 }
 
@@ -129,6 +130,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       .catch((error: unknown) => {
         console.error('Error opening project:', error);
       });
+  },
+
+  closeProject: () => {
+    set({
+      projectName: '',
+      projectPath: '',
+      settings: { asm: [], main: '' },
+      fileTree: [],
+    });
   },
 
   getAsmAbsolutePaths: () => {
