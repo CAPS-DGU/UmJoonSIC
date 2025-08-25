@@ -79,10 +79,8 @@ export default function CodeEditor() {
       } else if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_LINE_NUMBERS) {
         lineNumber = e.target.position?.lineNumber;
         console.log('Line number clicked at line:', lineNumber);
-      } else if (e.target.type === monaco_editor.editor.MouseTargetType.CONTENT_TEXT) {
-        lineNumber = e.target.position?.lineNumber;
-        console.log('Content text clicked at line:', lineNumber);
       }
+      // CONTENT_TEXT 클릭은 제거 - 코드 본문 클릭 시 중단점 토글 방지
 
       if (lineNumber && activeTab) {
         console.log('Before toggle - activeTab breakpoints:', activeTab.breakpoints);
