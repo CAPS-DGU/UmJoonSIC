@@ -14,6 +14,9 @@ interface ListProps {
 export default function List({ data, activeTabTitle, breakpoints, onBreakpointToggle }: ListProps) {
   const { PC } = useRegisterStore();
 
+  // if (data.some(row => parseInt(row.addressHex, 16) === PC)) {
+  //   console.log('PC is in data');
+  // }
 
   const totalColumns = 10;
   return (

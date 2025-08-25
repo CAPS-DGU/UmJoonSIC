@@ -4,6 +4,7 @@ import { createReadStream } from 'fs';
 import { app, BrowserWindow } from 'electron';
 import * as tar from 'tar';
 import * as AdmZip from 'adm-zip';
+import { ChildProcess, spawn } from 'child_process';
 
 export function checkJreExists() {
   const jrePath = getJavaPath();
@@ -354,4 +355,34 @@ export async function initServer() {
 
   const data = await res.json();
   console.log('Server initialized:', data.message);
+}
+
+export async function runServer(server: ChildProcess | null) {
+  const javaPath = getJavaPath();
+  if (javaPath) {
+    server = spawn(javaPath, ['-jar', getServerPath(), '9090']);
+  } else {
+    console.error('Java 경로를 찾을 수 없습니다.');
+    app.quit();
+  }
+  if (server && server.stdout && server.stderr) {
+    server.stdout.on('data', data => {
+      console.log(`서버 로그: ${data}`);
+    });
+    server.stderr.on('data', data => {
+      console.error(`서버 에러: ${data}`);
+    });
+    server.on('close', code => {
+      console.log(`서버 종료: ${code}`);
+    });
+  }
+  setTimeout(() => {
+    initServer().catch(error => {
+      console.error('Server 초기화 실패:', error);
+      if (server) {
+        server.kill();
+      }
+      app.quit();
+    });
+  }, 1000);
 }

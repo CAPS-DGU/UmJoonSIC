@@ -4,12 +4,26 @@ import {
   type MemoryNodeStatus,
   type MemoryLabel,
 } from '@/stores/MemoryViewStore';
+import { useEffect, useRef } from 'react';
 
 export default function MemoryViewer() {
-  const memoryRange = { start: 1010, end: 1060 }; // useMemoryViewStore(state => state.memoryRange);
-  const memoryValues = MOCK_MEMORY_DATA; // useMemoryViewStore(state => state.memoryValues);
-  const labels = MOCK_LABELS; //useMemoryViewStore(state => state.labels);
+  const memoryRange = useMemoryViewStore(state => state.memoryRange);
+  const memoryValues = useMemoryViewStore(state => state.memoryValues);
+  const labels = useMemoryViewStore(state => state.labels);
+  const changedNodes = useMemoryViewStore(state => state.changedNodes);
+  const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
   const ROW_SIZE = 8;
+
+  // 애니메이션 완료 후 변경된 노드 목록 초기화
+  useEffect(() => {
+    if (changedNodes.size > 0) {
+      const timer = setTimeout(() => {
+        clearChangedNodes();
+      }, 600); // 애니메이션 지속 시간과 동일
+
+      return () => clearTimeout(timer);
+    }
+  }, [changedNodes, clearChangedNodes]);
 
   // 8바이트 단위로 묶기
   const rows: MemoryNodeData[][] = [];
@@ -21,10 +35,15 @@ export default function MemoryViewer() {
   return (
     <section className="flex flex-col px-2">
       <h2 className="text-md font-bold">메모리 뷰어</h2>
-      <div className="w-full mt-2 flex justify-start items-start px-2">
+      <div className="w-full mt-2 flex justify-start items-start px-2 overflow-y-auto flex-1 min-h-0 h-full max-h-[700px]">
         <KeyColumn addresses={addresses} />
         <div className="flex flex-col">
-          <ValueColumn rows={rows} labels={labels} rowStartAddresses={addresses} />
+          <ValueColumn 
+            rows={rows} 
+            labels={labels} 
+            rowStartAddresses={addresses} 
+            changedNodes={changedNodes}
+          />
         </div>
       </div>
     </section>
@@ -47,10 +66,12 @@ function ValueColumn({
   rows,
   labels,
   rowStartAddresses,
+  changedNodes,
 }: {
   rows: MemoryNodeData[][];
   labels: MemoryLabel[];
   rowStartAddresses: number[];
+  changedNodes: Set<number>;
 }) {
   return (
     <div className="flex flex-col gap-2 pl-4 relative">
@@ -72,13 +93,17 @@ function ValueColumn({
             {/* 값 */}
             <div className="flex relative mb-2">
               {row.map((node, idx) => {
+                const globalIndex = rowStartIndex + idx;
                 const label = rowLabels.find(l => idx >= l.start && idx <= l.end);
+                const isChanged = changedNodes.has(globalIndex);
+                
                 return (
                   <MemoryNode
                     key={idx}
                     val={node.value}
                     status={node.status}
                     labelHighlight={!!label}
+                    isChanged={isChanged}
                   />
                 );
               })}
@@ -109,10 +134,12 @@ function MemoryNode({
   val,
   status,
   labelHighlight,
+  isChanged,
 }: {
   val: string;
   status?: MemoryNodeStatus;
   labelHighlight?: boolean;
+  isChanged?: boolean;
 }) {
   const statusClasses = {
     normal: '',
@@ -124,7 +151,9 @@ function MemoryNode({
     <span
       className={`font-mono text-sm px-1 w-6 text-center ${
         statusClasses[status || 'normal']
-      } ${labelHighlight ? '!text-orange-500 font-semibold' : ''}`}
+      } ${labelHighlight ? '!text-orange-500 font-semibold' : ''} ${
+        isChanged ? 'memory-flash' : ''
+      }`}
     >
       {val}
     </span>

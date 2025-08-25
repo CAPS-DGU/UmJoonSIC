@@ -19,3 +19,31 @@ body {
     'Segoe UI Symbol',
     sans-serif;
 }
+
+/* 메모리 값 변경 애니메이션 */
+@keyframes memory-flash {
+  0% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+  25% {
+    background-color: #fbbf24; /* yellow-400 */
+    transform: scale(1.1);
+  }
+  50% {
+    background-color: #f59e0b; /* yellow-500 */
+    transform: scale(1.05);
+  }
+  75% {
+    background-color: #fbbf24; /* yellow-400 */
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.memory-flash {
+  animation: memory-flash 0.6s ease-in-out;
+}

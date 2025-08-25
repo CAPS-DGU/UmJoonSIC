@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useRunningStore } from './RunningStore';
 
 interface Register {
   A: number;
@@ -35,7 +36,7 @@ interface RegisterState {
   fetchRegisters: () => void;
 }
 
-export const useRegisterStore = create<RegisterState>(set => ({
+export const useRegisterStore = create<RegisterState>((set, get) => ({
   A: 0,
   X: 0,
   L: 0,
@@ -77,6 +78,12 @@ export const useRegisterStore = create<RegisterState>(set => ({
     const data = await res.json();
     if (data.ok) {
       const registers = data.registers;
+      const { PC } = get();
+      if (PC === registers.PC) {
+        const { stopRunning } = useRunningStore.getState();
+        stopRunning();
+      }
+
       set({
         A: registers.A,
         X: registers.X,

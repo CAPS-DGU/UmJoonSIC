@@ -51,26 +51,13 @@ export default function ListContainer() {
   */
   // toggleBreakpoint 변수가 중복 선언되어 오류가 발생하므로, 아래 코드를 삭제하거나 기존 toggleBreakpoint를 사용하세요.
 
-  useEffect(() => {
-    console.log(activeTab);
-    console.log(listFile);
-    console.log(path.join(activeTab?.filePath.replace('.lst', '') || 'ss'));
-    console.log(listFile.map(file => file.filePath));
-    console.log(
-      listFile.find(
-        file => file.filePath === path.join(activeTab?.filePath.replace('.lst', '') || ''),
-      )?.rows,
-    );
-  }, []);
-
   return (
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
       <List
         data={
           listFile.find(
-            file =>
-              file.filePath === path.join(activeTab?.filePath.replace('.lst', '') || ''),
+            file => file.filePath === path.join(activeTab?.filePath.replace('.lst', '') || ''),
           )?.rows ?? []
         } // 스토어에서 가져온 listFile을 사용합니다.
         activeTabTitle={activeTab?.title}
