@@ -1,6 +1,4 @@
-// src/components/WarningPanel.tsx
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { File, ChevronRight, AlertTriangle, Settings, List } from 'lucide-react';
 
 // 경고 메시지 타입 정의
