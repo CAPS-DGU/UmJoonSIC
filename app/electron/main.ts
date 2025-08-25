@@ -89,9 +89,9 @@ app.whenReady().then(() => {
     console.log('jre 다운로드');
   }
   if (!checkServerExists()) {
-    // downloadServer().catch(error => {
-    //   console.error('Server 다운로드 실패:', error);
-    // });
+    downloadServer().catch(error => {
+      console.error('Server 다운로드 실패:', error);
+    });
     console.log('server 다운로드');
   }
 

@@ -6,29 +6,19 @@ import * as tar from 'tar';
 import * as AdmZip from 'adm-zip';
 
 export function checkJreExists() {
-  const jrePath = path.join(app.getPath('appData'), 'umjoonsic', 'jre');
-  if (process.platform === 'win32') {
-    const hasJre = fs.existsSync(path.join(jrePath, 'bin', 'java.exe'));
-    if (!hasJre) {
-      return false;
-    }
-  } else if (process.platform === 'darwin') {
-    const hasJre = fs.existsSync(path.join(jrePath, 'bin', 'java'));
-    if (!hasJre) {
-      return false;
-    }
-  } else if (process.platform === 'linux') {
-    const hasJre = fs.existsSync(path.join(jrePath, 'bin', 'java'));
-    if (!hasJre) {
-      return false;
-    }
+  const jrePath = getJavaPath();
+  if (!jrePath) {
+    return false;
+  }
+  const hasJre = fs.existsSync(jrePath);
+  if (!hasJre) {
+    return false;
   }
   return true;
 }
 
 export function checkServerExists() {
-  const serverPath = path.join(app.getPath('appData'), 'umjoonsic', 'server.jar');
-
+  const serverPath = path.join(app.getPath('appData'), 'umjoonsic', 'simulator.jar');
   const hasServer = fs.existsSync(serverPath);
   if (!hasServer) {
     return false;
@@ -42,6 +32,7 @@ export async function downloadFile(relativePath: string, url: string) {
 
   // 프로그레스 다이얼로그 생성
   const progressWindow = new BrowserWindow({
+    title: `Downloading ${relativePath}`,
     width: 400,
     height: 200,
     resizable: false,
@@ -238,9 +229,9 @@ export async function downloadJre() {
 }
 
 export async function downloadServer() {
-  const serverPath = path.join(app.getPath('appData'), 'umjoonsic', 'server.jar');
+  const serverPath = 'simulator.jar';
   const serverUrl =
-    'https://github.com/umjoonsic/umjoonsic-server/releases/download/v1.0.0/server.jar';
+    'https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v0.0.1/simulator.jar';
 
   console.log('server 다운로드');
   return downloadFile(serverPath, serverUrl);
@@ -332,14 +323,14 @@ async function extractJre(archivePath: string, extractPath: string): Promise<voi
   console.log('JRE 압축 해제 완료');
 }
 
-function getJavaPath() {
+export function getJavaPath() {
   const appDataPath = path.join(app.getPath('appData'), 'umjoonsic');
   if (process.platform === 'win32') {
-    return path.join(appDataPath, 'jdk-17.0.12+7-jre', 'bin', 'java.exe');
+    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'bin', 'java.exe');
   } else if (process.platform === 'darwin') {
-    return path.join(appDataPath, 'jdk-17.0.12+7-jre', 'Contents', 'Home', 'bin', 'java');
+    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'Contents', 'Home', 'bin', 'java');
   } else if (process.platform === 'linux') {
-    return path.join(appDataPath, 'jdk-17.0.12+7-jre', 'bin', 'java');
+    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'bin', 'java');
   }
   return null;
 }
