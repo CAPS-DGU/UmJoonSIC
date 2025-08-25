@@ -12,6 +12,7 @@ import { useEditorTabStore } from './stores/EditorTabStore';
 
 import WarningPanel from './components/warning/WarningPanel';
 import Resizer from './components/common/Resizer';
+import SicSettingContainer from './components/setting/SicSettingContainer';
 
 const STATUS_BAR_HEIGHT = 40;
 
@@ -90,8 +91,9 @@ function App() {
         <div className="text-center max-w-md mx-auto px-4">
           <h1 className="text-2xl font-bold mb-4">아직 프로젝트를 생성하지 않았습니다.</h1>
           <p className="text-sm text-gray-500 mb-8">
-            File &gt; New Project 를 클릭하여 프로젝트를 생성하거나<br />File &gt; Open Project 를 클릭하여
-            기존 프로젝트를 열어주세요.
+            File &gt; New Project 를 클릭하여 프로젝트를 생성하거나
+            <br />
+            File &gt; Open Project 를 클릭하여 기존 프로젝트를 열어주세요.
           </p>
           <div className="flex gap-4 justify-center">
             <button
@@ -120,6 +122,7 @@ function App() {
 
   const activeTab = tabs[activeTabIdx];
   const isLstFile = activeTab?.filePath?.toLowerCase().endsWith('.lst');
+  const isSicFile = activeTab?.filePath?.toLowerCase().endsWith('project.sic');
 
   return (
     <div className="flex h-screen w-screen flex-col">
@@ -130,7 +133,13 @@ function App() {
         </div>
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-hidden">
-            {isLstFile ? <ListContainer /> : <EditorContainer />}
+            {isLstFile ? (
+              <ListContainer />
+            ) : isSicFile ? (
+              <SicSettingContainer />
+            ) : (
+              <EditorContainer />
+            )}
           </div>
           <Resizer onMouseDown={() => setIsResizing(true)} />
           <div className="transition-all duration-200 ease-in-out" style={{ height: panelHeight }}>

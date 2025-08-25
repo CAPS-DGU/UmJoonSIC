@@ -49,6 +49,7 @@ export default function CodeEditor() {
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
+  const isLoadingRef = useRef(false);
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
@@ -115,7 +116,7 @@ export default function CodeEditor() {
 
     editor.onDidChangeModelContent(() => {
       const currentActiveTab = getActiveTab();
-      if (currentActiveTab) {
+      if (currentActiveTab && !isLoadingRef.current) {
         setIsModified(currentActiveTab.idx, true);
         setFileContent(currentActiveTab.idx, editor.getValue());
       }
@@ -216,17 +217,23 @@ export default function CodeEditor() {
     if (activeTab && activeTab.filePath && projectPath) {
       console.log('Loading file:', projectPath + '/' + activeTab.filePath);
       console.log(tabs);
+      
+      isLoadingRef.current = true;
       window.api
         .readFile(projectPath + '/' + activeTab.filePath)
         .then((res: { success: boolean; data?: string; message?: string }) => {
           if (res.success && res.data) {
             console.log('File loaded:', res.data);
             setFileContent(activeTab.idx, res.data);
+            setIsModified(activeTab.idx, false); // 파일 로드 후 수정 상태 초기화
           } else {
             console.error('Failed to load file:', res.message);
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => {
+          isLoadingRef.current = false;
+        });
     }
   }, [activeTab?.idx, activeTab?.filePath, projectPath]);
 

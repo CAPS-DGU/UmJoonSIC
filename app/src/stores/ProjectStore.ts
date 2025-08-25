@@ -61,7 +61,8 @@ interface ProjectState {
   closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
   addAsmFile: (filePath: string) => void;
-  saveSettings: () => void;
+  saveSettings: () => Promise<{ success: boolean, message?: string }>;
+  setSettings: (settings: { asm: string[]; main: string }) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -105,7 +106,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
   saveSettings: () => {
     const { settings, projectPath } = get();
-    window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
+    return window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
   },
   refreshFileTree: () => {
     const currentPath = get().projectPath;
@@ -200,4 +201,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return `${projectPath}/${cleaned}`;
     });
   },
+
+  setSettings: (settings: { asm: string[]; main: string }) => set({ settings }),
 }));
