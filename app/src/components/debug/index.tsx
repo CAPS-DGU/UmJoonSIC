@@ -7,21 +7,21 @@ import TimerIcon from '@/assets/icons/debug/timer.svg';
 
 import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
-import { useRunMenu } from '@/hooks/RunMenu';
 import { useRunningStore } from '@/stores/RunningStore';
 import { Redo, StepForward } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
+import { useMemoryViewStore } from '@/stores/MemoryViewStore';
 
 export default function Debug() {
-  const { run, rerun, stop } = useRunMenu();
   const isRunning = useRunningStore(s => s.isRunning);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchLoad = useRunningStore(s => s.fetchLoad);
+  const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
 
   const handleRun = async (time?: number) => {
     fetchLoad();
     toggleIsRunning();
-    await run();
+    fetchMemory();
   };
 
   return (
@@ -29,11 +29,7 @@ export default function Debug() {
       <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
         <h2 className="text-lg font-bold">실행 및 디버그</h2>
         <div className="flex space-x-2">
-          {isRunning ? (
-            <RunningButton rerun={rerun} stop={stop} />
-          ) : (
-            <DefaultButton handleRun={handleRun} />
-          )}
+          {isRunning ? <RunningButton /> : <DefaultButton handleRun={handleRun} />}
         </div>
       </section>
       <section className="border-b border-gray-200 py-3">
@@ -67,33 +63,45 @@ function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<vo
   );
 }
 
-function RunningButton({ rerun, stop }: { rerun: () => void; stop: () => void }) {
+function RunningButton() {
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
+  const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
+  const stopRunning = useRunningStore(s => s.stopRunning);
+  const fetchLoad = useRunningStore(s => s.fetchLoad);
+  const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
+
   return (
     <>
       <button
-        onClick={rerun}
+        onClick={() => {}}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Continue"
       >
         <StepForward className="w-4 h-4" />
       </button>
       <button
-        onClick={fetchRegisters}
+        onClick={() => {
+          fetchRegisters();
+          fetchMemory();
+        }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Step Over"
       >
         <Redo className="w-4 h-4" />
       </button>
       <button
-        onClick={rerun}
+        onClick={async () => {
+          await stopRunning();
+          await fetchLoad();
+          toggleIsRunning();
+        }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="재실행"
       >
         <img src={ReRunIcon} alt="ReRun" className="w-4 h-4" />
       </button>
       <button
-        onClick={stop}
+        onClick={stopRunning}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="실행 중지"
       >

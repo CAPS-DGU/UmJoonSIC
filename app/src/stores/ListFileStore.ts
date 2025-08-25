@@ -25,6 +25,7 @@ interface ListFileState {
   listFile: ListFile[];
   setListFile: (filePath: string, rows: ListFileRow[]) => void;
   addListFile: (filePath: string, rows: ListFileRow[]) => void;
+  clearListFile: () => void;
 }
 
 export const useListFileStore = create<ListFileState>(set => ({
@@ -35,4 +36,5 @@ export const useListFileStore = create<ListFileState>(set => ({
     set(state => ({
       listFile: [...state.listFile, { filePath, rows: [...rows] }],
     })),
+  clearListFile: () => set({ listFile: [] }),
 }));

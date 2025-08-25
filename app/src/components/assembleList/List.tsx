@@ -1,5 +1,5 @@
 // src/components/editor/List.tsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { ListViewItem } from './ListContainer';
 import { List as ListIcon } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
@@ -13,11 +13,26 @@ interface ListProps {
 
 export default function List({ data, activeTabTitle, breakpoints, onBreakpointToggle }: ListProps) {
   const { PC } = useRegisterStore();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const highlightedRowRef = useRef<HTMLTableRowElement>(null);
 
+  // PC가 변경될 때마다 하이라이팅된 행으로 스크롤
+  useEffect(() => {
+    if (highlightedRowRef.current && containerRef.current) {
+      highlightedRowRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [PC, data]);
+
+  // if (data.some(row => parseInt(row.addressHex, 16) === PC)) {
+  //   console.log('PC is in data');
+  // }
 
   const totalColumns = 10;
   return (
-    <div className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">
+    <div ref={containerRef} className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">
       <div className="w-full overflow-x-auto">
         <table className="divide-y divide-gray-300 border-collapse">
           <thead>
@@ -64,10 +79,13 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                     </tr>
                   );
                 }
+                const isHighlighted =
+                  PC == parseInt(row.addressHex, 16) && row.rawCodeHex.replaceAll(' ', '') != '';
                 return (
                   <tr
                     key={index}
-                    className={`whitespace-nowrap ${PC == parseInt(row.addressHex, 16) ? 'bg-blue-100' : ''}`}
+                    ref={isHighlighted ? highlightedRowRef : null}
+                    className={`whitespace-nowrap ${isHighlighted ? 'bg-blue-100' : ''}`}
                   >
                     <td
                       className="px-2 py-1 cursor-pointer w-8"

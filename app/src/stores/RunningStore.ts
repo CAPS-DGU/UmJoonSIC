@@ -6,6 +6,7 @@ import { useListFileStore, type ListFileRow } from './ListFileStore';
 import { useWatchStore } from './pannel/WatchStore';
 import { useRegisterStore } from './RegisterStore';
 import { useEditorTabStore } from './EditorTabStore';
+import { useMemoryViewStore } from './MemoryViewStore';
 
 interface RunningState {
   isRunning: boolean;
@@ -17,7 +18,7 @@ interface RunningState {
   fetchLoad: () => void;
   setLoadedFiles: (files: LoadedFile[]) => void;
   loadToListfileAndWatch: () => void;
-  stop: () => void;
+  stopRunning: () => void;
 }
 
 // Watch 변수 정보
@@ -81,6 +82,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   },
   fetchLoad: async () => {
     const { projectPath, settings } = useProjectStore.getState();
+    const { setMemoryRange } = useMemoryViewStore.getState();
     const { fetchBegin, loadToListfileAndWatch } = get();
     await fetchBegin();
     const res = await axios.post('http://localhost:9090/load', {
@@ -89,11 +91,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       main: settings.main == '' ? undefined : settings.main,
     });
     const data = res.data;
-    console.log(data);
     if (data.ok) {
       const { setAll } = useRegisterStore.getState();
       setAll(data.registers);
       const files: LoadedFile[] = data.files;
+      setMemoryRange({
+        start: data.registers.PC,
+        end: data.registers.PC + 256,
+      });
       set({ loadedFiles: files });
       loadToListfileAndWatch();
     } else {
@@ -133,10 +138,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       });
     });
   },
-  stop: async () => {
+  stopRunning: async () => {
+    const { clearListFile } = useListFileStore.getState();
+    const { clearWatch } = useWatchStore.getState();
     const res = await axios.post('http://localhost:9090/begin');
     const data = res.data;
     if (data.ok) {
+      clearListFile();
+      clearWatch();
       set({ isRunning: false, isReady: false, loadedFiles: [] });
     } else {
       console.error('Failed to stop');

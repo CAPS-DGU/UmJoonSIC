@@ -5,15 +5,7 @@ import { menuList } from './menu';
 import './ipc/file';
 import './ipc/server';
 import { ChildProcess, spawn } from 'child_process';
-import {
-  checkJreExists,
-  checkServerExists,
-  downloadJre,
-  downloadServer,
-  initServer,
-  getJavaPath,
-  getServerPath,
-} from './setup';
+import { checkJreExists, checkServerExists, downloadJre, downloadServer, runServer } from './setup';
 
 let server: ChildProcess | null = null;
 
@@ -45,51 +37,25 @@ function createWindow(): void {
     maximizable: false,
   });
 
-  mainWindow.on('ready-to-show', () => {
+  mainWindow.on('ready-to-show', async () => {
     splash.loadFile(path.join(__dirname, '../renderer/splash.html'));
     splash.center();
 
     if (!checkJreExists()) {
-      downloadJre().catch(error => {
+      await downloadJre().catch(error => {
         console.error('JRE 다운로드 실패:', error);
       });
       console.log('jre 다운로드');
     }
     if (!checkServerExists()) {
-      downloadServer().catch(error => {
+      await downloadServer().catch(error => {
         console.error('Server 다운로드 실패:', error);
       });
       console.log('server 다운로드');
     }
 
     // jar 서버 실행 (예시)
-    const javaPath = getJavaPath();
-    if (javaPath) {
-      server = spawn(javaPath, ['-jar', getServerPath(), '9090']);
-    } else {
-      console.error('Java 경로를 찾을 수 없습니다.');
-      app.quit();
-    }
-    if (server && server.stdout && server.stderr) {
-      server.stdout.on('data', data => {
-        console.log(`서버 로그: ${data}`);
-      });
-      server.stderr.on('data', data => {
-        console.error(`서버 에러: ${data}`);
-      });
-      server.on('close', code => {
-        console.log(`서버 종료: ${code}`);
-      });
-    }
-    setTimeout(() => {
-      initServer().catch(error => {
-        console.error('Server 초기화 실패:', error);
-        if (server) {
-          server.kill();
-        }
-        app.quit();
-      });
-    }, 1000);
+    await runServer(server);
 
     setTimeout(() => {
       splash.close();

@@ -260,7 +260,7 @@ export default function CodeEditor() {
   return (
     <>
       <Editor
-        height="400px"
+        height="100%"
         theme="asmTheme" // 추가한 테마를 적용합니다.
         defaultLanguage="asm" // 기본 언어를 'asm'으로 설정합니다.
         value={activeTab?.fileContent}
