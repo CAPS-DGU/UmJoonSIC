@@ -10,7 +10,7 @@ import ListContainer from './components/assembleList/ListContainer';
 import { useProjectStore } from './stores/ProjectStore';
 import { useEditorTabStore } from './stores/EditorTabStore';
 
-import WarningPanel from './components/warning/WarningPanel';
+import Pannel from './components/pannel/Pannel';
 import Resizer from './components/common/Resizer';
 import SicSettingContainer from './components/setting/SicSettingContainer';
 
@@ -143,7 +143,7 @@ function App() {
           </div>
           <Resizer onMouseDown={() => setIsResizing(true)} />
           <div className="transition-all duration-200 ease-in-out" style={{ height: panelHeight }}>
-            <WarningPanel />
+            <Pannel />
           </div>
         </div>
         <div className="min-w-64 max-w-xs flex-shrink-0 overflow-y-auto overflow-x-hidden">
