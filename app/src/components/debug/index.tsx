@@ -17,7 +17,7 @@ export default function Debug() {
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
-  
+
   const handleRun = async (time?: number) => {
     fetchLoad();
     toggleIsRunning();

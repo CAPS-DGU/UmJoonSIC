@@ -124,6 +124,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
           column: 0,
         },
       });
+      console.log(file.fileName, file.listing.rows);
       addListFile(file.fileName, file.listing.rows);
       file.listing.watch.forEach(w => {
         addWatch({
@@ -138,9 +139,13 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     });
   },
   stopRunning: async () => {
+    const { clearListFile } = useListFileStore.getState();
+    const { clearWatch } = useWatchStore.getState();
     const res = await axios.post('http://localhost:9090/begin');
     const data = res.data;
     if (data.ok) {
+      clearListFile();
+      clearWatch();
       set({ isRunning: false, isReady: false, loadedFiles: [] });
     } else {
       console.error('Failed to stop');

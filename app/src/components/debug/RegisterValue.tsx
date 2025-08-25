@@ -10,9 +10,7 @@ export default function RegisterValue() {
   const toggle = () => {
     setIsOn(!isOn);
   };
-  /**
-   * HEX 모드 토글의 ON/OFF 차이는 아직 추가 안했습니다.
-   */
+
   return (
     <div className="flex flex-col px-2 gap-2">
       <section className="flex w-full items-center justify-between">
@@ -43,7 +41,7 @@ export default function RegisterValue() {
           <div key={key} className="w-full flex justify-between items-center gap-4">
             <p className="text-base font-normal">{key}:</p>
             <div className="w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2">
-              <p className="font-mono text-sm">{value.toString(16).toUpperCase()}</p>
+              <p className="font-mono text-sm">{isOn ? value.toString(16).toUpperCase() : value}</p>
             </div>
           </div>
         ))}

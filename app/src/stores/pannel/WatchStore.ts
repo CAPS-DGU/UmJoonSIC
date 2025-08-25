@@ -13,10 +13,12 @@ interface WatchState {
   watch: WatchRow[];
   setWatch: (watch: WatchRow[]) => void;
   addWatch: (watch: WatchRow) => void;
+  clearWatch: () => void;
 }
 
 export const useWatchStore = create<WatchState>(set => ({
   watch: [],
   setWatch: watch => set({ watch }),
   addWatch: (watch: WatchRow) => set(state => ({ watch: [...state.watch, watch] })),
+  clearWatch: () => set({ watch: [] }),
 }));
