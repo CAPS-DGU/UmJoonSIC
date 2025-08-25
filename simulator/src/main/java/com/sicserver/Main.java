@@ -166,9 +166,9 @@ public class Main {
         ipAddress("127.0.0.1");
         port(portNum);
 
-        // CORS + default handlers
-        enableCors("*", "POST,OPTIONS", "Content-Type, Authorization, X-Requested-With");
+        // CORS + default handlers (centralized, overwrite headers to avoid duplicates)
         installJsonDefaultsAndHandlers();
+        enableCorsSingleton("*", "POST,OPTIONS", "Content-Type, Authorization, X-Requested-With");
 
         System.out.println("Server running on http://127.0.0.1:" + portNum);
 
@@ -186,7 +186,7 @@ public class Main {
             if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with filePaths (array)."));
             if (body.filePaths == null || body.filePaths.length == 0)
                 return gson.toJson(new Msg(false, "filePaths must be a non-empty array."));
-            // main is optional; Simulation.load handles null/blank and other defaults
+            // main and other options are optional; Simulation.load handles defaults
             return SIM.load(
                     body.filePaths,
                     body.outputDir,
@@ -258,29 +258,36 @@ public class Main {
         }
     }
 
-    /** CORS for browsers + preflight */
-    private static void enableCors(String origin, String methods, String headers) {
+    /** CORS for browsers + preflight (uses setHeader to AVOID duplicates) */
+    private static void enableCorsSingleton(String allowOrigin, String allowMethods, String allowHeaders) {
         // Preflight for any path
         options("/*", (req, res) -> {
             String reqHeaders = req.headers("Access-Control-Request-Headers");
-            if (reqHeaders != null) res.header("Access-Control-Allow-Headers", reqHeaders);
+            String reqMethod  = req.headers("Access-Control-Request-Method");
 
-            String reqMethod = req.headers("Access-Control-Request-Method");
-            if (reqMethod != null) res.header("Access-Control-Allow-Methods", reqMethod);
+            // Overwrite each header once
+            res.raw().setHeader("Access-Control-Allow-Origin", allowOrigin);
+            res.raw().setHeader("Vary", "Origin");
 
-            res.header("Access-Control-Allow-Origin", origin);
-            res.header("Vary", "Origin");
-            res.header("Access-Control-Max-Age", "86400"); // cache preflight 1 day
+            if (reqHeaders != null) res.raw().setHeader("Access-Control-Allow-Headers", reqHeaders);
+            else res.raw().setHeader("Access-Control-Allow-Headers", allowHeaders);
+
+            if (reqMethod != null) res.raw().setHeader("Access-Control-Allow-Methods", reqMethod);
+            else res.raw().setHeader("Access-Control-Allow-Methods", allowMethods);
+
+            res.raw().setHeader("Access-Control-Max-Age", "86400"); // 1 day
             res.status(204); // No Content
             return "";
         });
 
-        // Add CORS headers to all responses
-        before((req, res) -> {
-            res.header("Access-Control-Allow-Origin", origin);
-            res.header("Access-Control-Allow-Methods", methods);
-            res.header("Access-Control-Allow-Headers", headers);
-            res.header("Vary", "Origin");
+        // Apply headers to all non-OPTIONS responses (overwrite, don’t append)
+        after((req, res) -> {
+            if (!"OPTIONS".equalsIgnoreCase(req.requestMethod())) {
+                res.raw().setHeader("Access-Control-Allow-Origin", allowOrigin);
+                res.raw().setHeader("Access-Control-Allow-Methods", allowMethods);
+                res.raw().setHeader("Access-Control-Allow-Headers", allowHeaders);
+                res.raw().setHeader("Vary", "Origin");
+            }
         });
     }
 
@@ -290,7 +297,7 @@ public class Main {
         after((req, res) -> {
             if (!"OPTIONS".equalsIgnoreCase(req.requestMethod())) {
                 res.type("application/json; charset=UTF-8");
-                res.header("Cache-Control", "no-store");
+                res.raw().setHeader("Cache-Control", "no-store");
             }
         });
 
@@ -304,7 +311,7 @@ public class Main {
         exception(Exception.class, (e, req, res) -> {
             res.type("application/json; charset=UTF-8");
             res.status(500);
-            e.printStackTrace(); // log for server diagnostics
+            e.printStackTrace(); // log server-side
             res.body(new Gson().toJson(new Msg(false, "Internal error: " + e.getMessage())));
         });
     }
