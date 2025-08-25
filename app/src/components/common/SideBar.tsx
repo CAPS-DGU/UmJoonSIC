@@ -227,7 +227,7 @@ export default function SideBar() {
         // 삭제된 파일이 열려있는 탭이 있다면 닫기
         const tabToRemove = tabs.find(tab => tab.filePath === item.relativePath);
         setSettings({
-          asm: settings.asm.filter(asm => asm !== item.relativePath),
+          asm: settings.asm.filter(asm => asm !== item.relativePath && asm !== '/' + item.relativePath),
           main: settings.main,
         });
         if (tabToRemove) {
