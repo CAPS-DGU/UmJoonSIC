@@ -48,6 +48,7 @@ export default function CodeEditor() {
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
+  const decorationIdsRef = useRef<string[]>([]);
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
@@ -69,30 +70,41 @@ export default function CodeEditor() {
       console.log('Mouse down event:', e.target.type, e.target.position);
       console.log('Mouse target details:', e.target);
 
+      // 클릭된 위치에서 라인 번호 추출
+      let lineNumber: number | undefined;
+      
       if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-        const lineNumber = e.target.position?.lineNumber;
+        lineNumber = e.target.position?.lineNumber;
         console.log('Glyph margin clicked at line:', lineNumber);
+      } else if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_LINE_NUMBERS) {
+        lineNumber = e.target.position?.lineNumber;
+        console.log('Line number clicked at line:', lineNumber);
+      } else if (e.target.type === monaco_editor.editor.MouseTargetType.CONTENT_TEXT) {
+        lineNumber = e.target.position?.lineNumber;
+        console.log('Content text clicked at line:', lineNumber);
+      }
 
-        if (lineNumber && activeTab) {
-          console.log('Before toggle - activeTab breakpoints:', activeTab.breakpoints);
-          toggleBreakpoint(activeTab.idx, lineNumber);
+      if (lineNumber && activeTab) {
+        console.log('Before toggle - activeTab breakpoints:', activeTab.breakpoints);
+        console.log('Toggling breakpoint for line:', lineNumber);
+        
+        toggleBreakpoint(activeTab.idx, lineNumber);
 
-          // 상태 업데이트 후 다시 확인
-          setTimeout(() => {
-            const updatedActiveTab = getActiveTab();
-            console.log(
-              'After toggle - updatedActiveTab breakpoints:',
-              updatedActiveTab?.breakpoints,
-            );
-            if (updatedActiveTab) {
-              updateBreakpointDecorations(updatedActiveTab);
-            }
-          }, 0);
+        // 상태 업데이트 후 다시 확인
+        setTimeout(() => {
+          const updatedActiveTab = getActiveTab();
+          console.log(
+            'After toggle - updatedActiveTab breakpoints:',
+            updatedActiveTab?.breakpoints,
+          );
+          if (updatedActiveTab) {
+            updateBreakpointDecorations(updatedActiveTab);
+          }
+        }, 0);
 
-          console.log('Breakpoint toggled for line:', lineNumber);
-        }
+        console.log('Breakpoint toggled for line:', lineNumber);
       } else {
-        console.log('Not glyph margin click. Target type:', e.target.type);
+        console.log('No valid line number or active tab. Target type:', e.target.type);
       }
     });
 
@@ -123,69 +135,52 @@ export default function CodeEditor() {
 
     console.log('Updating breakpoint decorations for breakpoints:', targetTab.breakpoints);
 
+    // 기존 데코레이션 제거
+    if (decorationIdsRef.current.length > 0) {
+      editorRef.current.deltaDecorations(decorationIdsRef.current, []);
+      console.log('Removed existing decorations:', decorationIdsRef.current);
+    }
+
     const decorations = targetTab.breakpoints.map((lineNumber: number) => ({
       range: new monaco_editor.Range(lineNumber, 1, lineNumber, 1),
       options: {
         glyphMarginClassName: 'breakpoint-glyph',
         glyphMarginHoverMessage: { value: 'Breakpoint' },
         isWholeLine: false,
+        stickiness: monaco_editor.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
       },
     }));
 
     console.log('Created decorations:', decorations);
-    const decorationIds = editorRef.current.deltaDecorations([], decorations);
-    console.log('Applied decoration IDs:', decorationIds);
+    const newDecorationIds = editorRef.current.deltaDecorations([], decorations);
+    decorationIdsRef.current = newDecorationIds;
+    console.log('Applied decoration IDs:', newDecorationIds);
   };
 
-  // Breakpoint 시각적 표시를 위한 CSS 추가
+    // Breakpoint 시각적 표시를 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      /* Glyph margin 영역 스타일 */
-      .monaco-editor .margin-view-overlays .cgmr {
-        position: absolute !important;
-        width: 20px !important;
-        height: 20px !important;
-        cursor: pointer !important;
-        background-color: transparent !important;
-      }
-      
-      /* Breakpoint 아이콘 스타일 */
+      /* Breakpoint 아이콘 스타일 - Monaco Editor의 기본 위치 사용 */
       .breakpoint-glyph {
-        position: absolute !important;
-        width: 12px !important;
-        height: 12px !important;
         background-color: #e51400 !important;
         border-radius: 50% !important;
         border: 2px solid #ffffff !important;
-        top: 2px !important;
-        left: 4px !important;
-        cursor: pointer !important;
-        z-index: 100 !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+        width: 12px !important;
+        height: 12px !important;
+        display: inline-block !important;
+        margin: 2px !important;
       }
       
       .breakpoint-glyph:hover {
         background-color: #ff0000 !important;
         transform: scale(1.1) !important;
       }
-      
-      /* Glyph margin 영역 hover 효과 */
-      .monaco-editor .margin-view-overlays .cgmr:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-      }
-      
-      /* Monaco Editor의 기본 스타일 오버라이드 */
-      .monaco-editor .margin-view-overlays .cgmr .codicon {
-        display: none !important;
-      }
     `;
     document.head.appendChild(style);
-
+    
     console.log('Breakpoint CSS styles applied');
-
+    
     return () => {
       if (document.head.contains(style)) {
         document.head.removeChild(style);
