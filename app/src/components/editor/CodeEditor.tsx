@@ -270,7 +270,7 @@ export default function CodeEditor() {
           lineNumbers: 'on',
           folding: true,
           minimap: { enabled: true },
-          scrollBeyondLastLine: false,
+          scrollBeyondLastLine: true,
           renderLineHighlight: 'all',
           selectOnLineNumbers: true,
         }}
