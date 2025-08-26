@@ -63,7 +63,7 @@ export default function WatchPannel() {
           </td>
           <td className="py-1 font-mono">{row.dataType}</td>
           <td className="py-1 font-mono">
-            {'0x' + (row.address + i * row.elementSize).toString(16).toUpperCase()}
+            {'0x' + (row.address + i * row.elementSize).toString(16).toUpperCase().padStart(6, '0')}
           </td>
           <td className="py-1 font-mono">
             {elementValue.length > 0 ? parseInt(toHex(elementValue).replaceAll(' ', ''), 16) : ''}
