@@ -229,9 +229,11 @@ public class Simulation {
                     // Prelim DTO (will be replaced with relocated one if we link)
                     perFile.listing = listingToDTO(listing);
 
-                    // Optionally load to machine
-                    Loader.loadSection(executor.machine, new StringReader(objText));
-                    this.lastProgram = program;
+                    // Finally load to machine
+                    if (!multi) {
+                        Loader.loadSection(executor.machine, new StringReader(objText));
+                        this.lastProgram = program;
+                    }
 
                 } else if ("obj".equalsIgnoreCase(ext)) {
                     // Raw .obj inputs are not allowed in this API
@@ -306,6 +308,10 @@ public class Simulation {
                     }
                 }
 
+                // Load the linked output to machine
+                String linkedObjText = Files.readString(file.toPath());
+                Loader.loadSection(executor.machine, new StringReader(linkedObjText));
+
             } catch (LinkerError le) {
                 // For every file that didn't already fail compile, replace listing with linkerError
                 for (FileLoadResult fr : aggregate.files) {
@@ -319,6 +325,22 @@ public class Simulation {
                 }
                 aggregate.ok = false;
                 aggregate.message = "Linking failed.";
+                aggregate.registers = snapshotRegisters();
+                return gson.toJson(aggregate);
+
+            } catch (IOException ioe) {
+                // Handle IO problems reading/writing linked output
+                for (FileLoadResult fr : aggregate.files) {
+                    if (fr.compileErrors == null || fr.compileErrors.isEmpty()) {
+                        fr.listing = null;
+                        LinkerErrorDto leDto = new LinkerErrorDto();
+                        leDto.phase = "io";
+                        leDto.msg = ioe.getMessage();
+                        fr.linkerError = leDto;
+                    }
+                }
+                aggregate.ok = false;
+                aggregate.message = "I/O error during linking: " + ioe.getMessage();
                 aggregate.registers = snapshotRegisters();
                 return gson.toJson(aggregate);
             }
