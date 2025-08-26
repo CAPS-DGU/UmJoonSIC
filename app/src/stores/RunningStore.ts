@@ -83,7 +83,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   fetchLoad: async () => {
     const { projectPath, settings } = useProjectStore.getState();
     const { setMemoryRange } = useMemoryViewStore.getState();
-    const { fetchBegin, loadToListfileAndWatch } = get();
+    const { fetchBegin, loadToListfileAndWatch, stopRunning } = get();
     await fetchBegin();
     const res = await axios.post('http://localhost:9090/load', {
       filePaths: settings.asm.map(file => path.join(projectPath, file)),
@@ -91,6 +91,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       main: settings.main == '' ? undefined : settings.main,
     });
     const data = res.data;
+    console.log(data);
     if (data.ok) {
       const { setAll } = useRegisterStore.getState();
       setAll(data.registers);
@@ -103,11 +104,12 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       loadToListfileAndWatch();
     } else {
       console.error('Failed to load');
+      stopRunning();
     }
   },
   loadToListfileAndWatch: async () => {
     const { loadedFiles } = get();
-    const { addWatch } = useWatchStore.getState();
+    const { addWatch, fetchVarMemoryValue } = useWatchStore.getState();
     const { addListFile } = useListFileStore.getState();
     const { addTab } = useEditorTabStore.getState();
     loadedFiles.forEach(file => {
@@ -136,6 +138,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
           elementCount: w.elementCount,
         });
       });
+      fetchVarMemoryValue();
     });
   },
   stopRunning: async () => {

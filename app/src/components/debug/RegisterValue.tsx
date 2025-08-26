@@ -41,7 +41,7 @@ export default function RegisterValue() {
           <div key={key} className="w-full flex justify-between items-center gap-4">
             <p className="text-base font-normal">{key}:</p>
             <div className="w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2">
-              <p className="font-mono text-sm">{isOn ? value.toString(16).toUpperCase() : value}</p>
+              <p className="font-mono text-sm">{isOn ? 'Ox' + value.toString(16).toUpperCase().padStart(6, '0') : value}</p>
             </div>
           </div>
         ))}
