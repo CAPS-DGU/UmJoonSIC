@@ -324,7 +324,7 @@ public class Simulation {
                     }
                 }
                 aggregate.ok = false;
-                aggregate.message = "Linking failed.";
+                aggregate.message = "Linking failed : " + le.getMessage();
                 aggregate.registers = snapshotRegisters();
                 return gson.toJson(aggregate);
 
