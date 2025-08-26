@@ -97,7 +97,7 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                         <div className="w-2 h-2 rounded-full border border-gray-400 mx-auto"></div>
                       )}
                     </td>
-                    <td className="px-2 py-1 w-24">{row.addressHex}</td>
+                    <td className="px-2 py-1 w-24">{'0x' + parseInt(row.addressHex, 16).toString(16).toUpperCase().padStart(6, '0')}</td>
                     <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
                     <td className="px-2 py-1 w-24">{row.label}</td>
                     <td className="px-2 py-1 w-24">{row.instr}</td>
