@@ -377,7 +377,7 @@ export default function CodeEditor() {
           // 🔹 고정폭 + 자간 + 컬럼 맞춤
           fontFamily: 'JetBrains Mono', // 고정폭 폰트
           fontSize: 16, // 폰트 크기
-          letterSpacing: 1, // 글자 간격(px)
+          letterSpacing: 1.25, // 글자 간격(px)
           tabSize: 8, // SIC/XE 컬럼 기준 탭
           insertSpaces: true, // 탭 대신 스페이스
           rulers: [8, 16, 24, 32, 40], // 컬럼 가이드
