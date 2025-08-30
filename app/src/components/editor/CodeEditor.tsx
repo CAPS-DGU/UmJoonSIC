@@ -1,11 +1,12 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as monaco_editor from 'monaco-editor';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
-import { useSyntaxCheck } from './useSyntaxCheck';
+import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
 import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
+import '@/styles/SyntaxError.css';
 
 function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   if (monaco) {
@@ -25,6 +26,49 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const isLoadingRef = useRef(false);
+  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
+  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
+
+  const { result } = useSyntaxCheck(texts, fileNames);
+
+  const errorDecorationIdsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (!editorRef.current || !activeTab || !result) return;
+
+    const fileResult = result.files.find(
+      f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
+    );
+
+    // 에러 없으면 기존 제거
+    if (!fileResult || !fileResult.compileErrors?.length) {
+      errorDecorationIdsRef.current = editorRef.current.deltaDecorations(
+        errorDecorationIdsRef.current,
+        [],
+      );
+      return;
+    }
+
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    const decorations = fileResult.compileErrors.map(err => ({
+      range: new monaco_editor.Range(err.row, 1, err.row, model.getLineMaxColumn(err.row)),
+      options: {
+        isWholeLine: true,
+        className: 'syntax-error-line', // 라인 배경색
+        after: {
+          content: ` ⬅ ${err.message}`,
+          inlineClassName: 'syntax-error-inline',
+        },
+      },
+    }));
+
+    errorDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      errorDecorationIdsRef.current,
+      decorations,
+    );
+  }, [result, activeTab]);
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
