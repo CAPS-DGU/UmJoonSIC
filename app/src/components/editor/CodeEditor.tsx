@@ -41,6 +41,15 @@ export default function CodeEditor() {
       scrollBeyondLastLine: false,
     });
 
+    // 폰트가 로드된 후 재랜더링해 보조선과 글자 간격 맞추기
+    document.fonts.ready.then(() => {
+      editor.updateOptions({
+        fontFamily: 'JetBrains Mono',
+        letterSpacing: 0.1,
+      });
+      editor.layout();
+    });
+
     // Breakpoint 클릭 이벤트 처리
     editor.onMouseDown(e => {
       console.log('Mouse down event:', e.target.type, e.target.position);
@@ -252,11 +261,11 @@ export default function CodeEditor() {
           // 🔹 고정폭 + 자간 + 컬럼 맞춤
           fontFamily: 'JetBrains Mono', // 고정폭 폰트
           fontSize: 16, // 폰트 크기
-          letterSpacing: 1.25, // 글자 간격(px)
           tabSize: 8, // SIC/XE 컬럼 기준 탭
           insertSpaces: true, // 탭 대신 스페이스
           rulers: [8, 16, 24, 32, 40], // 컬럼 가이드
           wordWrap: 'off', // 자동 줄바꿈 해제
+          fontLigatures: false,
         }}
       />
     </>
