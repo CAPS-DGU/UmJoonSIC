@@ -8,7 +8,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 
 export default function MemoryViewer() {
   const memoryValues = useMemoryViewStore(state => state.memoryValues);
-  const labels = useMemoryViewStore(state => state.labels);
+  const getMemoryLabelFromWatch = useMemoryViewStore(state => state.getMemoryLabelFromWatch);
+  const labels = getMemoryLabelFromWatch();
   const changedNodes = useMemoryViewStore(state => state.changedNodes);
   const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
   const visibleRange = useMemoryViewStore(state => state.visibleRange);

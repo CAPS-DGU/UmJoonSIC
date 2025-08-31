@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import { useWatchStore } from './pannel/WatchStore';
+import type { WatchRow } from './pannel/WatchStore';
 
 export type MemoryNodeStatus = 'normal' | 'highlighted' | 'red bold';
 
@@ -43,6 +45,7 @@ interface MemoryViewState {
   setTotalMemorySize: (size: number) => void;
   loadMemoryRange: (start: number, end: number) => Promise<void>;
   getMemoryValue: (address: number) => MemoryNodeData | null;
+  getMemoryLabelFromWatch: () => MemoryLabel[];
 }
 
 export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
@@ -213,5 +216,16 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       memoryValues: newValues,
       changedNodes,
     });
+  },
+  getMemoryLabelFromWatch: () => {
+    const { watch } = useWatchStore();
+    const labels: MemoryLabel[] = [];
+    watch.forEach((watch: WatchRow) => {
+      const { address, name, dataType, elementSize, elementCount } = watch;
+      const end = address + elementSize * elementCount - 1;
+      labels.push({ start: address, end, name: name });
+    });
+
+    return labels;
   },
 }));

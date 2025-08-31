@@ -31,6 +31,7 @@ export default defineConfig({
         input: {
           index: path.resolve(__dirname, 'index.html'),
           splash: path.resolve(__dirname, 'src/splash.html'),
+          progress: path.resolve(__dirname, 'src/progress.html'),
         },
       },
     },
