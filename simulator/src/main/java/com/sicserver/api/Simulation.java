@@ -11,6 +11,7 @@ import sic.asm.ErrorCatcher;
 import sic.ast.Program;
 import sic.ast.StorageSymbol;
 import sic.common.Utils;
+import sic.link.section.Section;
 import sic.loader.Loader;
 import sic.sim.Args;
 import sic.sim.Executor;
@@ -133,6 +134,7 @@ public class Simulation {
         if (filePaths == null || filePaths.length == 0) {
             aggregate.ok = false;
             aggregate.message = "No input files.";
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
@@ -143,16 +145,18 @@ public class Simulation {
         } catch (IOException ioe) {
             aggregate.ok = false;
             aggregate.message = "Invalid output directory: " + ioe.getMessage();
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
         // Resolve linker output directory: <outDir>/.out/linker/
-        File linkerOutDir = new File(new File(outDir, ".out"), "linker");
+        File linkerOutDir = new File(outDir, "linker");
         try {
             ensureDir(linkerOutDir);
         } catch (IOException ioe) {
             aggregate.ok = false;
             aggregate.message = "Invalid linker output directory: " + ioe.getMessage();
+            aggregate.registers = snapshotRegisters();
             return gson.toJson(aggregate);
         }
 
@@ -225,9 +229,11 @@ public class Simulation {
                     // Prelim DTO (will be replaced with relocated one if we link)
                     perFile.listing = listingToDTO(listing);
 
-                    // Optionally load to machine
-                    Loader.loadSection(executor.machine, new StringReader(objText));
-                    this.lastProgram = program;
+                    // Finally load to machine
+                    if (!multi) {
+                        Loader.loadSection(executor.machine, new StringReader(objText));
+                        this.lastProgram = program;
+                    }
 
                 } else if ("obj".equalsIgnoreCase(ext)) {
                     // Raw .obj inputs are not allowed in this API
@@ -278,7 +284,9 @@ public class Simulation {
                 Linker linker = new Linker(generatedObjPaths, options);
 
                 // Perform link
-                linker.link();
+                Section linkedSection = linker.link();
+                sic.link.utils.Writer writer = new sic.link.utils.Writer(linkedSection, options);
+                File file = writer.write();
 
                 // Apply relocations to each Listing and refresh DTOs
                 Relocations relocs = linker.relocations; // exposed by your Linker
@@ -287,12 +295,22 @@ public class Simulation {
                         if (fr.listing != null) {
                             Listing listingObj = builtListings.get(fr.fileName);
                             if (listingObj != null) {
+                                System.out.println(fr.fileName + " BEFORE relocation");
+                                for(var row : listingObj.rows)
+                                    System.out.println(row.toString());
                                 listingObj.relocate(relocs);
+                                System.out.println(fr.fileName + " AFTER relocation");
+                                for(var row : listingObj.rows)
+                                    System.out.println(row.toString());
                                 fr.listing = listingToDTO(listingObj); // replace with relocated DTO
                             }
                         }
                     }
                 }
+
+                // Load the linked output to machine
+                String linkedObjText = Files.readString(file.toPath());
+                Loader.loadSection(executor.machine, new StringReader(linkedObjText));
 
             } catch (LinkerError le) {
                 // For every file that didn't already fail compile, replace listing with linkerError
@@ -306,7 +324,24 @@ public class Simulation {
                     }
                 }
                 aggregate.ok = false;
-                aggregate.message = "Linking failed.";
+                aggregate.message = "Linking failed : " + le.getMessage();
+                aggregate.registers = snapshotRegisters();
+                return gson.toJson(aggregate);
+
+            } catch (IOException ioe) {
+                // Handle IO problems reading/writing linked output
+                for (FileLoadResult fr : aggregate.files) {
+                    if (fr.compileErrors == null || fr.compileErrors.isEmpty()) {
+                        fr.listing = null;
+                        LinkerErrorDto leDto = new LinkerErrorDto();
+                        leDto.phase = "io";
+                        leDto.msg = ioe.getMessage();
+                        fr.linkerError = leDto;
+                    }
+                }
+                aggregate.ok = false;
+                aggregate.message = "I/O error during linking: " + ioe.getMessage();
+                aggregate.registers = snapshotRegisters();
                 return gson.toJson(aggregate);
             }
         }
@@ -323,6 +358,7 @@ public class Simulation {
         if (aggregate.message == null) {
             aggregate.message = okAll ? "OK" : "Completed with errors.";
         }
+        aggregate.registers = snapshotRegisters();
         return gson.toJson(aggregate);
     }
 
@@ -449,4 +485,17 @@ public class Simulation {
         return gson.toJson(out);
     }
 
+    private Registers snapshotRegisters() {
+        Registers r = new Registers();
+        r.A  = machine.registers.getA();
+        r.X  = machine.registers.getX();
+        r.L  = machine.registers.getL();
+        r.S  = machine.registers.getS();
+        r.T  = machine.registers.getT();
+        r.B  = machine.registers.getB();
+        r.SW = machine.registers.getSW();
+        r.PC = machine.registers.getPC();
+        r.F  = String.valueOf(machine.registers.getF());
+        return r;
+    }
 }

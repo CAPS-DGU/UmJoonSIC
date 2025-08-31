@@ -41,23 +41,18 @@ import com.sicserver.api.Simulation;
  * ### 2) POST /load
  * **Purpose:** Assemble (and if multi-file, link) one or more `.asm` files; writes `.obj` files.
  *
- * **Request JSON:**
+ * **Request JSON (extended options):**
  * ```json
  * {
  *   "filePaths": ["/abs/foo.asm", "/abs/bar.asm"],
  *   "outputDir": "/abs/out",      // optional; default "."
- *   "outputName": "out.obj",       // optional; default "out.obj"
- *   "main": "ENTRY",               // optional; omit or null if not needed
- *   "keep": false,                  // optional; default false
- *   "graphical": false,             // optional; default false
- *   "editing": false,               // optional; default false
- *   "force": false,                 // optional; default false
- *   "verbose": true                 // optional; default true
- * }
- * ```json
- * {
- *   "filePaths": ["/abs/foo.asm", "/abs/bar.asm"],
- *   "outputDir": "/abs/out"   // optional; default "."
+ *   "outputName": "out.obj",      // optional; default "out.obj"
+ *   "main": "ENTRY",              // optional; omit or null if not needed
+ *   "keep": false,                // optional; default false
+ *   "graphical": false,           // optional; default false
+ *   "editing": false,             // optional; default false
+ *   "force": false,               // optional; default false
+ *   "verbose": true               // optional; default true
  * }
  * ```
  *
@@ -70,16 +65,18 @@ import com.sicserver.api.Simulation;
  *     {
  *       "fileName": "...",
  *       "listing": { "codeFileName":"...", "startAddress":4096, "programLength":123,
- *                     "rows":[{...}], "watch":[{"name":"X","address":4096,...}] },
+ *                    "rows":[{...}], "watch":[{"name":"X","address":4096,...}] },
  *       "compileErrors": null,
  *       "linkerError": null
  *     }
- *   ]
+ *   ],
+ *   "registers": { "A":0, "X":0, "L":0, "S":0, "T":0, "B":0, "SW":0, "PC":4096, "F":"0.0" }
  * }
  * ```
  *
  * **Notes:**
  * - Exactly one of `listing`, `compileErrors`, `linkerError` is populated per file.
+ * - `registers` is a snapshot of the machine state **after** loading (and linking, when applicable).
  * - Raw `.obj` inputs are **rejected** by the API (see error in response).
  *
  * ---
@@ -138,14 +135,6 @@ import com.sicserver.api.Simulation;
  *   "registers": { "A":0, "X":0, "L":0, "S":0, "T":0, "B":0, "SW":0, "PC":4099, "F":"0.0" }
  * }
  * ```
- *
- * ---
- * ### Example curl
- * ```bash
- * curl -s -X POST http://127.0.0.1:8080/begin -H 'Content-Type: application/json' -d '{}'
- * curl -s -X POST http://127.0.0.1:8080/load -H 'Content-Type: application/json' \
- *   -d '{"filePaths":["/abs/main.asm"],"outputDir":"/abs/out"}'
- * ```
  */
 public class Main {
     private static final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
@@ -159,7 +148,10 @@ public class Main {
     }
 
     // ---------- Request DTOs ----------
-    static final class LoadReq { String[] filePaths; String outputDir; String outputName; String main; Boolean keep; Boolean graphical; Boolean editing; Boolean force; Boolean verbose; }
+    static final class LoadReq {
+        String[] filePaths; String outputDir; String outputName; String main;
+        Boolean keep; Boolean graphical; Boolean editing; Boolean force; Boolean verbose;
+    }
     static final class SyntaxReq { String[] texts; String[] fileNames; }
     static final class MemoryReq { Object addr; Object start; Object end; }
 
@@ -175,12 +167,15 @@ public class Main {
 
         ipAddress("127.0.0.1");
         port(portNum);
+
+        // CORS + default handlers (centralized, overwrite headers to avoid duplicates)
+        installJsonDefaultsAndHandlers();
+        enableCorsSingleton("*", "POST,OPTIONS", "Content-Type, Authorization, X-Requested-With");
+
         System.out.println("Server running on http://127.0.0.1:" + portNum);
 
-        // Global response type
-        after((req, res) -> res.type("application/json; charset=UTF-8"));
-
-        // Health
+        // ---------- Routes ----------
+        // Health / init simulation
         post("/begin", (req, res) -> {
             SIM = new Simulation();
             return gson.toJson(new Msg(true, "Simulation initialized"));
@@ -191,8 +186,9 @@ public class Main {
             if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
             LoadReq body = safeFromJson(req.body(), LoadReq.class);
             if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with filePaths (array)."));
-            if (body.filePaths == null || body.filePaths.length == 0) return gson.toJson(new Msg(false, "filePaths must be a non-empty array."));
-            // main is optional; pass through as-is (Simulation.load handles null/blank)
+            if (body.filePaths == null || body.filePaths.length == 0)
+                return gson.toJson(new Msg(false, "filePaths must be a non-empty array."));
+            // main and other options are optional; Simulation.load handles defaults
             return SIM.load(
                     body.filePaths,
                     body.outputDir,
@@ -220,7 +216,8 @@ public class Main {
         post("/memory", (req, res) -> {
             if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
             MemoryReq body = safeFromJson(req.body(), MemoryReq.class);
-            if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with addr OR start+end."));
+            if (body == null)
+                return gson.toJson(new Msg(false, "Expected JSON body with addr OR start+end."));
 
             Integer addr = parseIntFlexible(body.addr);
             Integer start = parseIntFlexible(body.start);
@@ -232,7 +229,8 @@ public class Main {
             if (addr == null && start != null && end != null) {
                 return SIM.memory(start, end); // already JSON
             }
-            return gson.toJson(new Msg(false, "Provide either {addr} OR {start,end}. Values may be decimal or hex strings like '0x1000'."));
+            return gson.toJson(new Msg(false,
+                    "Provide either {addr} OR {start,end}. Values may be decimal or hex strings like '0x1000'."));
         });
 
         // One step
@@ -240,9 +238,6 @@ public class Main {
             if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
             return SIM.step(); // already JSON
         });
-
-        // 404 fallback (POST-only surface)
-        post("*", (req, res) -> gson.toJson(new Msg(false, "Unknown endpoint.")));
     }
 
     private static <T> T safeFromJson(String json, Class<T> clazz) {
@@ -263,5 +258,63 @@ public class Main {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** CORS for browsers + preflight (uses setHeader to AVOID duplicates) */
+    private static void enableCorsSingleton(String allowOrigin, String allowMethods, String allowHeaders) {
+        // Preflight for any path
+        options("/*", (req, res) -> {
+            String reqHeaders = req.headers("Access-Control-Request-Headers");
+            String reqMethod  = req.headers("Access-Control-Request-Method");
+
+            // Overwrite each header once
+            res.raw().setHeader("Access-Control-Allow-Origin", allowOrigin);
+            res.raw().setHeader("Vary", "Origin");
+
+            if (reqHeaders != null) res.raw().setHeader("Access-Control-Allow-Headers", reqHeaders);
+            else res.raw().setHeader("Access-Control-Allow-Headers", allowHeaders);
+
+            if (reqMethod != null) res.raw().setHeader("Access-Control-Allow-Methods", reqMethod);
+            else res.raw().setHeader("Access-Control-Allow-Methods", allowMethods);
+
+            res.raw().setHeader("Access-Control-Max-Age", "86400"); // 1 day
+            res.status(204); // No Content
+            return "";
+        });
+
+        // Apply headers to all non-OPTIONS responses (overwrite, don’t append)
+        after((req, res) -> {
+            if (!"OPTIONS".equalsIgnoreCase(req.requestMethod())) {
+                res.raw().setHeader("Access-Control-Allow-Origin", allowOrigin);
+                res.raw().setHeader("Access-Control-Allow-Methods", allowMethods);
+                res.raw().setHeader("Access-Control-Allow-Headers", allowHeaders);
+                res.raw().setHeader("Vary", "Origin");
+            }
+        });
+    }
+
+    /** JSON content-type defaults, unified errors, and sane fallbacks */
+    private static void installJsonDefaultsAndHandlers() {
+        // Set JSON content-type on every non-OPTIONS response
+        after((req, res) -> {
+            if (!"OPTIONS".equalsIgnoreCase(req.requestMethod())) {
+                res.type("application/json; charset=UTF-8");
+                res.raw().setHeader("Cache-Control", "no-store");
+            }
+        });
+
+        // Return JSON for 404s (e.g., wrong method/path)
+        notFound((req, res) -> {
+            res.type("application/json; charset=UTF-8");
+            return new Gson().toJson(new Msg(false, "Not found: " + req.requestMethod() + " " + req.pathInfo()));
+        });
+
+        // Return JSON for 500s (uncaught)
+        exception(Exception.class, (e, req, res) -> {
+            res.type("application/json; charset=UTF-8");
+            res.status(500);
+            e.printStackTrace(); // log server-side
+            res.body(new Gson().toJson(new Msg(false, "Internal error: " + e.getMessage())));
+        });
     }
 }
