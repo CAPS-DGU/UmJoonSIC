@@ -38,6 +38,13 @@ export default function CodeEditor() {
   const { result, runCheck } = useSyntaxCheck();
 
   useEffect(() => {
+    if (!activeTab) return;
+
+    // 탭 전환 시 문법 검사
+    runCheck([activeTab.fileContent], [activeTab.filePath]);
+  }, [activeTab, runCheck]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
