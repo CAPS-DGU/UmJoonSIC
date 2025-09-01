@@ -1,7 +1,7 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { useEffect, useRef, useMemo } from 'react';
 import * as monaco_editor from 'monaco-editor';
-import { useEditorTabStore } from '@/stores/EditorTabStore';
+import { useEditorTabStore, type EditorTab } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
@@ -60,52 +60,41 @@ export default function CodeEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [texts, fileNames, runCheck]);
 
-  const errorDecorationIdsRef = useRef<string[]>([]);
-
   useEffect(() => {
-    if (!editorRef.current || !activeTab || !result) return;
+    const editor = editorRef.current;
+    if (!editor || !activeTab || !result) return;
+
+    const model = editor.getModel();
+    if (!model) return;
 
     const fileResult = result.files.find(
       f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
     );
 
-    // 에러 없으면 기존 제거
-    if (!fileResult || !fileResult.compileErrors?.length) {
-      errorDecorationIdsRef.current = editorRef.current.deltaDecorations(
-        errorDecorationIdsRef.current,
-        [],
-      );
+    if (!monaco || !fileResult) {
       return;
     }
 
-    const model = editorRef.current.getModel();
-    if (!model) return;
+    if (!fileResult || !fileResult.compileErrors?.length) {
+      monaco.editor.setModelMarkers(model, 'sicxe', []);
+      return;
+    }
 
-    const decorations = fileResult.compileErrors.map(err => {
-      const line = clampLine(err.row, model); // 그대로 사용
-      const column = clampLine(err.col, model); // 필요하다면 col도 보정
-      return {
-        range: new monaco_editor.Range(line, column, line, model.getLineMaxColumn(line)),
-        options: {
-          isWholeLine: true,
-          className: 'syntax-error-line',
-          after: {
-            content: ` ⬅ ${err.message}`,
-            inlineClassName: 'syntax-error-inline',
-          },
-        },
-      };
-    });
+    const markers = fileResult.compileErrors.map(err => ({
+      severity: monaco.MarkerSeverity.Error,
+      message: err.message,
+      startLineNumber: clampLine(err.row, model),
+      startColumn: clampLine(err.col, model),
+      endLineNumber: clampLine(err.row, model),
+      endColumn: clampLine(err.col + (err.length ?? 1), model), // length 없으면 1로
+    }));
 
-    errorDecorationIdsRef.current = editorRef.current.deltaDecorations(
-      errorDecorationIdsRef.current,
-      decorations,
-    );
-  }, [result, activeTab]);
+    monaco.editor.setModelMarkers(model, 'sicxe', markers);
+  }, [result, activeTab, monaco]);
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
-    monaco: typeof monaco_editor | null,
+    // monaco: typeof monaco_editor | null,
   ) => {
     editorRef.current = editor;
 
@@ -190,7 +179,7 @@ export default function CodeEditor() {
   };
 
   // Breakpoint 데코레이션 업데이트 함수
-  const updateBreakpointDecorations = (tab?: any) => {
+  const updateBreakpointDecorations = (tab?: EditorTab) => {
     const targetTab = tab || activeTab;
     const editor = editorRef.current;
     if (!editor || !targetTab) {
@@ -353,7 +342,7 @@ export default function CodeEditor() {
           fontSize: 16, // 폰트 크기
           tabSize: 8, // SIC/XE 컬럼 기준 탭
           insertSpaces: true, // 탭 대신 스페이스
-          rulers: [8, 16, 24, 32, 40], // 컬럼 가이드
+          rulers: [8, 16, 24], // 컬럼 가이드
           wordWrap: 'off', // 자동 줄바꿈 해제
           fontLigatures: false,
         }}

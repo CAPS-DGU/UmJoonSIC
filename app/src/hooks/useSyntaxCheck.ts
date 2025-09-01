@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 export interface CompileError {
   row: number;
   col: number;
+  length?: number;
   message: string;
   nonbreaking: boolean;
 }
