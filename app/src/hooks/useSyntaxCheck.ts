@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useErrorStore } from '@/stores/pannel/ErrorStore';
 
 // ----- 타입 정의 -----
 export interface CompileError {
@@ -44,7 +45,18 @@ export function useSyntaxCheck() {
 
       const data: SyntaxCheckResult = await res.json();
       setResult(data);
-      console.log('Syntax check result:', data);
+      console.log(data);
+
+      // ----- Zustand 에러 스토어 갱신 -----
+      fileNames.forEach((fileName, idx) => {
+        const newErrors: (CompileError & { type: 'syntax' })[] =
+          data.files[idx]?.compileErrors?.map(err => ({
+            ...err,
+            type: 'syntax',
+          })) ?? [];
+
+        useErrorStore.getState().addErrors(fileName, newErrors);
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '알 수 없는 오류 발생');
     } finally {

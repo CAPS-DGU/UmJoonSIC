@@ -1,5 +1,5 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import * as monaco_editor from 'monaco-editor';
 import { useEditorTabStore, type EditorTab } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
@@ -32,8 +32,8 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const isLoadingRef = useRef(false);
-  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab]);
-  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab]);
+  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
+  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
 
   const { result, runCheck } = useSyntaxCheck();
 
@@ -42,18 +42,23 @@ export default function CodeEditor() {
 
     // 탭 전환 시 문법 검사
     runCheck([activeTab.fileContent], [activeTab.filePath]);
-  }, [activeTab, runCheck]);
+  }, [activeTab?.idx, runCheck]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      const key = e.key;
+      // 저장
+      if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') {
         e.preventDefault();
-        runCheck(texts, fileNames); // 저장 시 검사
+        runCheck(texts, fileNames);
+        return;
       }
-
-      if (['Tab', 'Enter', ' '].includes(e.key)) {
-        runCheck(texts, fileNames); // 공백류 입력 시 검사
+      // 공백 관련 키만 검사
+      if (key === ' ' || key === 'Tab' || key === 'Enter') {
+        runCheck(texts, fileNames);
+        return;
       }
+      // 나머지 키는 무시
     };
 
     window.addEventListener('keydown', handleKeyDown);
