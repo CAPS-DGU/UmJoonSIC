@@ -1,142 +1,24 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import * as monaco_editor from 'monaco-editor';
-import { useEditorTabStore } from '@/stores/EditorTabStore';
+import { useEditorTabStore, type EditorTab } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
+import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
+import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
+import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
+
+import EditorErrorBoundary from './EditorErrorBoundary';
+import '@/styles/SyntaxError.css';
+
+const clampLine = (line1: number, model: monaco_editor.editor.ITextModel) => {
+  return Math.max(1, Math.min(line1 ?? 1, model.getLineCount()));
+};
 
 function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   if (monaco) {
     monaco.languages.register({ id: 'sicxe' });
-
-    monaco.languages.setMonarchTokensProvider('sicxe', {
-      tokenizer: {
-        root: [
-          [/^\s*\..*/, 'comment'], // 주석(.으로 시작)
-          [
-            /\b(LDA|STA|ADD|SUB|MUL|DIV|LDX|STX|COMP|JSUB|RSUB|J|JEQ|JLT|JGT|CLEAR|TIX|TD|RD|WD)\b/i,
-            'keyword',
-          ], // 명령어
-          [/\b(START|END|BYTE|WORD|RESB|RESW|BASE|NOBASE|EQU)\b/i, 'keyword.directive'], // 지시어
-          [/#[a-zA-Z0-9_]+/, 'number.immediate'], // 즉시 주소 (#VALUE)
-          [/@[a-zA-Z0-9_]+/, 'variable.indirect'], // 간접 주소 (@VALUE)
-          [/[a-zA-Z_]\w*/, 'identifier'], // 심볼(Label, 이름)
-          [/[0-9]+/, 'number'], // 10진수
-          [/X'([0-9A-Fa-f]+)'/, 'number.hex'], // 16진 상수
-          [/C'([^']+)'/, 'string'], // 문자 상수
-          [/:/, 'delimiter'], // 콜론
-          [/[,+\-*/]/, 'operator'], // 연산자
-        ],
-      },
-    });
-
-    monaco.editor.defineTheme('sicxeTheme', {
-      base: 'vs',
-      inherit: true,
-      rules: [
-        // 주석 - 연한 초록색, 이탤릭
-        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
-        { token: 'comment.line', foreground: '6A9955', fontStyle: 'italic' },
-        { token: 'comment.block', foreground: '6A9955', fontStyle: 'italic' },
-
-        // 키워드 - 밝은 파란색, 볼드
-        { token: 'keyword', foreground: '569CD6', fontStyle: 'bold' },
-        { token: 'keyword.control', foreground: 'C586C0', fontStyle: 'bold' },
-
-        // 변수/라벨 - 밝은 청록색
-        { token: 'variable', foreground: '9CDCFE' },
-        { token: 'variable.name', foreground: '9CDCFE' },
-        { token: 'variable.parameter', foreground: '9CDCFE' },
-
-        // 숫자 - 연한 노란색
-        { token: 'number', foreground: 'B5CEA8' },
-        { token: 'number.hex', foreground: 'B5CEA8' },
-        { token: 'number.binary', foreground: 'B5CEA8' },
-
-        // 연산자 - 밝은 회색
-        { token: 'operator', foreground: 'D4D4D4' },
-        { token: 'operator.arithmetic', foreground: 'D4D4D4' },
-        { token: 'operator.logical', foreground: 'D4D4D4' },
-
-        // 구분자 - 밝은 회색
-        { token: 'delimiter', foreground: 'D4D4D4' },
-        { token: 'delimiter.square', foreground: 'D4D4D4' },
-        { token: 'delimiter.parenthesis', foreground: 'D4D4D4' },
-        { token: 'delimiter.curly', foreground: 'D4D4D4' },
-
-        // 문자열 - 연한 주황색
-        { token: 'string', foreground: 'CE9178' },
-        { token: 'string.quoted', foreground: 'CE9178' },
-        { token: 'string.quoted.single', foreground: 'CE9178' },
-        { token: 'string.quoted.double', foreground: 'CE9178' },
-
-        // 함수/명령어 - 밝은 보라색
-        { token: 'function', foreground: 'DCDCAA' },
-        { token: 'function.name', foreground: 'DCDCAA' },
-
-        // 상수 - 연한 분홍색
-        { token: 'constant', foreground: '4FC1FF' },
-        { token: 'constant.numeric', foreground: 'B5CEA8' },
-        { token: 'constant.character', foreground: '4FC1FF' },
-
-        // 타입 - 연한 초록색
-        { token: 'type', foreground: '4EC9B0' },
-        { token: 'type.primitive', foreground: '4EC9B0' },
-
-        // 기타 토큰들
-        { token: 'entity', foreground: '9CDCFE' },
-        { token: 'entity.name', foreground: '9CDCFE' },
-        { token: 'entity.name.function', foreground: 'DCDCAA' },
-        { token: 'entity.name.type', foreground: '4EC9B0' },
-
-        // 특수 문자들
-        { token: 'punctuation', foreground: 'D4D4D4' },
-        { token: 'punctuation.definition', foreground: 'D4D4D4' },
-        { token: 'punctuation.separator', foreground: 'D4D4D4' },
-        { token: 'punctuation.terminator', foreground: 'D4D4D4' },
-      ],
-      colors: {
-        // 에디터 배경색
-        'editor.background': '#1E1E1E',
-        'editor.foreground': '#D4D4D4',
-
-        // 선택 영역
-        'editor.selectionBackground': '#264F78',
-        'editor.selectionHighlightBackground': '#2A2D2E',
-
-        // 현재 라인 하이라이트
-        'editor.lineHighlightBackground': '#2A2D2E',
-        'editor.lineHighlightBorder': '#454545',
-
-        // 커서
-        'editorCursor.foreground': '#AEAFAD',
-
-        // 인디케이터
-        'editorIndentGuide.background': '#404040',
-        'editorIndentGuide.activeBackground': '#707070',
-
-        // 스크롤바
-        'scrollbarSlider.background': '#424242',
-        'scrollbarSlider.hoverBackground': '#4F4F4F',
-        'scrollbarSlider.activeBackground': '#686868',
-
-        // 라인 번호
-        'editorLineNumber.foreground': '#858585',
-        'editorLineNumber.activeForeground': '#C6C6C6',
-
-        // 검색 하이라이트
-        'editor.findMatchBackground': '#515C6A',
-        'editor.findMatchHighlightBackground': '#3A3D41',
-
-        // 브레이크포인트
-        'editor.breakpointBackground': '#E51400',
-        'editor.breakpointBorder': '#E51400',
-
-        // 에러/경고
-        'editorError.foreground': '#F44747',
-        'editorWarning.foreground': '#CCA700',
-        'editorInfo.foreground': '#75BEFF',
-      },
-    });
+    monaco.languages.setMonarchTokensProvider('sicxe', sicxeLanguage);
+    monaco.editor.defineTheme('sicxeTheme', sicxeTheme);
   }
 }
 
@@ -150,10 +32,74 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const isLoadingRef = useRef(false);
+  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
+  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
+
+  const { result, runCheck } = useSyntaxCheck();
+
+  useEffect(() => {
+    if (!activeTab) return;
+
+    // 탭 전환 시 문법 검사
+    runCheck([activeTab.fileContent], [activeTab.filePath]);
+  }, [activeTab?.idx, runCheck]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key;
+      // 저장
+      if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') {
+        e.preventDefault();
+        runCheck(texts, fileNames);
+        return;
+      }
+      // 공백 관련 키만 검사
+      if (key === ' ' || key === 'Tab' || key === 'Enter') {
+        runCheck(texts, fileNames);
+        return;
+      }
+      // 나머지 키는 무시
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [texts, fileNames, runCheck]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !activeTab || !result) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    const fileResult = result.files.find(
+      f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
+    );
+
+    if (!monaco || !fileResult) {
+      return;
+    }
+
+    if (!fileResult || !fileResult.compileErrors?.length) {
+      monaco.editor.setModelMarkers(model, 'sicxe', []);
+      return;
+    }
+
+    const markers = fileResult.compileErrors.map(err => ({
+      severity: monaco.MarkerSeverity.Error,
+      message: err.message,
+      startLineNumber: clampLine(err.row, model),
+      startColumn: clampLine(err.col, model),
+      endLineNumber: clampLine(err.row, model),
+      endColumn: clampLine(err.col + (err.length ?? 1), model), // length 없으면 1로
+    }));
+
+    monaco.editor.setModelMarkers(model, 'sicxe', markers);
+  }, [result, activeTab, monaco]);
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
-    monaco: typeof monaco_editor | null,
+    // monaco: typeof monaco_editor | null,
   ) => {
     editorRef.current = editor;
 
@@ -214,6 +160,11 @@ export default function CodeEditor() {
       }
     });
 
+    // 복사시 문법 체크
+    editorRef.current.onDidPaste(() => {
+      runCheck([editorRef.current!.getValue()], [activeTab!.filePath]);
+    });
+
     editor.onDidChangeModelContent(() => {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab && !isLoadingRef.current) {
@@ -224,23 +175,32 @@ export default function CodeEditor() {
   };
 
   // Breakpoint 데코레이션 업데이트 함수
-  const updateBreakpointDecorations = (tab?: any) => {
+  const updateBreakpointDecorations = (tab?: EditorTab) => {
     const targetTab = tab || activeTab;
-
-    if (!editorRef.current || !targetTab) {
+    const editor = editorRef.current;
+    if (!editor || !targetTab) {
       console.log('Cannot update decorations - editor or targetTab not available');
       return;
     }
 
+    const model = editor.getModel();
+    if (!model) return;
+
     console.log('Updating breakpoint decorations for breakpoints:', targetTab.breakpoints);
 
-    // 기존 데코레이션 제거
+    // 기존 데코 제거
     if (decorationIdsRef.current.length > 0) {
-      editorRef.current.deltaDecorations(decorationIdsRef.current, []);
-      console.log('Removed existing decorations:', decorationIdsRef.current);
+      editor.deltaDecorations(decorationIdsRef.current, []);
     }
 
-    const decorations = targetTab.breakpoints.map((lineNumber: number) => ({
+    // ✅ 숫자 보정 + 1~lineCount 범위로 제한 + 중복 제거
+    const validLines = (targetTab.breakpoints ?? [])
+      .map((n: unknown) => Math.floor(Number(n)))
+      .filter((n: number) => Number.isFinite(n))
+      .map((n: number) => clampLine(n, model))
+      .filter((n: number, i: number, arr: number[]) => arr.indexOf(n) === i);
+
+    const decorations = validLines.map((lineNumber: number) => ({
       range: new monaco_editor.Range(lineNumber, 1, lineNumber, 1),
       options: {
         glyphMarginClassName: 'breakpoint-glyph',
@@ -251,9 +211,8 @@ export default function CodeEditor() {
     }));
 
     console.log('Created decorations:', decorations);
-    const newDecorationIds = editorRef.current.deltaDecorations([], decorations);
-    decorationIdsRef.current = newDecorationIds;
-    console.log('Applied decoration IDs:', newDecorationIds);
+    decorationIdsRef.current = editor.deltaDecorations([], decorations);
+    console.log('Applied decoration IDs:', decorationIdsRef.current);
   };
 
   // Breakpoint 시각적 표시를 위한 CSS 추가
@@ -358,7 +317,7 @@ export default function CodeEditor() {
   }
 
   return (
-    <>
+    <EditorErrorBoundary>
       <Editor
         height="100%"
         theme="asmTheme" // 추가한 테마를 적용합니다.
@@ -380,10 +339,10 @@ export default function CodeEditor() {
           letterSpacing: 1.25, // 글자 간격(px)
           tabSize: 8, // SIC/XE 컬럼 기준 탭
           insertSpaces: true, // 탭 대신 스페이스
-          rulers: [8, 16, 24, 32, 40], // 컬럼 가이드
+          rulers: [8, 16, 24], // 컬럼 가이드
           wordWrap: 'off', // 자동 줄바꿈 해제
         }}
       />
-    </>
+    </EditorErrorBoundary>
   );
 }
