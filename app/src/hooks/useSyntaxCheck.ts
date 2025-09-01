@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 // ----- 타입 정의 -----
 export interface CompileError {
@@ -21,44 +21,35 @@ export interface SyntaxCheckResult {
 }
 
 // ----- 커스텀 훅 -----
-export function useSyntaxCheck(texts: string[], fileNames: string[]) {
+export function useSyntaxCheck() {
   const [result, setResult] = useState<SyntaxCheckResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // texts/fileNames 둘 다 유효해야 호출
+  const runCheck = useCallback(async (texts: string[], fileNames: string[]) => {
     if (!texts?.length || !fileNames?.length || texts.length !== fileNames.length) return;
 
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-        const res = await fetch('http://localhost:9090/syntax-check', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texts, fileNames }),
-        });
+      const res = await fetch('http://localhost:9090/syntax-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts, fileNames }),
+      });
 
-        if (!res.ok) throw new Error('서버 요청 실패');
+      if (!res.ok) throw new Error('서버 요청 실패');
 
-        const data: SyntaxCheckResult = await res.json();
-        setResult(data);
-        console.log('Syntax check result:', data);
-      } catch (err: unknown) {
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError('알 수 없는 오류 발생');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+      const data: SyntaxCheckResult = await res.json();
+      setResult(data);
+      console.log('Syntax check result:', data);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '알 수 없는 오류 발생');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    fetchData();
-  }, [texts, fileNames]);
-
-  return { result, loading, error };
+  return { result, loading, error, runCheck };
 }

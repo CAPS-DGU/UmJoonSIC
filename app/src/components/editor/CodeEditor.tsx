@@ -32,10 +32,26 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const decorationIdsRef = useRef<string[]>([]);
   const isLoadingRef = useRef(false);
-  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
-  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
+  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab]);
+  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab]);
 
-  const { result } = useSyntaxCheck(texts, fileNames);
+  const { result, runCheck } = useSyntaxCheck();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        runCheck(texts, fileNames); // 저장 시 검사
+      }
+
+      if (['Tab', 'Enter', ' '].includes(e.key)) {
+        runCheck(texts, fileNames); // 공백류 입력 시 검사
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [texts, fileNames, runCheck]);
 
   const errorDecorationIdsRef = useRef<string[]>([]);
 
@@ -150,6 +166,11 @@ export default function CodeEditor() {
       if (currentActiveTab) {
         setCursor(currentActiveTab.idx, { line: e.position.lineNumber, column: e.position.column });
       }
+    });
+
+    // 복사시 문법 체크
+    editorRef.current.onDidPaste(() => {
+      runCheck([editorRef.current!.getValue()], [activeTab!.filePath]);
     });
 
     editor.onDidChangeModelContent(() => {
