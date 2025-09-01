@@ -6,7 +6,13 @@ import { useProjectStore } from '@/stores/ProjectStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
 import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
+
+import EditorErrorBoundary from './EditorErrorBoundary';
 import '@/styles/SyntaxError.css';
+
+const clampLine = (line1: number, model: monaco_editor.editor.ITextModel) => {
+  return Math.max(1, Math.min(line1 ?? 1, model.getLineCount()));
+};
 
 function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   if (monaco) {
@@ -52,17 +58,21 @@ export default function CodeEditor() {
     const model = editorRef.current.getModel();
     if (!model) return;
 
-    const decorations = fileResult.compileErrors.map(err => ({
-      range: new monaco_editor.Range(err.row, 1, err.row, model.getLineMaxColumn(err.row)),
-      options: {
-        isWholeLine: true,
-        className: 'syntax-error-line', // 라인 배경색
-        after: {
-          content: ` ⬅ ${err.message}`,
-          inlineClassName: 'syntax-error-inline',
+    const decorations = fileResult.compileErrors.map(err => {
+      const line = clampLine(err.row, model); // 그대로 사용
+      const column = clampLine(err.col, model); // 필요하다면 col도 보정
+      return {
+        range: new monaco_editor.Range(line, column, line, model.getLineMaxColumn(line)),
+        options: {
+          isWholeLine: true,
+          className: 'syntax-error-line',
+          after: {
+            content: ` ⬅ ${err.message}`,
+            inlineClassName: 'syntax-error-inline',
+          },
         },
-      },
-    }));
+      };
+    });
 
     errorDecorationIdsRef.current = editorRef.current.deltaDecorations(
       errorDecorationIdsRef.current,
@@ -154,21 +164,30 @@ export default function CodeEditor() {
   // Breakpoint 데코레이션 업데이트 함수
   const updateBreakpointDecorations = (tab?: any) => {
     const targetTab = tab || activeTab;
-
-    if (!editorRef.current || !targetTab) {
+    const editor = editorRef.current;
+    if (!editor || !targetTab) {
       console.log('Cannot update decorations - editor or targetTab not available');
       return;
     }
 
+    const model = editor.getModel();
+    if (!model) return;
+
     console.log('Updating breakpoint decorations for breakpoints:', targetTab.breakpoints);
 
-    // 기존 데코레이션 제거
+    // 기존 데코 제거
     if (decorationIdsRef.current.length > 0) {
-      editorRef.current.deltaDecorations(decorationIdsRef.current, []);
-      console.log('Removed existing decorations:', decorationIdsRef.current);
+      editor.deltaDecorations(decorationIdsRef.current, []);
     }
 
-    const decorations = targetTab.breakpoints.map((lineNumber: number) => ({
+    // ✅ 숫자 보정 + 1~lineCount 범위로 제한 + 중복 제거
+    const validLines = (targetTab.breakpoints ?? [])
+      .map((n: unknown) => Math.floor(Number(n)))
+      .filter((n: number) => Number.isFinite(n))
+      .map((n: number) => clampLine(n, model))
+      .filter((n: number, i: number, arr: number[]) => arr.indexOf(n) === i);
+
+    const decorations = validLines.map((lineNumber: number) => ({
       range: new monaco_editor.Range(lineNumber, 1, lineNumber, 1),
       options: {
         glyphMarginClassName: 'breakpoint-glyph',
@@ -179,9 +198,8 @@ export default function CodeEditor() {
     }));
 
     console.log('Created decorations:', decorations);
-    const newDecorationIds = editorRef.current.deltaDecorations([], decorations);
-    decorationIdsRef.current = newDecorationIds;
-    console.log('Applied decoration IDs:', newDecorationIds);
+    decorationIdsRef.current = editor.deltaDecorations([], decorations);
+    console.log('Applied decoration IDs:', decorationIdsRef.current);
   };
 
   // Breakpoint 시각적 표시를 위한 CSS 추가
@@ -286,7 +304,7 @@ export default function CodeEditor() {
   }
 
   return (
-    <>
+    <EditorErrorBoundary>
       <Editor
         height="100%"
         theme="asmTheme" // 추가한 테마를 적용합니다.
@@ -312,6 +330,6 @@ export default function CodeEditor() {
           fontLigatures: false,
         }}
       />
-    </>
+    </EditorErrorBoundary>
   );
 }
