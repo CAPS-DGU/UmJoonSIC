@@ -16,7 +16,7 @@ export default function MemoryViewer() {
   const totalMemorySize = useMemoryViewStore(state => state.totalMemorySize);
   const loadMemoryRange = useMemoryViewStore(state => state.loadMemoryRange);
   const getMemoryValue = useMemoryViewStore(state => state.getMemoryValue);
-
+  const memoryRange = useMemoryViewStore(state => state.memoryRange);
   const containerRef = useRef<HTMLDivElement>(null);
   const ROW_SIZE = 8;
   const BUFFER_SIZE = 512; // 미리 로드할 범위 (위아래 256바이트씩)
@@ -35,6 +35,12 @@ export default function MemoryViewer() {
       return () => clearTimeout(timer);
     }
   }, [changedNodes, clearChangedNodes]);
+
+  //메모리 범위 변경 확인
+  useEffect(() => {
+    // memoryRange가 바뀌면 새 범위 로드
+    loadMemoryRange(memoryRange.start, memoryRange.end);
+  }, [memoryRange, loadMemoryRange]);
 
   // 스크롤 이벤트 핸들러
   const handleScroll = useCallback(() => {
@@ -55,7 +61,10 @@ export default function MemoryViewer() {
 
     // 현재 보이는 메모리 범위 계산
     const visibleStart = startRow * ROW_SIZE;
-    const visibleEnd = Math.min(endRow * ROW_SIZE, totalMemorySize);
+    const visibleEnd = Math.min(
+      scrollTop / ROW_HEIGHT + containerHeight / ROW_HEIGHT,
+      (memoryRange.end - memoryRange.start + 1) / ROW_SIZE,
+    );
 
     // 버퍼를 포함한 로드 범위 계산
     const loadStart = Math.max(0, visibleStart - BUFFER_SIZE);

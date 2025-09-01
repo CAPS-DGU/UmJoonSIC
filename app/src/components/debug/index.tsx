@@ -1,16 +1,11 @@
-/** 에디터 우측 디버그창 */
-
-import RunIcon from '@/assets/icons/debug/run.svg';
-import ReRunIcon from '@/assets/icons/debug/rerun.svg';
-import StopIcon from '@/assets/icons/debug/stop.svg';
-import TimerIcon from '@/assets/icons/debug/timer.svg';
-
+import React, { useState, useRef, useEffect } from 'react';
+import { Cpu, AlarmClock, Play } from 'lucide-react';
 import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 import { useRunningStore } from '@/stores/RunningStore';
-import { Redo, StepForward } from 'lucide-react';
+import { Redo, StepForward, RotateCcw, Square } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
-import { useMemoryViewStore } from '@/stores/MemoryViewStore';
+import { useMemoryViewStore, type MachineMode } from '@/stores/MemoryViewStore';
 import { useWatchStore } from '@/stores/pannel/WatchStore';
 
 export default function Debug() {
@@ -19,19 +14,77 @@ export default function Debug() {
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
+
   const handleRun = async (time?: number) => {
     fetchLoad();
-    toggleIsRunning();
     fetchMemory();
     fetchVarMemoryValue();
+    toggleIsRunning();
+  };
+
+  const [showModeMenu, setShowModeMenu] = useState<boolean>(false);
+  const { mode: currentMode, setMode } = useMemoryViewStore();
+
+  // 모달 외부 클릭 감지를 위한 ref
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowModeMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleModeChange = (newMode: MachineMode) => {
+    setMode(newMode);
   };
 
   return (
     <div className="flex flex-col w-max border border-gray-200">
       <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
         <h2 className="text-lg font-bold">실행 및 디버그</h2>
-        <div className="flex space-x-2">
-          {isRunning ? <RunningButton /> : <DefaultButton handleRun={handleRun} />}
+        <div className="flex space-x-2 relative" ref={menuRef}>
+          {' '}
+          {/* ref 할당 */}
+          {isRunning ? (
+            <RunningButton />
+          ) : (
+            <DefaultButton
+              handleRun={handleRun}
+              onToggleModeMenu={() => setShowModeMenu(!showModeMenu)}
+            />
+          )}
+          {showModeMenu && (
+            <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg p-2 z-10">
+              <div className="flex flex-col space-y-1">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="machineMode"
+                    value="SIC"
+                    checked={currentMode === 'SIC'}
+                    onChange={() => handleModeChange('SIC')}
+                  />
+                  <span>SIC 모드</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="machineMode"
+                    value="SICXE"
+                    checked={currentMode === 'SICXE'}
+                    onChange={() => handleModeChange('SICXE')}
+                  />
+                  <span>SIC/XE 모드</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </section>
       <section className="border-b border-gray-200 py-3">
@@ -44,7 +97,12 @@ export default function Debug() {
   );
 }
 
-function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<void> }) {
+interface DefaultButtonProps {
+  handleRun: (time?: number) => Promise<void>;
+  onToggleModeMenu: () => void;
+}
+
+function DefaultButton({ handleRun, onToggleModeMenu }: DefaultButtonProps) {
   return (
     <>
       <button
@@ -52,14 +110,21 @@ function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<vo
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="1초 타임아웃으로 실행"
       >
-        <img src={TimerIcon} alt="Timer" className="w-4 h-4" />
+        <AlarmClock className="w-4 h-4" />
       </button>
       <button
         onClick={() => handleRun()}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="실행"
       >
-        <img src={RunIcon} alt="Run" className="w-4 h-4" />
+        <Play className="w-4 h-4" />
+      </button>
+      <button
+        onClick={onToggleModeMenu}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="아키텍처 설정"
+      >
+        <Cpu className="w-4 h-4" />
       </button>
     </>
   );
@@ -101,14 +166,14 @@ function RunningButton() {
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="재실행"
       >
-        <img src={ReRunIcon} alt="ReRun" className="w-4 h-4" />
+        <RotateCcw className="w-4 h-4" />
       </button>
       <button
         onClick={stopRunning}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="실행 중지"
       >
-        <img src={StopIcon} alt="Stop" className="w-4 h-4" />
+        <Square className="w-4 h-4" />
       </button>
     </>
   );
