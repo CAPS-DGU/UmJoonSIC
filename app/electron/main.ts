@@ -1,37 +1,79 @@
-import { app, shell, BrowserWindow, ipcMain } from "electron";
-const path = require("node:path");
-import { electronApp, optimizer, is } from "@electron-toolkit/utils";
+import { app, shell, BrowserWindow, Menu } from 'electron';
+const path = require('node:path');
+import { electronApp, optimizer, is } from '@electron-toolkit/utils';
+import { menuList } from './menu';
+import './ipc/file';
+import './ipc/server';
+import { ChildProcess, spawn } from 'child_process';
+import { checkJreExists, checkServerExists, downloadJre, downloadServer, runServer } from './setup';
+
+let server: ChildProcess | null = null;
 
 function createWindow(): void {
   // Create the browser window.
-  const preloadPath = path.join(__dirname, "../preload/index.mjs");
+  const preloadPath = path.join(__dirname, '../preload/index.mjs');
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 640,
     show: false,
-    autoHideMenuBar: true,
-    ...(process.platform === "linux" ? {} : {}), //app-icon
+    autoHideMenuBar: false,
+    ...(process.platform === 'linux' ? {} : {}), // app-icon
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: true,
     },
   });
-  mainWindow.on("ready-to-show", () => {
-    mainWindow.show();
+
+  const splash = new BrowserWindow({
+    width: 500,
+    height: 300,
+    autoHideMenuBar: true,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    fullscreenable: false,
+    maximizable: false,
   });
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  mainWindow.on('ready-to-show', async () => {
+    splash.loadFile(path.join(__dirname, '../renderer/splash.html'));
+    splash.center();
+
+    if (!checkJreExists()) {
+      await downloadJre().catch(error => {
+        console.error('JRE 다운로드 실패:', error);
+      });
+      console.log('jre 다운로드');
+    }
+    if (!checkServerExists()) {
+      await downloadServer().catch(error => {
+        console.error('Server 다운로드 실패:', error);
+      });
+      console.log('server 다운로드');
+    }
+
+    // jar 서버 실행 (예시)
+    await runServer(server);
+
+    setTimeout(() => {
+      splash.close();
+      mainWindow.show();
+    }, 3000);
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(details => {
     shell.openExternal(details.url);
-    return { action: "deny" };
+    return { action: 'deny' };
   });
 
-  // HMR for renderer base on electron-vite cli.
+  // HMR for renderer based on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 }
 
@@ -40,18 +82,20 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId("com.electron");
+  electronApp.setAppUserModelId('com.electron');
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuList));
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on("browser-window-created", (_, window) => {
+  app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window);
   });
 
   createWindow();
 
-  app.on("activate", function () {
+  app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -61,8 +105,11 @@ app.whenReady().then(() => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    if (server) {
+      server.kill();
+    }
     app.quit();
   }
 });

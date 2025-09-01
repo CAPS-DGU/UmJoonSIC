@@ -1,0 +1,10 @@
+node_modules
+.next
+build
+dist
+coverage
+pnpm-lock.yaml
+*.yml
+
+src/components/ui/*.tsx
+simulator/

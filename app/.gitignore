@@ -24,3 +24,5 @@ out
 *.sln
 *.sw?
 
+
+package-lock.json

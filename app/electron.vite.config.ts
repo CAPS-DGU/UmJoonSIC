@@ -1,14 +1,14 @@
-import path from "path";
-import react from "@vitejs/plugin-react-swc";
-import tailwindcss from "@tailwindcss/vite";
-import { externalizeDepsPlugin, defineConfig } from "electron-vite";
+import path from 'path';
+import react from '@vitejs/plugin-react-swc';
+import tailwindcss from '@tailwindcss/vite';
+import { externalizeDepsPlugin, defineConfig } from 'electron-vite';
 
 export default defineConfig({
   main: {
     build: {
       rollupOptions: {
         input: {
-          index: path.resolve(__dirname, "electron/main.ts"),
+          index: path.resolve(__dirname, 'electron/main.ts'),
         },
       },
     },
@@ -18,7 +18,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: path.resolve(__dirname, "electron/preload.ts"),
+          index: path.resolve(__dirname, 'electron/preload.ts'),
         },
       },
     },
@@ -29,13 +29,15 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: path.resolve(__dirname, "index.html"),
+          index: path.resolve(__dirname, 'index.html'),
+          splash: path.resolve(__dirname, 'src/splash.html'),
+          progress: path.resolve(__dirname, 'src/progress.html'),
         },
       },
     },
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "src"),
+        '@': path.resolve(__dirname, 'src'),
       },
     },
     plugins: [react(), tailwindcss()],

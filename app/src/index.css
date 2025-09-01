@@ -1,2 +1,67 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/pretendard/1.3.9/variable/pretendardvariable.min.css');
+@import 'tailwindcss';
 
-@import "tailwindcss";
+/* 일반체 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono[wght].ttf') format('truetype');
+  font-weight: 100 900; /* Variable weight 범위 */
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 이탤릭체 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Italic[wght].ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+body {
+  font-family:
+    'Pretendard Variable',
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    Roboto,
+    'Helvetica Neue',
+    'Segoe UI',
+    'Apple SD Gothic Neo',
+    'Noto Sans KR',
+    'Malgun Gothic',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    sans-serif;
+}
+
+/* 메모리 값 변경 애니메이션 */
+@keyframes memory-flash {
+  0% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+  25% {
+    background-color: #fbbf24; /* yellow-400 */
+    transform: scale(1.1);
+  }
+  50% {
+    background-color: #f59e0b; /* yellow-500 */
+    transform: scale(1.05);
+  }
+  75% {
+    background-color: #fbbf24; /* yellow-400 */
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.memory-flash {
+  animation: memory-flash 0.6s ease-in-out;
+}
