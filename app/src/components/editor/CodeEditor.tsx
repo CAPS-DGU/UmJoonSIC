@@ -1,5 +1,5 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as monaco_editor from 'monaco-editor';
 import { useEditorTabStore, type EditorTab } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
@@ -36,13 +36,15 @@ export default function CodeEditor() {
   const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
 
   const { result, runCheck } = useSyntaxCheck();
+  const hasRunRef = useRef(false);
 
   useEffect(() => {
-    if (!activeTab) return;
+    if (!activeTab || hasRunRef.current) return;
+    if (!activeTab.fileContent) return; // 파일 내용이 준비되지 않았으면 대기
 
-    // 탭 전환 시 문법 검사
     runCheck([activeTab.fileContent], [activeTab.filePath]);
-  }, [activeTab?.idx, runCheck]);
+    hasRunRef.current = true; // 한 번만 실행
+  }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
