@@ -17,8 +17,136 @@ const clampLine = (line1: number, model: monaco_editor.editor.ITextModel) => {
 function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   if (monaco) {
     monaco.languages.register({ id: 'sicxe' });
-    monaco.languages.setMonarchTokensProvider('sicxe', sicxeLanguage);
-    monaco.editor.defineTheme('sicxeTheme', sicxeTheme);
+
+    monaco.languages.setMonarchTokensProvider('sicxe', {
+      tokenizer: {
+        root: [
+          [/^\s*\..*/, 'comment'], // 주석(.으로 시작)
+          [
+            /\b(LDA|STA|ADD|SUB|MUL|DIV|LDX|STX|COMP|JSUB|RSUB|J|JEQ|JLT|JGT|CLEAR|TIX|TD|RD|WD)\b/i,
+            'keyword',
+          ], // 명령어
+          [/\b(START|END|BYTE|WORD|RESB|RESW|BASE|NOBASE|EQU)\b/i, 'keyword.directive'], // 지시어
+          [/#[a-zA-Z0-9_]+/, 'number.immediate'], // 즉시 주소 (#VALUE)
+          [/@[a-zA-Z0-9_]+/, 'variable.indirect'], // 간접 주소 (@VALUE)
+          [/[a-zA-Z_]\w*/, 'identifier'], // 심볼(Label, 이름)
+          [/[0-9]+/, 'number'], // 10진수
+          [/X'([0-9A-Fa-f]+)'/, 'number.hex'], // 16진 상수
+          [/C'([^']+)'/, 'string'], // 문자 상수
+          [/:/, 'delimiter'], // 콜론
+          [/[,+\-*/]/, 'operator'], // 연산자
+        ],
+      },
+    });
+
+    monaco.editor.defineTheme('sicxeTheme', {
+      base: 'vs',
+      inherit: true,
+      rules: [
+        // 주석 - 연한 초록색, 이탤릭
+        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
+        { token: 'comment.line', foreground: '6A9955', fontStyle: 'italic' },
+        { token: 'comment.block', foreground: '6A9955', fontStyle: 'italic' },
+
+        // 키워드 - 밝은 파란색, 볼드
+        { token: 'keyword', foreground: '569CD6', fontStyle: 'bold' },
+        { token: 'keyword.control', foreground: 'C586C0', fontStyle: 'bold' },
+
+        // 변수/라벨 - 밝은 청록색
+        { token: 'variable', foreground: '9CDCFE' },
+        { token: 'variable.name', foreground: '9CDCFE' },
+        { token: 'variable.parameter', foreground: '9CDCFE' },
+
+        // 숫자 - 연한 노란색
+        { token: 'number', foreground: 'B5CEA8' },
+        { token: 'number.hex', foreground: 'B5CEA8' },
+        { token: 'number.binary', foreground: 'B5CEA8' },
+
+        // 연산자 - 밝은 회색
+        { token: 'operator', foreground: 'D4D4D4' },
+        { token: 'operator.arithmetic', foreground: 'D4D4D4' },
+        { token: 'operator.logical', foreground: 'D4D4D4' },
+
+        // 구분자 - 밝은 회색
+        { token: 'delimiter', foreground: 'D4D4D4' },
+        { token: 'delimiter.square', foreground: 'D4D4D4' },
+        { token: 'delimiter.parenthesis', foreground: 'D4D4D4' },
+        { token: 'delimiter.curly', foreground: 'D4D4D4' },
+
+        // 문자열 - 연한 주황색
+        { token: 'string', foreground: 'CE9178' },
+        { token: 'string.quoted', foreground: 'CE9178' },
+        { token: 'string.quoted.single', foreground: 'CE9178' },
+        { token: 'string.quoted.double', foreground: 'CE9178' },
+
+        // 함수/명령어 - 밝은 보라색
+        { token: 'function', foreground: 'DCDCAA' },
+        { token: 'function.name', foreground: 'DCDCAA' },
+
+        // 상수 - 연한 분홍색
+        { token: 'constant', foreground: '4FC1FF' },
+        { token: 'constant.numeric', foreground: 'B5CEA8' },
+        { token: 'constant.character', foreground: '4FC1FF' },
+
+        // 타입 - 연한 초록색
+        { token: 'type', foreground: '4EC9B0' },
+        { token: 'type.primitive', foreground: '4EC9B0' },
+
+        // 기타 토큰들
+        { token: 'entity', foreground: '9CDCFE' },
+        { token: 'entity.name', foreground: '9CDCFE' },
+        { token: 'entity.name.function', foreground: 'DCDCAA' },
+        { token: 'entity.name.type', foreground: '4EC9B0' },
+
+        // 특수 문자들
+        { token: 'punctuation', foreground: 'D4D4D4' },
+        { token: 'punctuation.definition', foreground: 'D4D4D4' },
+        { token: 'punctuation.separator', foreground: 'D4D4D4' },
+        { token: 'punctuation.terminator', foreground: 'D4D4D4' },
+      ],
+      colors: {
+        // 에디터 배경색
+        'editor.background': '#1E1E1E',
+        'editor.foreground': '#D4D4D4',
+
+        // 선택 영역
+        'editor.selectionBackground': '#264F78',
+        'editor.selectionHighlightBackground': '#2A2D2E',
+
+        // 현재 라인 하이라이트
+        'editor.lineHighlightBackground': '#2A2D2E',
+        'editor.lineHighlightBorder': '#454545',
+
+        // 커서
+        'editorCursor.foreground': '#AEAFAD',
+
+        // 인디케이터
+        'editorIndentGuide.background': '#404040',
+        'editorIndentGuide.activeBackground': '#707070',
+
+        // 스크롤바
+        'scrollbarSlider.background': '#424242',
+        'scrollbarSlider.hoverBackground': '#4F4F4F',
+        'scrollbarSlider.activeBackground': '#686868',
+
+        // 라인 번호
+        'editorLineNumber.foreground': '#858585',
+        'editorLineNumber.activeForeground': '#C6C6C6',
+
+        // 검색 하이라이트
+        'editor.findMatchBackground': '#515C6A',
+        'editor.findMatchHighlightBackground': '#3A3D41',
+
+        // 브레이크포인트
+        'editor.breakpointBackground': '#E51400',
+        'editor.breakpointBorder': '#E51400',
+
+        // 에러/경고
+        'editorError.foreground': '#F44747',
+        'editorWarning.foreground': '#CCA700',
+        'editorInfo.foreground': '#75BEFF',
+      },
+    });
   }
 }
 
@@ -110,15 +238,6 @@ export default function CodeEditor() {
       folding: true,
       minimap: { enabled: true }, // 미니맵 비활성화로 공간 확보
       scrollBeyondLastLine: false,
-    });
-
-    // 폰트가 로드된 후 재랜더링해 보조선과 글자 간격 맞추기
-    document.fonts.ready.then(() => {
-      editor.updateOptions({
-        fontFamily: 'JetBrains Mono',
-        letterSpacing: 0.1,
-      });
-      editor.layout();
     });
 
     // Breakpoint 클릭 이벤트 처리
@@ -344,12 +463,12 @@ export default function CodeEditor() {
 
           // 🔹 고정폭 + 자간 + 컬럼 맞춤
           fontFamily: 'JetBrains Mono', // 고정폭 폰트
-          fontSize: 16, // 폰트 크기
+          fontSize: 12, // 폰트 크기
+          letterSpacing: 1.25, // 글자 간격(px)
           tabSize: 8, // SIC/XE 컬럼 기준 탭
           insertSpaces: true, // 탭 대신 스페이스
           rulers: [8, 16, 24], // 컬럼 가이드
           wordWrap: 'off', // 자동 줄바꿈 해제
-          fontLigatures: false,
         }}
       />
     </EditorErrorBoundary>

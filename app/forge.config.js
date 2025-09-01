@@ -4,31 +4,50 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './src/assets/icon',
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: './src/assets/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      config: {
+        icon: './src/assets/icon.icns',
+      },
     },
     {
       name: '@electron-forge/maker-dmg',
-      platforms: ['darwin'],
-      config: {},
+      config: {
+        icon: './src/assets/icon.icns',
+      },
     },
     {
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          icon: './src/assets/icon.png',
+        },
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: './src/assets/icon.png',
+        },
+      },
     },
   ],
+  make_targets: {
+    win32: ['squirrel'],
+    darwin: ['dmg', 'zip'],
+    linux: ['deb', 'rpm', 'zip'],
+  },
   plugins: [
     {
       name: '@electron-forge/plugin-auto-unpack-natives',
