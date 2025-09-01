@@ -8,7 +8,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 
 export default function MemoryViewer() {
   const memoryValues = useMemoryViewStore(state => state.memoryValues);
-  const labels = useMemoryViewStore(state => state.labels);
+  const getMemoryLabelFromWatch = useMemoryViewStore(state => state.getMemoryLabelFromWatch);
+  const labels = getMemoryLabelFromWatch();
   const changedNodes = useMemoryViewStore(state => state.changedNodes);
   const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
   const visibleRange = useMemoryViewStore(state => state.visibleRange);
@@ -252,20 +253,52 @@ function ValueColumn({
                 );
               })}
 
-              {/* 라벨 밑줄 & 이름 */}
+              {/* 라벨 밑줄 (모든 라벨에 대해 표시) */}
               {rowLabels.map((label, idx) => {
-                const left = label.start * 24; // w-6 + gap
-                const width = (label.end - label.start + 1) * 24;
+                // 원본 라벨의 절대 위치 사용
+                const originalLabel = labels.find(l => l.name === label.name);
+                if (!originalLabel) return null;
+                
+                // 현재 행에서의 상대 위치 계산
+                const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
+                const relativeEnd = Math.min(originalLabel.end, rowEndAddr) - rowStartAddr;
+                
+                const left = relativeStart * 24 + 4; // w-6 + gap
+                const width = (relativeEnd - relativeStart + 1) * 24 - 8;
+                
                 return (
                   <div
-                    key={idx}
-                    className="absolute -bottom-4 border-t-2 border-orange-500 text-xs text-orange-500 text-center font-mono"
+                    key={`line-${idx}`}
+                    className="absolute -bottom-0.5 border-t-2 border-orange-500"
                     style={{ left, width }}
-                  >
-                    {label.name}
-                  </div>
+                  />
                 );
               })}
+
+              {/* 라벨 이름 (시작하는 행에만 표시) */}
+              {rowLabels
+                .filter(label => {
+                  // 전체 labels 배열에서 이 라벨이 처음 나타나는 행인지 확인
+                  const originalLabel = labels.find(l => l.name === label.name);
+                  if (!originalLabel) return false;
+                  
+                  // 원본 라벨의 시작 주소가 현재 행에 속하는지 확인
+                  const labelStartRow = Math.floor(originalLabel.start / ROW_SIZE);
+                  return labelStartRow === rowIndex;
+                })
+                .map((label, idx) => {
+                  const left = label.start * 24 + 4; // w-6 + gap
+                  const width = (label.end - label.start + 1) * 24 - 8;
+                  return (
+                    <div
+                      key={`name-${idx}`}
+                      className="absolute -bottom-4 text-xs text-orange-500 text-center font-mono"
+                      style={{ left, width }}
+                    >
+                      {label.name}
+                    </div>
+                  );
+                })}
             </div>
           </div>
         );
