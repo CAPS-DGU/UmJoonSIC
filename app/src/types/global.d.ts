@@ -31,3 +31,13 @@ interface Window {
     ) => Promise<{ success: boolean; message?: string }>;
   };
 }
+
+declare module '*.svg' {
+  const content: string;
+  export default content;
+}
+
+declare module '*.css' {
+  const content: string;
+  export default content;
+}
