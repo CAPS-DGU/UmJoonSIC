@@ -19,6 +19,10 @@ export default function Debug() {
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
+  const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
+  const delay = async (time: number) => {
+    await new Promise(resolve => setTimeout(resolve, time));
+  };
 
   const handleRun = async (time?: number) => {
     await fetchLoad();
@@ -27,12 +31,26 @@ export default function Debug() {
     fetchVarMemoryValue();
   };
 
+  const handleRunWithDelay = async (time: number) => {
+    await fetchLoad();
+    toggleIsRunning();
+    await fetchMemory();
+    fetchVarMemoryValue();
+
+    while(isRunning) {
+      await delay(time);
+      fetchRegisters();
+      fetchMemory();
+      fetchVarMemoryValue();
+    }
+  };
+
   return (
     <div className="flex flex-col w-max border border-gray-200">
       <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
         <h2 className="text-lg font-bold">실행 및 디버그</h2>
         <div className="flex space-x-2">
-          {isRunning ? <RunningButton /> : <DefaultButton handleRun={handleRun} />}
+          {isRunning ? <RunningButton /> : <DefaultButton handleRun={handleRun} handleRunWithDelay={handleRunWithDelay} />}
         </div>
       </section>
       <section className="border-b border-gray-200 py-3">
@@ -45,11 +63,11 @@ export default function Debug() {
   );
 }
 
-function DefaultButton({ handleRun }: { handleRun: (time?: number) => Promise<void> }) {
+function DefaultButton({ handleRun, handleRunWithDelay }: { handleRun: (time?: number) => Promise<void>, handleRunWithDelay: (time: number) => Promise<void> }) {
   return (
     <>
       <button
-        onClick={() => handleRun(1000)}
+        onClick={() => handleRunWithDelay(1000)}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="1초 타임아웃으로 실행"
       >

@@ -113,10 +113,18 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         activeTabIdx: newActiveTabIdx,
       };
     }),
-  closeAllListFileTabs: () =>
+  closeAllListFileTabs: () => {
+    const { closeTab } = get();
+    get().tabs.forEach(tab => {
+      if (tab.filePath.endsWith('.lst')) {
+        closeTab(tab.idx);
+      }
+    });
     set(state => ({
       tabs: state.tabs.filter(tab => !tab.filePath.endsWith('.lst')),
-    })),
+      activeTabIdx: state.activeTabIdx,
+    }));
+  },
   setActiveTab: idx =>
     set(state => ({
       tabs: state.tabs.map(tab => ({
