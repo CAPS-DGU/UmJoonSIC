@@ -65,3 +65,17 @@ body {
 .memory-flash {
   animation: memory-flash 0.6s ease-in-out;
 }
+
+/* 레지스터 값 변경 애니메이션 */
+@keyframes register-flash {
+  0%, 100% {
+    background-color: #CB601529;
+  }
+  50% {
+    background-color: #f59e0b;
+  }
+}
+
+.register-flash {
+  animation: register-flash 0.6s ease-in-out;
+}
