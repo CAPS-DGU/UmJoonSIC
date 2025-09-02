@@ -19,10 +19,11 @@ export default function Debug() {
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
+
   const handleRun = async (time?: number) => {
-    fetchLoad();
+    await fetchLoad();
     toggleIsRunning();
-    fetchMemory();
+    await fetchMemory();
     fetchVarMemoryValue();
   };
 

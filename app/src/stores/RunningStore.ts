@@ -15,7 +15,7 @@ interface RunningState {
   setIsRunning: (isRunning: boolean) => void;
   toggleIsRunning: () => void;
   fetchBegin: () => void;
-  fetchLoad: () => void;
+  fetchLoad: () => Promise<void>;
   setLoadedFiles: (files: LoadedFile[]) => void;
   loadToListfileAndWatch: () => void;
   stopRunning: () => void;

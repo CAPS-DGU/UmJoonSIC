@@ -38,7 +38,7 @@ interface MemoryViewState {
   setLabels: (labels: MemoryLabel[]) => void;
   updateMemoryNode: (index: number, patch: MemoryNodeData) => void;
   clearChangedNodes: () => void; // 변경된 노드 목록 초기화
-  fetchMemoryValues: () => void;
+  fetchMemoryValues: () => Promise<void>;
 
   // 무한 스크롤 관련 함수들
   setVisibleRange: (range: { start: number; end: number }) => void;
