@@ -15,15 +15,34 @@ export default function Debug() {
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
+  
   const delay = async (time: number) => {
     await new Promise(resolve => setTimeout(resolve, time));
   };
 
-  const handleRun = async (time?: number) => {
+  const handleRun = async () => {
     await fetchLoad();
     toggleIsRunning();
     await fetchMemory();
     fetchVarMemoryValue();
+  };
+
+  const handleRunWithDelay = async (time: number) => {
+    await fetchLoad();
+    console.log('run with delay toggleIsRunning', isRunning);
+    toggleIsRunning();
+    await fetchMemory();
+    fetchVarMemoryValue();
+    console.log('run with delay start', useRunningStore.getState().isRunning);
+
+    while(useRunningStore.getState().isRunning) {
+      console.log('run with delay loop');
+      await delay(time);
+      fetchRegisters();
+      fetchMemory();
+      fetchVarMemoryValue();
+    }
+    console.log('run with delay end');
   };
 
   const [showModeMenu, setShowModeMenu] = useState<boolean>(false);
@@ -46,20 +65,6 @@ export default function Debug() {
 
   const handleModeChange = (newMode: MachineMode) => {
     setMode(newMode);
-  };
-
-  const handleRunWithDelay = async (time: number) => {
-    await fetchLoad();
-    toggleIsRunning();
-    await fetchMemory();
-    fetchVarMemoryValue();
-
-    while(isRunning) {
-      await delay(time);
-      fetchRegisters();
-      fetchMemory();
-      fetchVarMemoryValue();
-    }
   };
 
   return (
@@ -118,7 +123,7 @@ export default function Debug() {
 }
 
 interface DefaultButtonProps {
-  handleRun: (time?: number) => Promise<void>;
+  handleRun: () => Promise<void>;
   handleRunWithDelay: (time: number) => Promise<void>;
   onToggleModeMenu: () => void;
 }
