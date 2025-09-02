@@ -21,6 +21,7 @@ interface EditorTabState {
   getActiveTab: () => EditorTab | undefined;
   addTab: (tab: EditorTab) => void;
   closeTab: (idx: number) => void;
+  closeAllListFileTabs: () => void;
   setActiveTab: (idx: number) => void;
   setCursor: (idx: number, cursor: { line: number; column: number }) => void;
   setFileContent: (idx: number, fileContent: string) => void;
@@ -112,6 +113,10 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         activeTabIdx: newActiveTabIdx,
       };
     }),
+  closeAllListFileTabs: () =>
+    set(state => ({
+      tabs: state.tabs.filter(tab => !tab.filePath.endsWith('.lst')),
+    })),
   setActiveTab: idx =>
     set(state => ({
       tabs: state.tabs.map(tab => ({
