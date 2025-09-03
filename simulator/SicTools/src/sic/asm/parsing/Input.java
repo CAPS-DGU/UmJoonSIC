@@ -107,7 +107,7 @@ public class Input {
 
     public void advance(char ch) throws AsmError {
         if (advanceIf(ch)) return;
-        throw new AsmError(loc(), "Expected '%c'", ch);
+        throw new AsmError(loc(), 1, "Expected '%c'", ch);
     }
 
     public boolean advanceIf(String str) {

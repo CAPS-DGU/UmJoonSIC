@@ -23,7 +23,7 @@ public class InstructionF3m extends InstructionF34Base {
     @Override
     public void checkSymbol(Program program, Symbol symbol) throws AsmError {
         if (symbol.isImported())
-            throw new AsmError(loc, "External symbol '%s' is not allowed here", symbol);
+            throw new AsmError(loc, 1, "External symbol '%s' is not allowed here", symbol);
     }
 
     @Override

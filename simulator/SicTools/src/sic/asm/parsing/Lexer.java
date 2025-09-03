@@ -114,14 +114,14 @@ public class Lexer extends Input {
          char ch = advance();
          int reg = Conversion.nameToReg(ch);
          if (reg < 0)
-             throw new AsmError(loc(), "Invalid register '%c'", ch);
+             throw new AsmError(loc(), 1, "Invalid register '%c'", ch);
          return reg;
      }
 
     public String readSymbol() throws AsmError {
         String sym = readAlphanumeric();
         if (sym.length() > 0) return sym;
-        throw new AsmError(loc(), "Symbol expected");
+        throw new AsmError(loc(), 1, "Symbol expected");
     }
 
     public String readIfSymbol() {
@@ -156,21 +156,21 @@ public class Lexer extends Input {
         } else if (Character.isDigit(peek()))
             radix = 10;
         else
-            throw new AsmError(loc(), "Number expected");
+            throw new AsmError(loc(), 1, "Number expected");
         // read digits
         int num;
         try {
             num = Integer.parseInt(readDigits(radix), radix);
         } catch (NumberFormatException e) {
-            throw new AsmError(loc(), "Invalid number");
+            throw new AsmError(loc(), 1, "Invalid number");
         }
         // number must not be followed by letter or digit
         if (Character.isLetterOrDigit(peek()))
-            throw new AsmError(loc(), "invalid digit '%c'", peek());
+            throw new AsmError(loc(), 1, "invalid digit '%c'", peek());
         // check range
         if (negative) num = -num;
         if (num < lo || num > hi)
-            throw new AsmError(loc(), "Number '%d' out of range [%d..%d]", num, lo, hi);
+            throw new AsmError(loc(), 1, "Number '%d' out of range [%d..%d]", num, lo, hi);
         return num;
     }
 
@@ -189,7 +189,7 @@ public class Lexer extends Input {
         try {
             num = Double.parseDouble(readDigits(10));
         } catch (NumberFormatException e) {
-            throw new AsmError(loc(), "Invalid number");
+            throw new AsmError(loc(), 1, "Invalid number");
         }
 
         // Check for dot
@@ -197,13 +197,13 @@ public class Lexer extends Input {
             try {
                 num += Double.parseDouble("0." + readDigits(10));
             } catch (NumberFormatException e) {
-                throw new AsmError(loc(), "Invalid number");
+                throw new AsmError(loc(), 1, "Invalid number");
             }
         }
 
         // Number must not be followed by letter or digit
         if (Character.isLetterOrDigit(peek()))
-            throw new AsmError(loc(), "invalid digit '%c'", peek());
+            throw new AsmError(loc(), 1, "invalid digit '%c'", peek());
 
         // Apply sign
         if (negative) num = -num;
@@ -213,7 +213,7 @@ public class Lexer extends Input {
         double lo = -sicDoubleLimit;
         double hi = sicDoubleLimit;
         if (num < lo || num > hi)
-            throw new AsmError(loc(), "Number '%d' out of range [%d..%d]", num, lo, hi);
+            throw new AsmError(loc(), 1, "Number '%d' out of range [%d..%d]", num, lo, hi);
 
         return num;
     }
@@ -222,7 +222,7 @@ public class Lexer extends Input {
         StringBuilder buf = new StringBuilder();
         for (char c = advance(); c != terminator; c = advance()) {
             if (!ready() || c == '\n') {
-                throw new AsmError(loc(), "Unterminated byte string");
+                throw new AsmError(loc(), 1, "Unterminated byte string");
             }
             if (c == '\\') {
                 c = advance();
@@ -255,11 +255,11 @@ public class Lexer extends Input {
                         try {
                             c = (char) Integer.parseInt(str, 16);
                         } catch (NumberFormatException e) {
-                            throw new AsmError(loc(), "Hexadecimal byte expected");
+                            throw new AsmError(loc(), 1, "Hexadecimal byte expected");
                         }
                         break;
                     default:
-                        throw new AsmError(loc(), "Unknown escape sequence '\\%c'", c);
+                        throw new AsmError(loc(), 1, "Unknown escape sequence '\\%c'", c);
                 }
             }
             buf.append(c);

@@ -20,7 +20,7 @@ public class DirectiveEQU extends DirectiveFe {
     @Override
     public void append(Program program) throws AsmError {
         if (!hasLabel())
-            throw new AsmError(loc, "Missing label at EQU");
+            throw new AsmError(loc, 1, "Missing label at EQU");
         super.append(program);
     }
 

@@ -26,11 +26,11 @@ public abstract class Expr {
     }
 
     public Expr parse(ExpressionParser parser) throws AsmError {
-        throw new AsmError(loc, "unexpected token '%s'", this);
+        throw new AsmError(loc, 1, "unexpected token '%s'", this);
     }
 
     public Expr parseLeft(ExpressionParser parser, Expr left) throws AsmError {
-        throw new AsmError(loc, "unexpected token '%s'", this);
+        throw new AsmError(loc, 1, "unexpected token '%s'", this);
     }
 
     public abstract Set<String> extractSyms();

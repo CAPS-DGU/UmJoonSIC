@@ -60,14 +60,14 @@ public abstract class InstructionF34Base extends Instruction {
         } else {
             resolvedSymbol = program.section().symbols.get(symbol);
             if (resolvedSymbol == null)
-                throw new AsmError(loc, "Undefined symbol '%s'", symbol);
+                throw new AsmError(loc, 1, "Undefined symbol '%s'", symbol);
             checkSymbol(program, resolvedSymbol);
             resolvedValue = resolvedSymbol.value();
         }
         // resolve addressing
         if (resolveAddressing(program)) return;
         // otherwise no suitable addressing found
-        throw new AsmError(loc, "Cannot address symbol '%s'", symbol);
+        throw new AsmError(loc, 1, "Cannot address symbol '%s'", symbol);
     }
 
     @Override

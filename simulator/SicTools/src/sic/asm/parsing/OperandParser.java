@@ -41,7 +41,7 @@ public class OperandParser {
         do {
             String sym = parser.readSymbol();
             if (sym.length() > maxLength)
-                throw new AsmError(parser.loc(), "Symbol name '%s' too long", sym);
+                throw new AsmError(parser.loc(), 1, "Symbol name '%s' too long", sym);
             syms.add(sym);
         } while (parser.skipIfComma());
         return syms;
@@ -50,7 +50,7 @@ public class OperandParser {
     private Expr parseExpression(boolean throwIfNull) throws AsmError {
         Expr expr = parser.expressionParser.parseExpression();
         if (throwIfNull && expr == null)
-            throw new AsmError(parser.loc(), "Expression expected '%c'", parser.peek());
+            throw new AsmError(parser.loc(), 1, "Expression expected '%c'", parser.peek());
         return expr;
     }
 
@@ -150,13 +150,13 @@ public class OperandParser {
             operand = 0;
             symbol = "*";
         } else
-            throw new AsmError(parser.loc(), "Invalid character '%c", parser.peek());
+            throw new AsmError(parser.loc(), 1, "Invalid character '%c", parser.peek());
         // check for indexed addressing (only if simple)
         if (parser.skipIfIndexed()) {
             if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
                 flags.setIndexed();
             else
-                throw new AsmError(parser.loc(), "Indexed addressing not supported here");
+                throw new AsmError(parser.loc(), 1, "Indexed addressing not supported here");
         }
         return new InstructionF3m(loc, label, mnemonic, flags, operand, symbol);
     }
@@ -188,13 +188,13 @@ public class OperandParser {
             operand = 0;
             symbol = "*";
         } else
-            throw new AsmError(parser.loc(), "Invalid character '%c", parser.peek());
+            throw new AsmError(parser.loc(), 1, "Invalid character '%c", parser.peek());
         // check for indexed addressing (only if simple)
         if (parser.skipIfIndexed()) {
             if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
                 flags.setIndexed();
             else
-                throw new AsmError(parser.loc(), "Indexed addressing not supported here");
+                throw new AsmError(parser.loc(), 1, "Indexed addressing not supported here");
         }
         return new InstructionF4m(loc, label, mnemonic, flags, operand, symbol);    }
 

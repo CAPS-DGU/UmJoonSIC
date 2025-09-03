@@ -31,7 +31,7 @@ public class DataHex extends Data {
         parser.advance('\'');
         String str = parser.readUntil('\'');
         if (str.length() % 2 == 1)
-            throw new AsmError(parser.loc(), "Invalid length of hex encoding '%s'", str);
+            throw new AsmError(parser.loc(), 1, "Invalid length of hex encoding '%s'", str);
         data = Conversion.hexToBytes(str);
         if (allowList) super.parse(parser, true);
     }

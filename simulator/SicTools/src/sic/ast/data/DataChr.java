@@ -35,7 +35,7 @@ public class DataChr extends Data {
                 data = parser.readEscapedString('"').getBytes();
                 break;
             default:
-                throw new AsmError(parser.loc(), "Expected quote");
+                throw new AsmError(parser.loc(), 1, "Expected quote");
         }
         if (allowList) super.parse(parser, true);
     }

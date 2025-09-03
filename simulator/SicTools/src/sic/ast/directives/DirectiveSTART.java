@@ -20,7 +20,7 @@ public class DirectiveSTART extends DirectiveFe {
     @Override
     public void append(Program program) throws AsmError {
         if (!hasLabel())
-            throw new AsmError(loc, "Missing label at START");
+            throw new AsmError(loc, 1, "Missing label at START");
         super.append(program);
     }
 

@@ -36,9 +36,10 @@ public final class DTO {
     /* =========================
      * Errors
      * ========================= */
-    public static final class CompileError {
+    public static final class AssemblerError {
         public int row;
         public int col;
+        public int length;
         public String message;
         public boolean nonbreaking;
     }
@@ -77,7 +78,7 @@ public final class DTO {
     public static final class FileLoadResult {
         public String fileName;                      // input file path or display name
         public ListingDTO listing;                   // present if assembly succeeded for this file
-        public List<CompileError> compileErrors;     // present if assembly failed for this file
+        public List<AssemblerError> assemblerErrors;     // present if assembly failed for this file
         public LinkerErrorDto linkerError;           // present if linking surfaced an error for this file
     }
 
@@ -96,7 +97,7 @@ public final class DTO {
     public static final class SyntaxCheckFileResult {
         public String fileName;
         public boolean ok;                        // true if no compile errors
-        public List<CompileError> compileErrors;  // present if not ok
+        public List<AssemblerError> assemblerErrors;  // present if not ok
     }
 
     /** Aggregated result for syntax check. */

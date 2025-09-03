@@ -58,7 +58,7 @@ public class ExprSym extends Expr {
     public int eval(Program program) throws AsmError {
         Symbols symbols = program.section().symbols;
         if (symbols.isEvaluated(value)) return symbols.get(value).value();
-        throw new AsmError(loc, "Undefined symbol '%s'", value);
+        throw new AsmError(loc, 1, "Undefined symbol '%s'", value);
     }
 
 }
