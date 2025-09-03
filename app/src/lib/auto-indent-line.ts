@@ -182,9 +182,17 @@ export function autoIndentLine(
     ? ''
     : correct_space(instruction, spaces_inst_raw, LEN_INSTR_FIELD);
 
-  const spaces_operand = remove_spaces_oper
-    ? ''
-    : correct_space(operand, spaces_operand_raw, LEN_OPERAND_FIELD);
+  let spaces_operand;
+  if (remove_spaces_oper) {
+    spaces_operand = '';
+  } else if (comment_part.length > 0 || dot !== -1) {
+    // 주석이 존재하거나, 주석을 이제 막 입력하려는 경우(`.`)에만 공백을 계산합니다.
+    spaces_operand = correct_space(operand, spaces_operand_raw, LEN_OPERAND_FIELD);
+  } else {
+    // 주석이 없으면, operand 뒤에 추가 공백을 넣지 않습니다.
+    spaces_operand =
+      operand.length > 0 && code_part.trim().endsWith(operand) ? '' : spaces_operand_raw;
+  }
 
   // Normalize comment
   const comment_norm = comment_part ? replace_tabs_with_spaces(comment_part) : '';

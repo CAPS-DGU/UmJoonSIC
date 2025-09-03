@@ -5,12 +5,12 @@ import * as monaco_editor from 'monaco-editor';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
+import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
 
 import { editorOptions } from '@/constants/monaco/editor-config';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
 import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
 
-import { autoIndentLine } from '@/lib/auto-indent-line';
 import { clampLine } from '@/lib/editor-utils';
 import { useBreakpointManager } from '@/hooks/editor/useBreakpointManager';
 
@@ -25,23 +25,6 @@ function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   }
 }
 
-function applyEdit(
-  editor: monaco_editor.editor.IStandaloneCodeEditor,
-  monaco: typeof monaco_editor,
-  lineNumber: number,
-  oldContent: string,
-  newContent: string,
-) {
-  if (oldContent === newContent) return;
-  editor.executeEdits('auto-indent', [
-    {
-      range: new monaco.Range(lineNumber, 1, lineNumber, oldContent.length + 1),
-      text: newContent,
-      forceMoveMarkers: true,
-    },
-  ]);
-}
-
 // 에디터 컴포넌트
 export default function CodeEditor() {
   const monaco = useMonaco();
@@ -51,6 +34,8 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const isLoadingRef = useRef(false);
   const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
+  const { handleKeyDown: handleAutoIndentationKeyDown, handlePaste: handleAutoIndentationPaste } =
+    useAutoIndentation(editorRef, monaco);
   const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
   const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
 
@@ -118,27 +103,6 @@ export default function CodeEditor() {
     monaco.editor.setModelMarkers(model, 'sicxe', markers);
   }, [result, activeTab, monaco]);
 
-  const handleAutoIndent = (
-    editor: monaco_editor.editor.IStandaloneCodeEditor,
-    lineNumber: number,
-    cursorIndex: number,
-    backspace = false,
-  ) => {
-    const model = editor.getModel();
-    if (!model) return;
-
-    const lineContent = model.getLineContent(lineNumber);
-    const newText = autoIndentLine(lineContent, backspace, cursorIndex);
-
-    applyEdit(editor, monaco_editor, lineNumber, lineContent, newText);
-
-    // 커서 위치 재조정
-    let newColumn = cursorIndex + 1; // 기본: 기존 위치
-    if (newColumn > newText.length + 1) newColumn = newText.length + 1;
-
-    editor.setPosition({ lineNumber, column: newColumn });
-  };
-
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
     // monaco: typeof monaco_editor | null,
@@ -193,38 +157,7 @@ export default function CodeEditor() {
       const model = editor.getModel();
       if (!model) return;
 
-      const pos = editor.getPosition();
-      if (!pos) return;
-
-      const lineNumber = pos.lineNumber;
-      const cursorIndex = pos.column - 1;
-
-      // Space, Tab -> 현재 줄에 대해 실행
-      if (e.code === 'Space' || e.code === 'Tab') {
-        e.preventDefault();
-        handleAutoIndent(editor, lineNumber, cursorIndex, false);
-      }
-
-      // Backspace -> 현재 줄에 대해 backspace=true로 실행
-      if (e.code === 'Backspace') {
-        e.preventDefault();
-        handleAutoIndent(editor, lineNumber, cursorIndex, true);
-      }
-
-      // Enter -> 정상적으로 개행 후 개행 이전 줄과 개행된 줄에 대해 실행
-      if (e.code === 'Enter') {
-        setTimeout(() => {
-          const newPos = editor.getPosition();
-          if (!newPos) return;
-          const curLine = newPos.lineNumber;
-          const prevLine = curLine - 1;
-
-          [prevLine, curLine].forEach(ln => {
-            if (ln < 1) return;
-            handleAutoIndent(editor, ln, 0, false);
-          });
-        });
-      }
+      handleAutoIndentationKeyDown(e);
     });
 
     // 붙여넣기 -> 정상적으로 붙여넣기 후 붙여넣기된 모든 줄에 대하여 실행
@@ -232,11 +165,7 @@ export default function CodeEditor() {
       const model = editor.getModel();
       if (!model) return;
 
-      for (let i = e.range.startLineNumber; i <= e.range.endLineNumber; i++) {
-        const content = model.getLineContent(i);
-        const newText = autoIndentLine(content, false, 0);
-        applyEdit(editor, monaco_editor, i, content, newText);
-      }
+      handleAutoIndentationPaste(e);
     });
   };
 
