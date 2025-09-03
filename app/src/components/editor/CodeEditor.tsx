@@ -45,8 +45,7 @@ function applyEdit(
 // 에디터 컴포넌트
 export default function CodeEditor() {
   const monaco = useMonaco();
-  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified, toggleBreakpoint } =
-    useEditorTabStore();
+  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
@@ -145,15 +144,28 @@ export default function CodeEditor() {
     // monaco: typeof monaco_editor | null,
   ) => {
     editorRef.current = editor;
+    const setupEditorAfterFontLoad = async () => {
+      try {
+        // 1. 'JetBrains Mono' 폰트를 명시적으로 로드하고 완료될 때까지 기다립니다.
+        await document.fonts.load(`12px "JetBrains Mono"`);
+        console.log('JetBrains Mono font loaded.');
 
-    // Breakpoint 기능 활성화
-    editor.updateOptions({
-      glyphMargin: true,
-      lineNumbers: 'on',
-      folding: true,
-      minimap: { enabled: true },
-      scrollBeyondLastLine: false,
-    });
+        // 2. 폰트가 준비된 후, 에디터 옵션을 적용합니다.
+        editor.updateOptions(editorOptions);
+        console.log('Editor options applied after font load.');
+
+        // 3. 렌더링 동기화를 위해 짧은 지연시간 후 레이아웃을 강제로 재계산합니다.
+        setTimeout(() => {
+          console.log('Recalculating editor layout to ensure alignment.');
+          editor.layout();
+        }, 50);
+      } catch (error) {
+        console.error('Font loading failed:', error);
+        // 폰트 로딩에 실패하더라도 대체 폰트로 에디터가 동작하도록 옵션을 적용합니다.
+        editor.updateOptions(editorOptions);
+      }
+    };
+    setupEditorAfterFontLoad();
 
     editor.onMouseDown(handleBreakpointMouseDown);
 
@@ -300,7 +312,7 @@ export default function CodeEditor() {
         defaultLanguage="sicxe" // 기본 언어를 'asm'으로 설정합니다.
         value={activeTab?.fileContent}
         onMount={handleEditorDidMount}
-        options={editorOptions}
+        // options={editorOptions}
       />
     </EditorErrorBoundary>
   );
