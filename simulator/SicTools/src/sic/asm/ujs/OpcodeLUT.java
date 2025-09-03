@@ -1,4 +1,4 @@
-package com.sicserver.data;
+package sic.asm.ujs;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

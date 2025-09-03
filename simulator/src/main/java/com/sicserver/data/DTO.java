@@ -1,5 +1,7 @@
 package com.sicserver.data;
 
+import sic.asm.ujs.Listing;
+
 import java.util.List;
 
 /**
@@ -64,7 +66,7 @@ public final class DTO {
         public String codeFileName;                            // from Listing.codeFileName
         public int startAddress;                               // relocated start address
         public int programLength;                              // length in bytes
-        public List<com.sicserver.data.Listing.Row> rows;      // formatted rows from Listing
+        public List<Listing.Row> rows;      // formatted rows from Listing
         public List<WatchVar> watch;                           // flattened watch view
     }
 

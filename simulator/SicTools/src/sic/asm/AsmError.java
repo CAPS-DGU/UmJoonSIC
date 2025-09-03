@@ -1,30 +1,27 @@
 package sic.asm;
 
-/**
- * Syntax errors.
- *
- * @author jure
- */
 public class AsmError extends Exception implements Comparable<AsmError> {
 
     public final Location loc;
+    public final int length;
     private boolean nonBreaking = false;
 
-    public AsmError(Location loc, String msg) {
+    public AsmError(Location loc, int length, String msg) {
         super(msg);
         this.loc = loc;
+        this.length = length;
     }
 
-    public AsmError(Location loc, String format, Object... objs) {
-        this(loc, String.format(format, objs));
+    public AsmError(Location loc, int length, String format, Object... objs) {
+        this(loc, length, String.format(format, objs));
     }
 
     public AsmError(String format, Object... objs) {
-        this(null, format, objs);
+        this(null, 0, format, objs);
     }
 
-    public AsmError(Location loc, boolean nonBreaking, String format, Object... objs) {
-        this(loc, String.format(format, objs));
+    public AsmError(Location loc, int length, boolean nonBreaking, String format, Object... objs) {
+        this(loc, length, String.format(format, objs));
         this.nonBreaking = nonBreaking;
     }
 
@@ -44,5 +41,4 @@ public class AsmError extends Exception implements Comparable<AsmError> {
     public boolean isBreaking() {
         return !nonBreaking;
     }
-
 }

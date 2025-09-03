@@ -1,4 +1,4 @@
-package com.sicserver.data;
+package sic.asm.ujs;
 
 import sic.link.section.Section;
 import sic.link.section.ExtDef;

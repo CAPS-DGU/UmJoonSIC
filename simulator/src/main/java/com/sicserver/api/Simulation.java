@@ -3,9 +3,8 @@ package com.sicserver.api;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.sicserver.data.CompileErrors;
-import com.sicserver.data.Listing;
-import com.sicserver.data.Relocations;
-import sic.asm.AsmError;
+import sic.asm.ujs.Listing;
+import sic.asm.ujs.Relocations;
 import sic.asm.Assembler;
 import sic.asm.ErrorCatcher;
 import sic.ast.Program;
@@ -17,7 +16,7 @@ import sic.sim.Args;
 import sic.sim.Executor;
 import sic.sim.vm.Machine;
 
-import com.sicserver.alternatives.Linker;
+import sic.link.Linker;
 import sic.link.Options;
 import sic.link.LinkerError;
 

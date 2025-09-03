@@ -1,4 +1,4 @@
-package com.sicserver.data;
+package sic.asm.ujs;
 
 import sic.asm.ErrorCatcher;
 import sic.asm.visitors.WriteVisitor;

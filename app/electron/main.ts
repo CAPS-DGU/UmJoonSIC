@@ -55,7 +55,7 @@ function createWindow(): void {
     }
 
     // jar 서버 실행 (예시)
-    await runServer(server);
+    //await runServer(server);
 
     setTimeout(() => {
       splash.close();
