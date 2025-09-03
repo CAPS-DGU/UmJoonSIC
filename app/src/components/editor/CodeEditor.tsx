@@ -1,5 +1,5 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import * as monaco_editor from 'monaco-editor';
 
 import { useEditorTabStore } from '@/stores/EditorTabStore';
@@ -34,10 +34,11 @@ export default function CodeEditor() {
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const isLoadingRef = useRef(false);
   const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
-  const { handleKeyDown: handleAutoIndentationKeyDown, handlePaste: handleAutoIndentationPaste } =
-    useAutoIndentation(editorRef, monaco);
-  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
-  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
+  const {
+    handleKeyDown: handleAutoIndentationKeyDown,
+    handlePaste: handleAutoIndentationPaste,
+    formatDocument,
+  } = useAutoIndentation(editorRef, monaco);
 
   const { result, runCheck } = useSyntaxCheck();
   const hasRunRef = useRef(false);
@@ -49,27 +50,6 @@ export default function CodeEditor() {
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
   }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key;
-      // 저장
-      if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') {
-        e.preventDefault();
-        runCheck(texts, fileNames);
-        return;
-      }
-      // 공백 관련 키만 검사
-      if (key === ' ' || key === 'Tab' || key === 'Enter') {
-        runCheck(texts, fileNames);
-        return;
-      }
-      // 나머지 키는 무시
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [texts, fileNames, runCheck]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -169,31 +149,57 @@ export default function CodeEditor() {
     });
   };
 
+  // ✨ [수정] 여러 군데 흩어져 있던 KeyDown 관련 useEffect를 하나로 통합하고,
+  // 저장 로직을 수정하여 포맷팅된 최신 내용을 저장하도록 합니다.
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      const editor = editorRef.current;
+      const key = event.key;
+      const activeTab = getActiveTab();
+
+      // 저장 (Ctrl+S or Cmd+S)
+      if ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 's') {
         event.preventDefault();
-        console.log('Ctrl+S pressed in React');
-        const activeTab = getActiveTab();
-        if (activeTab) {
-          console.log('Save file in', projectPath + '/' + activeTab.filePath);
-          window.api
-            .saveFile(projectPath + '/' + activeTab.filePath, activeTab.fileContent)
-            .then((res: { success: boolean; message?: string }) => {
-              if (res.success) {
-                setIsModified(activeTab.idx, false);
-                console.log('File saved');
-              } else {
-                console.error('Failed to save file:', res.message);
-              }
-            });
+        if (activeTab && editor) {
+          // 1. 먼저 전체 문서를 포맷합니다.
+          formatDocument();
+
+          // 2. 포맷팅이 적용될 시간을 짧게 기다린 후, 구문 분석과 저장을 실행합니다.
+          setTimeout(() => {
+            const formattedContent = editor.getValue();
+            // 구문 분석 실행
+            runCheck([formattedContent], [activeTab.filePath]);
+
+            // 파일 저장 API 호출
+            window.api
+              .saveFile(projectPath + '/' + activeTab.filePath, formattedContent)
+              .then((res: { success: boolean; message?: string }) => {
+                if (res.success) {
+                  setIsModified(activeTab.idx, false);
+                  console.log('File saved successfully');
+                } else {
+                  console.error('Failed to save file:', res.message);
+                }
+              });
+          }, 100);
+        }
+        return;
+      }
+
+      // 구문 분석 (공백, 탭, 엔터)
+      if (key === ' ' || key === 'Tab' || key === 'Enter') {
+        if (editor) {
+          // 키 입력 후 업데이트된 내용을 기준으로 구문 분석
+          setTimeout(() => {
+            runCheck([editor.getValue()], [activeTab!.filePath]);
+          }, 0);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [getActiveTab, projectPath, setIsModified, formatDocument, runCheck]);
 
   useEffect(() => {
     if (activeTab && activeTab.filePath && projectPath) {

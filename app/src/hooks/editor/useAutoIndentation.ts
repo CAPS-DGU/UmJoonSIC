@@ -112,5 +112,35 @@ export function useAutoIndentation(
     [editorRef, monaco],
   );
 
-  return { handleKeyDown, handlePaste };
+  // 저장 시 전체 문서를 포맷하는 함수입니다.
+  const formatDocument = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor || !monaco) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    const lineCount = model.getLineCount();
+    const edits: monaco_editor.editor.ISingleEditOperation[] = [];
+
+    for (let i = 1; i <= lineCount; i++) {
+      const lineContent = model.getLineContent(i);
+      // 전체 포맷팅이므로 커서 위치는 중요하지 않습니다.
+      const newText = autoIndentLine(lineContent, false, 0);
+
+      if (lineContent !== newText) {
+        edits.push({
+          range: new monaco.Range(i, 1, i, lineContent.length + 1),
+          text: newText,
+          forceMoveMarkers: true,
+        });
+      }
+    }
+
+    if (edits.length > 0) {
+      editor.executeEdits('format-document', edits);
+    }
+  }, [editorRef, monaco]);
+
+  return { handleKeyDown, handlePaste, formatDocument };
 }
