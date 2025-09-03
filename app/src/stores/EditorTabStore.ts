@@ -177,6 +177,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
   toggleBreakpoint: (idx, lineNumber) => {
     const { tabs } = get();
     const tab = tabs.find(t => t.idx === idx);
+    console.log(`${tab?.filePath}의 ${lineNumber}줄 에서 브레이크 포인트 클릭!`);
     if (tab && tab.breakpoints && tab.breakpoints.includes(lineNumber)) {
       get().removeBreakpoint(idx, lineNumber);
     } else {
