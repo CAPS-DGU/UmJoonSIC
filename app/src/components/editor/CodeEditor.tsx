@@ -66,12 +66,12 @@ export default function CodeEditor() {
       return;
     }
 
-    if (!fileResult || !fileResult.compileErrors?.length) {
+    if (!fileResult || !fileResult.assemblerErrors?.length) {
       monaco.editor.setModelMarkers(model, 'sicxe', []);
       return;
     }
 
-    const markers = fileResult.compileErrors.map(err => ({
+    const markers = fileResult.assemblerErrors.map(err => ({
       severity: monaco.MarkerSeverity.Error,
       message: err.message,
       startLineNumber: clampLine(err.row, model),
