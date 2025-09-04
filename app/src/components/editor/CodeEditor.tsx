@@ -85,42 +85,60 @@ export default function CodeEditor() {
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,
-    // monaco: typeof monaco_editor | null,
   ) => {
     editorRef.current = editor;
+
     const setupEditorAfterFontLoad = async () => {
       try {
-        // 1. 'JetBrains Mono' 폰트를 명시적으로 로드하고 완료될 때까지 기다립니다.
+        // 1) Load editor font explicitly
         await document.fonts.load(`12px "JetBrains Mono"`);
         console.log('JetBrains Mono font loaded.');
 
-        // 2. 폰트가 준비된 후, 에디터 옵션을 적용합니다.
-        editor.updateOptions(editorOptions);
-        console.log('Editor options applied after font load.');
+        // 2) Apply options AFTER font is ready
+        editor.updateOptions({
+          ...editorOptions,
+          // ⬇ Disable Monaco's own indent/format so our hook controls it
+          autoIndent: 'none',
+          formatOnType: false,
+          formatOnPaste: false,
+          tabCompletion: 'off',
+        });
+        console.log('Editor options applied after font load (autoIndent off).');
 
-        // 3. 렌더링 동기화를 위해 짧은 지연시간 후 레이아웃을 강제로 재계산합니다.
+        // 3) Recalculate layout a tick later
         setTimeout(() => {
           console.log('Recalculating editor layout to ensure alignment.');
           editor.layout();
         }, 50);
       } catch (error) {
         console.error('Font loading failed:', error);
-        // 폰트 로딩에 실패하더라도 대체 폰트로 에디터가 동작하도록 옵션을 적용합니다.
-        editor.updateOptions(editorOptions);
+        // Apply options even if font load fails
+        editor.updateOptions({
+          ...editorOptions,
+          autoIndent: 'none',
+          formatOnType: false,
+          formatOnPaste: false,
+          tabCompletion: 'off',
+        });
       }
     };
+
     setupEditorAfterFontLoad();
 
+    // --- Wiring (unchanged) ---
     editor.onMouseDown(handleBreakpointMouseDown);
 
     editor.onDidChangeCursorPosition(e => {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab) {
-        setCursor(currentActiveTab.idx, { line: e.position.lineNumber, column: e.position.column });
+        setCursor(currentActiveTab.idx, {
+          line: e.position.lineNumber,
+          column: e.position.column,
+        });
       }
     });
 
-    // 복사시 문법 체크
+    // Run syntax check on paste (full doc)
     editorRef.current.onDidPaste(() => {
       runCheck([editorRef.current!.getValue()], [activeTab!.filePath]);
     });
@@ -133,18 +151,17 @@ export default function CodeEditor() {
       }
     });
 
+    // Delegate keys to our auto-indenter (it will prevent default for Tab/Enter)
     editor.onKeyDown(e => {
       const model = editor.getModel();
       if (!model) return;
-
       handleAutoIndentationKeyDown(e);
     });
 
-    // 붙여넣기 -> 정상적으로 붙여넣기 후 붙여넣기된 모든 줄에 대하여 실행
+    // Let our paste hook reflow pasted lines
     editor.onDidPaste(e => {
       const model = editor.getModel();
       if (!model) return;
-
       handleAutoIndentationPaste(e);
     });
   };
