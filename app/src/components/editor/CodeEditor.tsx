@@ -1,18 +1,21 @@
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import * as monaco_editor from 'monaco-editor';
-import { useEditorTabStore, type EditorTab } from '@/stores/EditorTabStore';
+
+import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
+import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
+
+import { editorOptions } from '@/constants/monaco/editor-config';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
 import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
 
+import { clampLine } from '@/lib/editor-utils';
+import { useBreakpointManager } from '@/hooks/editor/useBreakpointManager';
+
 import EditorErrorBoundary from './EditorErrorBoundary';
 import '@/styles/SyntaxError.css';
-
-const clampLine = (line1: number, model: monaco_editor.editor.ITextModel) => {
-  return Math.max(1, Math.min(line1 ?? 1, model.getLineCount()));
-};
 
 function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
   if (monaco) {
@@ -25,15 +28,17 @@ function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
 // 에디터 컴포넌트
 export default function CodeEditor() {
   const monaco = useMonaco();
-  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified, toggleBreakpoint } =
-    useEditorTabStore();
+  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
-  const decorationIdsRef = useRef<string[]>([]);
   const isLoadingRef = useRef(false);
-  const texts = useMemo(() => (activeTab ? [activeTab.fileContent] : []), [activeTab?.fileContent]);
-  const fileNames = useMemo(() => (activeTab ? [activeTab.filePath] : []), [activeTab?.filePath]);
+  const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
+  const {
+    handleKeyDown: handleAutoIndentationKeyDown,
+    handlePaste: handleAutoIndentationPaste,
+    formatDocument,
+  } = useAutoIndentation(editorRef, monaco);
 
   const { result, runCheck } = useSyntaxCheck();
   const hasRunRef = useRef(false);
@@ -45,27 +50,6 @@ export default function CodeEditor() {
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
   }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key;
-      // 저장
-      if ((e.ctrlKey || e.metaKey) && key.toLowerCase() === 's') {
-        e.preventDefault();
-        runCheck(texts, fileNames);
-        return;
-      }
-      // 공백 관련 키만 검사
-      if (key === ' ' || key === 'Tab' || key === 'Enter') {
-        runCheck(texts, fileNames);
-        return;
-      }
-      // 나머지 키는 무시
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [texts, fileNames, runCheck]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -104,56 +88,30 @@ export default function CodeEditor() {
     // monaco: typeof monaco_editor | null,
   ) => {
     editorRef.current = editor;
+    const setupEditorAfterFontLoad = async () => {
+      try {
+        // 1. 'JetBrains Mono' 폰트를 명시적으로 로드하고 완료될 때까지 기다립니다.
+        await document.fonts.load(`12px "JetBrains Mono"`);
+        console.log('JetBrains Mono font loaded.');
 
-    // Breakpoint 기능 활성화
-    editor.updateOptions({
-      glyphMargin: true, // Breakpoint를 위한 여백 활성화
-      lineNumbers: 'on',
-      folding: true,
-      minimap: { enabled: true }, // 미니맵 비활성화로 공간 확보
-      scrollBeyondLastLine: false,
-    });
+        // 2. 폰트가 준비된 후, 에디터 옵션을 적용합니다.
+        editor.updateOptions(editorOptions);
+        console.log('Editor options applied after font load.');
 
-    // Breakpoint 클릭 이벤트 처리
-    editor.onMouseDown(e => {
-      console.log('Mouse down event:', e.target.type, e.target.position);
-      console.log('Mouse target details:', e.target);
-
-      // 클릭된 위치에서 라인 번호 추출
-      let lineNumber: number | undefined;
-
-      if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
-        lineNumber = e.target.position?.lineNumber;
-        console.log('Glyph margin clicked at line:', lineNumber);
-      } else if (e.target.type === monaco_editor.editor.MouseTargetType.GUTTER_LINE_NUMBERS) {
-        lineNumber = e.target.position?.lineNumber;
-        console.log('Line number clicked at line:', lineNumber);
-      }
-      // CONTENT_TEXT 클릭은 제거 - 코드 본문 클릭 시 중단점 토글 방지
-
-      if (lineNumber && activeTab) {
-        console.log('Before toggle - activeTab breakpoints:', activeTab.breakpoints);
-        console.log('Toggling breakpoint for line:', lineNumber);
-
-        toggleBreakpoint(activeTab.idx, lineNumber);
-
-        // 상태 업데이트 후 다시 확인
+        // 3. 렌더링 동기화를 위해 짧은 지연시간 후 레이아웃을 강제로 재계산합니다.
         setTimeout(() => {
-          const updatedActiveTab = getActiveTab();
-          console.log(
-            'After toggle - updatedActiveTab breakpoints:',
-            updatedActiveTab?.breakpoints,
-          );
-          if (updatedActiveTab) {
-            updateBreakpointDecorations(updatedActiveTab);
-          }
-        }, 0);
-
-        console.log('Breakpoint toggled for line:', lineNumber);
-      } else {
-        console.log('No valid line number or active tab. Target type:', e.target.type);
+          console.log('Recalculating editor layout to ensure alignment.');
+          editor.layout();
+        }, 50);
+      } catch (error) {
+        console.error('Font loading failed:', error);
+        // 폰트 로딩에 실패하더라도 대체 폰트로 에디터가 동작하도록 옵션을 적용합니다.
+        editor.updateOptions(editorOptions);
       }
-    });
+    };
+    setupEditorAfterFontLoad();
+
+    editor.onMouseDown(handleBreakpointMouseDown);
 
     editor.onDidChangeCursorPosition(e => {
       const currentActiveTab = getActiveTab();
@@ -174,105 +132,74 @@ export default function CodeEditor() {
         setFileContent(currentActiveTab.idx, editor.getValue());
       }
     });
+
+    editor.onKeyDown(e => {
+      const model = editor.getModel();
+      if (!model) return;
+
+      handleAutoIndentationKeyDown(e);
+    });
+
+    // 붙여넣기 -> 정상적으로 붙여넣기 후 붙여넣기된 모든 줄에 대하여 실행
+    editor.onDidPaste(e => {
+      const model = editor.getModel();
+      if (!model) return;
+
+      handleAutoIndentationPaste(e);
+    });
   };
 
-  // Breakpoint 데코레이션 업데이트 함수
-  const updateBreakpointDecorations = (tab?: EditorTab) => {
-    const targetTab = tab || activeTab;
-    const editor = editorRef.current;
-    if (!editor || !targetTab) {
-      console.log('Cannot update decorations - editor or targetTab not available');
-      return;
-    }
-
-    const model = editor.getModel();
-    if (!model) return;
-
-    console.log('Updating breakpoint decorations for breakpoints:', targetTab.breakpoints);
-
-    // 기존 데코 제거
-    if (decorationIdsRef.current.length > 0) {
-      editor.deltaDecorations(decorationIdsRef.current, []);
-    }
-
-    // ✅ 숫자 보정 + 1~lineCount 범위로 제한 + 중복 제거
-    const validLines = (targetTab.breakpoints ?? [])
-      .map((n: unknown) => Math.floor(Number(n)))
-      .filter((n: number) => Number.isFinite(n))
-      .map((n: number) => clampLine(n, model))
-      .filter((n: number, i: number, arr: number[]) => arr.indexOf(n) === i);
-
-    const decorations = validLines.map((lineNumber: number) => ({
-      range: new monaco_editor.Range(lineNumber, 1, lineNumber, 1),
-      options: {
-        glyphMarginClassName: 'breakpoint-glyph',
-        glyphMarginHoverMessage: { value: 'Breakpoint' },
-        isWholeLine: false,
-        stickiness: monaco_editor.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-      },
-    }));
-
-    console.log('Created decorations:', decorations);
-    decorationIdsRef.current = editor.deltaDecorations([], decorations);
-    console.log('Applied decoration IDs:', decorationIdsRef.current);
-  };
-
-  // Breakpoint 시각적 표시를 위한 CSS 추가
+  // ✨ [수정] 여러 군데 흩어져 있던 KeyDown 관련 useEffect를 하나로 통합하고,
+  // 저장 로직을 수정하여 포맷팅된 최신 내용을 저장하도록 합니다.
   useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      /* Breakpoint 아이콘 스타일 - Monaco Editor의 기본 위치 사용 */
-      .breakpoint-glyph {
-        background-color: #e51400 !important;
-        border-radius: 50% !important;
-        border: 2px solid #ffffff !important;
-        width: 12px !important;
-        height: 12px !important;
-        display: inline-block !important;
-        margin: 2px !important;
-      }
-      
-      .breakpoint-glyph:hover {
-        background-color: #ff0000 !important;
-        transform: scale(1.1) !important;
-      }
-    `;
-    document.head.appendChild(style);
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      const editor = editorRef.current;
+      const key = event.key;
+      const activeTab = getActiveTab();
 
-    console.log('Breakpoint CSS styles applied');
-
-    return () => {
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      // 저장 (Ctrl+S or Cmd+S)
+      if ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 's') {
         event.preventDefault();
-        console.log('Ctrl+S pressed in React');
-        const activeTab = getActiveTab();
-        if (activeTab) {
-          console.log('Save file in', projectPath + '/' + activeTab.filePath);
-          window.api
-            .saveFile(projectPath + '/' + activeTab.filePath, activeTab.fileContent)
-            .then((res: { success: boolean; message?: string }) => {
-              if (res.success) {
-                setIsModified(activeTab.idx, false);
-                console.log('File saved');
-              } else {
-                console.error('Failed to save file:', res.message);
-              }
-            });
+        if (activeTab && editor) {
+          // 1. 먼저 전체 문서를 포맷합니다.
+          formatDocument();
+
+          // 2. 포맷팅이 적용될 시간을 짧게 기다린 후, 구문 분석과 저장을 실행합니다.
+          setTimeout(() => {
+            const formattedContent = editor.getValue();
+            // 구문 분석 실행
+            runCheck([formattedContent], [activeTab.filePath]);
+
+            // 파일 저장 API 호출
+            window.api
+              .saveFile(projectPath + '/' + activeTab.filePath, formattedContent)
+              .then((res: { success: boolean; message?: string }) => {
+                if (res.success) {
+                  setIsModified(activeTab.idx, false);
+                  console.log('File saved successfully');
+                } else {
+                  console.error('Failed to save file:', res.message);
+                }
+              });
+          }, 100);
+        }
+        return;
+      }
+
+      // 구문 분석 (공백, 탭, 엔터)
+      if (key === ' ' || key === 'Tab' || key === 'Enter') {
+        if (editor) {
+          // 키 입력 후 업데이트된 내용을 기준으로 구문 분석
+          setTimeout(() => {
+            runCheck([editor.getValue()], [activeTab!.filePath]);
+          }, 0);
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [getActiveTab, projectPath, setIsModified, formatDocument, runCheck]);
 
   useEffect(() => {
     if (activeTab && activeTab.filePath && projectPath) {
@@ -302,13 +229,6 @@ export default function CodeEditor() {
     registerAssemblyLanguage(monaco);
   }, [monaco]);
 
-  // Active tab이 변경될 때 breakpoint 데코레이션 업데이트
-  useEffect(() => {
-    if (editorRef.current && activeTab) {
-      updateBreakpointDecorations(activeTab);
-    }
-  }, [activeTab?.idx, activeTab?.filePath]);
-
   if (tabs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
@@ -321,29 +241,13 @@ export default function CodeEditor() {
   return (
     <EditorErrorBoundary>
       <Editor
+        key={activeTab?.idx}
         height="100%"
         theme="asmTheme" // 추가한 테마를 적용합니다.
         defaultLanguage="sicxe" // 기본 언어를 'asm'으로 설정합니다.
         value={activeTab?.fileContent}
         onMount={handleEditorDidMount}
-        options={{
-          glyphMargin: true,
-          lineNumbers: 'on',
-          folding: true,
-          minimap: { enabled: true },
-          scrollBeyondLastLine: true,
-          renderLineHighlight: 'all',
-          selectOnLineNumbers: true,
-
-          // 🔹 고정폭 + 자간 + 컬럼 맞춤
-          fontFamily: 'JetBrains Mono', // 고정폭 폰트
-          fontSize: 12, // 폰트 크기
-          letterSpacing: 1.25, // 글자 간격(px)
-          tabSize: 8, // SIC/XE 컬럼 기준 탭
-          insertSpaces: true, // 탭 대신 스페이스
-          rulers: [8, 16, 24], // 컬럼 가이드
-          wordWrap: 'off', // 자동 줄바꿈 해제
-        }}
+        // options={editorOptions}
       />
     </EditorErrorBoundary>
   );
