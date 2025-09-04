@@ -33,97 +33,98 @@ interface EditorTabState {
   clearBreakpoints: (idx: number) => void;
 }
 
-const defaultTab: EditorTab = {
-  idx: 0,
-  title: 'Untitled',
-  filePath: './main.asm',
-  isModified: false,
-  fileContent: 'hello',
-  breakpoints: [],
-  isActive: false,
-  cursor: {
-    line: 0,
-    column: 0,
-  },
+// const defaultTab: EditorTab = {
+//   idx: 0,
+//   title: 'Untitled',
+//   filePath: './main.asm',
+//   isModified: false,
+//   fileContent: 'hello',
+//   breakpoints: [],
+//   isActive: false,
+//   cursor: {
+//     line: 0,
+//     column: 0,
+//   },
+// };
+
+// 'activeTabIdx'를 기준으로 모든 탭의 'isActive' 상태를 동기화하는 헬퍼 함수
+const syncActiveState = (tabs: EditorTab[], activeIdx: number): EditorTab[] => {
+  return tabs.map((tab, index) => ({
+    ...tab,
+    isActive: index === activeIdx,
+  }));
 };
 
 export const useEditorTabStore = create<EditorTabState>((set, get) => ({
   tabs: [],
   activeTabIdx: -1, // default value (e.g., -1 for no active tab)
-  getActiveTab: () => get().tabs.find(tab => tab.isActive),
+
+  getActiveTab: () => {
+    const { tabs, activeTabIdx } = get();
+    // 유효한 인덱스인지 확인 후 반환
+    if (activeTabIdx >= 0 && activeTabIdx < tabs.length) {
+      return tabs[activeTabIdx];
+    }
+    return undefined;
+  },
+
   addTab: newTab =>
     set(state => {
       const exists = state.tabs.some(tab => tab.filePath === newTab.filePath);
+      // 이미 탭이 존재하는 경우
       if (exists) {
         const newActiveTabIdx = state.tabs.findIndex(tab => tab.filePath === newTab.filePath);
-        return {
-          tabs: state.tabs.map(tab => ({
-            ...tab,
-            breakpoints: tab.breakpoints || [],
-            isActive: tab.filePath === newTab.filePath ? true : false,
-          })),
-          activeTabIdx: newActiveTabIdx,
-        };
+        const syncedTabs = syncActiveState(state.tabs, newActiveTabIdx);
+        return { tabs: syncedTabs, activeTabIdx: newActiveTabIdx };
       }
+
+      // 새 탭 추가하는 경우
       const newIdx = state.tabs.length;
-      return {
-        tabs: [
-          ...state.tabs.map(tab => ({
-            ...tab,
-            breakpoints: tab.breakpoints || [],
-            isActive: false,
-          })),
-          {
-            ...newTab,
-            breakpoints: newTab.breakpoints || [],
-            isActive: true,
-            idx: newIdx,
-          },
-        ],
-        activeTabIdx: newIdx,
-      };
+      const updatedTabs = [...state.tabs, { ...newTab, idx: newIdx }];
+      const syncedTabs = syncActiveState(updatedTabs, newIdx);
+      return { tabs: syncedTabs, activeTabIdx: newIdx };
     }),
+
   closeTab: idx =>
     set(state => {
-      const closedTabIsActive = state.tabs[idx]?.isActive;
+      const closedTabWasActive = state.tabs[idx]?.idx === state.activeTabIdx;
       const updatedTabs = state.tabs.filter(tab => tab.idx !== idx);
-
       const reindexedTabs = updatedTabs.map((tab, i) => ({ ...tab, idx: i }));
 
       let newActiveTabIdx = -1;
       if (reindexedTabs.length > 0) {
-        if (closedTabIsActive) {
+        if (closedTabWasActive) {
+          // 닫은 탭이 활성 탭이었다면, 마지막 탭을 활성화
           newActiveTabIdx = reindexedTabs.length - 1;
         } else {
-          const currentActiveTab = state.tabs.find(tab => tab.isActive);
-          newActiveTabIdx = currentActiveTab
-            ? reindexedTabs.findIndex(tab => tab.filePath === currentActiveTab.filePath)
-            : -1;
+          // 다른 탭을 닫았다면, 기존 활성 탭의 새 인덱스 찾기
+          const oldActiveTab = state.tabs[state.activeTabIdx];
+          if (oldActiveTab) {
+            newActiveTabIdx = reindexedTabs.findIndex(t => t.filePath === oldActiveTab.filePath);
+          }
         }
       }
 
-      const finalTabs = reindexedTabs.map((tab, i) => ({
-        ...tab,
-        isActive: i === newActiveTabIdx,
-      }));
-
+      const finalTabs = syncActiveState(reindexedTabs, newActiveTabIdx);
       return {
         tabs: finalTabs,
         activeTabIdx: newActiveTabIdx,
       };
     }),
   setActiveTab: idx =>
-    set(state => ({
-      tabs: state.tabs.map(tab => ({
-        ...tab,
-        isActive: tab.idx === idx,
-      })),
-      activeTabIdx: idx,
-    })),
+    set(state => {
+      const syncedTabs = syncActiveState(state.tabs, idx);
+      return {
+        tabs: syncedTabs,
+        activeTabIdx: idx,
+      };
+    }),
+
   setCursor: (idx, cursor) =>
     set(state => ({
       tabs: state.tabs.map(tab => ({ ...tab, cursor: tab.idx === idx ? cursor : tab.cursor })),
     })),
+
   setFileContent: (idx, fileContent) =>
     set(state => ({
       tabs: state.tabs.map(tab => ({
@@ -131,7 +132,9 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         fileContent: tab.idx === idx ? fileContent : tab.fileContent,
       })),
     })),
+
   clearTabs: () => set(() => ({ tabs: [], activeTabIdx: -1 })),
+
   setIsModified: (idx, isModified) =>
     set(state => ({
       tabs: state.tabs.map(tab => ({
@@ -139,6 +142,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         isModified: tab.idx === idx ? isModified : tab.isModified,
       })),
     })),
+
   // Breakpoint 관련 함수들
   addBreakpoint: (idx, lineNumber) =>
     set(state => ({
@@ -155,6 +159,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         return tab;
       }),
     })),
+
   removeBreakpoint: (idx, lineNumber) =>
     set(state => ({
       tabs: state.tabs.map(tab => {
@@ -168,15 +173,18 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         return tab;
       }),
     })),
+
   toggleBreakpoint: (idx, lineNumber) => {
     const { tabs } = get();
     const tab = tabs.find(t => t.idx === idx);
+    console.log(`${tab?.filePath}의 ${lineNumber}줄 에서 브레이크 포인트 클릭!`);
     if (tab && tab.breakpoints && tab.breakpoints.includes(lineNumber)) {
       get().removeBreakpoint(idx, lineNumber);
     } else {
       get().addBreakpoint(idx, lineNumber);
     }
   },
+
   clearBreakpoints: idx =>
     set(state => ({
       tabs: state.tabs.map(tab => {
