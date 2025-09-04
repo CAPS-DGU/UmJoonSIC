@@ -209,6 +209,7 @@ public class Simulation {
                                     ae.row = err.loc.row;
                                     ae.col = err.loc.col;
                                     ae.length = err.length;
+                                    ae.message = err.getMessage();
                                     return ae;
                                 })
                                 .toList();
@@ -404,6 +405,7 @@ public class Simulation {
                                 ae.row = err.loc.row;
                                 ae.col = err.loc.col;
                                 ae.length = err.length;
+                                ae.message = err.getMessage();
                                 return ae;
                             })
                             .toList();
