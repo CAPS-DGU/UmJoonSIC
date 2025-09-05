@@ -1,0 +1,15 @@
+@keyframes search-flash-animation {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: #60a5fa;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.search-flash {
+  animation: search-flash-animation 0.6s ease-in-out;
+}

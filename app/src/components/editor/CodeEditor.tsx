@@ -4,6 +4,7 @@ import * as monaco_editor from 'monaco-editor';
 
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
+import { useErrorStore } from '@/stores/pannel/ErrorStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
 import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
 
@@ -31,8 +32,11 @@ export default function CodeEditor() {
   const { tabs, getActiveTab, setFileContent, setCursor, setIsModified } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
+
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const isLoadingRef = useRef(false);
+  const loadErrorDecorationIdsRef = useRef<string[]>([]);
+
   const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
   const {
     handleKeyDown: handleAutoIndentationKeyDown,
@@ -40,94 +44,81 @@ export default function CodeEditor() {
     formatDocument,
   } = useAutoIndentation(editorRef, monaco);
 
-  const { result, runCheck } = useSyntaxCheck();
+  const { runCheck } = useSyntaxCheck();
+  const errors = useErrorStore(state => state.errors);
   const hasRunRef = useRef(false);
 
+  // 최초 마운트 구문 검사를 위한 useEffect
   useEffect(() => {
     if (!activeTab || hasRunRef.current) return;
     if (!activeTab.fileContent) return; // 파일 내용이 준비되지 않았으면 대기
 
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
-  }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
+  }, [activeTab, runCheck]);
 
-useEffect(() => {
-  const editor = editorRef.current;
-  if (!editor || !activeTab || !result) return;
+  // 커서 위치 동기화
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !activeTab) return;
 
-  const model = editor.getModel();
-  if (!model) return;
+    const { line, column } = activeTab.cursor ?? { line: 1, column: 1 };
+    editor.setPosition({ lineNumber: line, column: column });
 
-  const fileResult = result.files.find(
-    f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
-  );
+    // 레이아웃이 끝난 뒤 중앙으로 스크롤
+    setTimeout(() => {
+      editor.revealLineInCenter(line);
+    }, 50);
+  }, [activeTab]);
 
-  if (!monaco || !fileResult) return;
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !activeTab || !errors) return;
 
-  if (!fileResult.assemblerErrors?.length) {
-    monaco.editor.setModelMarkers(model, 'sicxe', []);
-    return;
-  }
+    const model = editor.getModel();
+    if (!model || !monaco) return;
 
-  const clampLine = (line: number) =>
-    Math.max(1, Math.min(line, model.getLineCount()));
+    if (!errors[activeTab.filePath]?.length) {
+      monaco.editor.setModelMarkers(model, 'sicxe', []);
+      if (loadErrorDecorationIdsRef.current.length > 0) {
+        loadErrorDecorationIdsRef.current = editor.deltaDecorations(
+          loadErrorDecorationIdsRef.current,
+          [],
+        );
+      }
+      return;
+    }
 
-  const clampColumn = (line: number, col: number) => {
-    const maxCol = model.getLineMaxColumn(line);
-    return Math.max(1, Math.min(col, maxCol));
-  };
-
-  const markers = fileResult.assemblerErrors.map(err => {
-    // Detect if incoming positions are 0-based (common from parsers/lexers)
-    const probablyZeroBased = err.row === 0 || err.col === 0;
-
-    const rawLine = (err.row ?? 1);
-    const rawCol  = (err.col ?? 1);
-
-    const startLineNumber = clampLine(probablyZeroBased ? rawLine + 1 : rawLine);
-
-    // Monaco columns are 1-based; endColumn is the column **after** the last char
-    const startColumnBase1 = probablyZeroBased ? rawCol + 1 : rawCol;
-    const startColumn = clampColumn(startLineNumber, startColumnBase1);
-
-    const length = Math.max(err.length ?? 1, 1);
-    const endColumn = clampColumn(startLineNumber, startColumn + length);
-
-    const marker: monaco.editor.IMarkerData = {
+    const markers = errors[activeTab.filePath].map(err => ({
       severity: monaco.MarkerSeverity.Error,
       message: err.message,
-      startLineNumber,
-      startColumn,
-      endLineNumber: startLineNumber,
-      endColumn,
-    };
+      startLineNumber: clampLine(err.row, model),
+      startColumn: clampLine(err.col, model),
+      endLineNumber: clampLine(err.row, model),
+      endColumn: clampLine(err.col + (err.length ?? 1), model),
+    }));
+    monaco.editor.setModelMarkers(model, 'sicxe', markers);
 
-    // Helpful debug log
-    console.debug('[assembler-error]', {
-      fileName: fileResult.fileName,
-      message: err.message,
-      errRow: err.row,
-      errCol: err.col,
-      errLength: err.length,
-      computed: {
-        startLineNumber,
-        startColumn,
-        endColumn,
-        lineText: model.getLineContent(startLineNumber),
+    const loadErrorLines = errors[activeTab.filePath]
+      .filter(err => err.type === 'load')
+      .map(err => clampLine(err.row, model));
+
+    const newDecorations = loadErrorLines.map(line => ({
+      range: new monaco.Range(line, 1, line, 1),
+      options: {
+        isWholeLine: true,
+        className: 'load-error-line',
       },
-    });
+    }));
 
-    return marker;
-  });
+    // 기존 decorations 교체
+    loadErrorDecorationIdsRef.current = editor.deltaDecorations(
+      loadErrorDecorationIdsRef.current,
+      newDecorations,
+    );
+  }, [errors, activeTab, monaco]);
 
-  monaco.editor.setModelMarkers(model, 'sicxe', markers);
-}, [result, activeTab, monaco]);
-
-
-
-  const handleEditorDidMount = (
-    editor: monaco_editor.editor.IStandaloneCodeEditor,
-  ) => {
+  const handleEditorDidMount = (editor: monaco_editor.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
     const setupEditorAfterFontLoad = async () => {

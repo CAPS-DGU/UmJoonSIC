@@ -1,26 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useErrorStore } from '@/stores/pannel/ErrorStore';
-
-// ----- 타입 정의 -----
-export interface AssemblerError {
-  row: number;
-  col: number;
-  length?: number;
-  message: string;
-  nonbreaking: boolean;
-}
-
-export interface SyntaxCheckFileResult {
-  fileName: string;
-  ok: boolean;
-  assemblerErrors?: AssemblerError[] | null;
-}
-
-export interface SyntaxCheckResult {
-  ok: boolean;
-  message: string;
-  files: SyntaxCheckFileResult[];
-}
+import type { AssemblerError, SyntaxCheckResult } from '@/types/DTO';
 
 // ----- 커스텀 훅 -----
 export function useSyntaxCheck() {
