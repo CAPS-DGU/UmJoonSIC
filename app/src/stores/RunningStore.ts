@@ -7,6 +7,8 @@ import { useWatchStore } from './pannel/WatchStore';
 import { useRegisterStore } from './RegisterStore';
 import { useEditorTabStore } from './EditorTabStore';
 import { useMemoryViewStore } from './MemoryViewStore';
+import { useErrorStore } from './pannel/ErrorStore';
+import type { AssemblerError, LinkerError } from '@/types/DTO';
 
 interface RunningState {
   isRunning: boolean;
@@ -60,8 +62,8 @@ interface Listing {
 interface LoadedFile {
   fileName: string;
   listing: Listing;
-  compileErrors: string[] | null;
-  linkerError: string | null;
+  assemblerErrors?: AssemblerError[];
+  linkerErrors?: LinkerError[];
 }
 
 export const useRunningStore = create<RunningState>((set, get) => ({
@@ -84,6 +86,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { projectPath, settings } = useProjectStore.getState();
     const { setMemoryRange } = useMemoryViewStore.getState();
     const { fetchBegin, loadToListfileAndWatch, stopRunning } = get();
+    const { addErrors, clearErrors } = useErrorStore.getState();
+
     await fetchBegin();
     const res = await axios.post('http://localhost:9090/load', {
       filePaths: settings.asm.map(file => path.join(projectPath, file)),
@@ -91,8 +95,10 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       main: settings.main == '' ? undefined : settings.main,
     });
     const data = res.data;
-    console.log(data);
+    console.log('load response: ', data);
+
     if (data.ok) {
+      clearErrors(undefined, 'load'); // 이전 load 에러 정리
       const { setAll } = useRegisterStore.getState();
       setAll(data.registers);
       const files: LoadedFile[] = data.files;
@@ -103,8 +109,28 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       set({ loadedFiles: files });
       loadToListfileAndWatch();
     } else {
-      console.error('Failed to load');
-      stopRunning();
+      // 실패 → 에러 스토어에 기록
+      try {
+        const files: LoadedFile[] = data.files;
+        files.forEach(file => {
+          if (file.assemblerErrors?.length) {
+            addErrors(
+              file.fileName,
+              file.assemblerErrors.map(err => ({
+                row: err.row,
+                col: err.col,
+                length: err.length,
+                message: err.message,
+                type: 'load', // assembler error → load 타입
+              })),
+            );
+          }
+        });
+        console.error('Failed to load', data.message);
+        stopRunning();
+      } catch (e) {
+        console.error('Failed to parse load error response', e);
+      }
     }
   },
   loadToListfileAndWatch: async () => {
