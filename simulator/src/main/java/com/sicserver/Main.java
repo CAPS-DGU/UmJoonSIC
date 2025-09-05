@@ -4,6 +4,8 @@ import static spark.Spark.*;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.sicserver.api.SicSimulation;
+import com.sicserver.api.SicxeSimulation;
 import com.sicserver.api.Simulation;
 
 /**
@@ -33,9 +35,12 @@ import com.sicserver.api.Simulation;
  * ### 1) POST /begin
  * **Purpose:** Create a fresh {@link Simulation} instance (resets state).
  *
- * **Request:** _empty object_ `{}`
+ * **Request JSON:**
+ * ```json
+ * { "type": "sic" }     // or "sicxe"
+ * ```
  *
- * **Response:** `{ ok:true, message:"Simulation initialized" }`
+ * **Response:** `{ ok:true, message:"Simulation initialized (sic)" }`
  *
  * ---
  * ### 2) POST /load
@@ -148,6 +153,7 @@ public class Main {
     }
 
     // ---------- Request DTOs ----------
+    static final class BeginReq { String type; }  // <-- NEW: engine type for /begin
     static final class LoadReq {
         String[] filePaths; String outputDir; String outputName; String main;
         Boolean keep; Boolean graphical; Boolean editing; Boolean force; Boolean verbose;
@@ -156,7 +162,7 @@ public class Main {
     static final class MemoryReq { Object addr; Object start; Object end; }
 
     public static void main(String[] args) {
-        SIM = new Simulation();
+        SIM = new SicSimulation(); // default engine before first /begin
         int portNum = 9090; // default
         if (args != null && args.length > 0) {
             try {
@@ -178,8 +184,19 @@ public class Main {
         // ---------- Routes ----------
         // Health / init simulation
         post("/begin", (req, res) -> {
-            SIM = new Simulation();
-            return gson.toJson(new Msg(true, "Simulation initialized"));
+            BeginReq body = safeFromJson(req.body(), BeginReq.class);
+            if (body == null || body.type == null) {
+                return gson.toJson(new Msg(false, "Expected JSON body: { \"type\": \"sic\" | \"sicxe\" }"));
+            }
+            String t = body.type.trim().toLowerCase();
+            switch (t) {
+                case "sic" -> SIM = new SicSimulation();
+                case "sicxe" -> SIM = new SicxeSimulation();
+                default -> {
+                    return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
+                }
+            }
+            return gson.toJson(new Msg(true, "Simulation initialized (" + t + ")"));
         });
 
         // Assemble / Link
