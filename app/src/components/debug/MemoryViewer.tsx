@@ -6,6 +6,7 @@ import {
   type MemoryLabel,
 } from '@/stores/MemoryViewStore';
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { Search } from 'lucide-react';
 
 export default function MemoryViewer() {
   const memoryValues = useMemoryViewStore(state => state.memoryValues);
@@ -23,8 +24,9 @@ export default function MemoryViewer() {
   const BUFFER_SIZE = 512; // 미리 로드할 범위 (위아래 256바이트씩)
   const ROW_HEIGHT = 32; // 각 행의 높이
 
-  // 현재 보이는 행 범위 상태
+  const [searchAddress, setSearchAddress] = useState('');
   const [visibleRowRange, setVisibleRowRange] = useState({ start: 0, end: 20 });
+  const [searchedNodes, setSearchedNodes] = useState<Set<number>>(new Set());
 
   // 애니메이션 완료 후 변경된 노드 목록 초기화
   useEffect(() => {
@@ -36,6 +38,17 @@ export default function MemoryViewer() {
       return () => clearTimeout(timer);
     }
   }, [changedNodes, clearChangedNodes]);
+
+  // 검색된 노드 애니메이션 초기화
+  useEffect(() => {
+    if (searchedNodes.size > 0) {
+      const timer = setTimeout(() => {
+        setSearchedNodes(new Set());
+      }, 600);
+
+      return () => clearTimeout(timer);
+    }
+  }, [searchedNodes]);
 
   //메모리 범위 변경 확인
   useEffect(() => {
@@ -96,6 +109,27 @@ export default function MemoryViewer() {
     console.log('주소 0x0008의 값:', getMemoryValue(8));
     console.log('주소 0x0010의 값:', getMemoryValue(16));
   };
+  const handleSearch = () => {
+    if (!containerRef.current || !searchAddress) return;
+
+    const address = parseInt(searchAddress, 16);
+    if (isNaN(address) || address < 0 || address >= totalMemorySize) {
+      alert('유효하지 않은 메모리 주소입니다.');
+      return;
+    }
+
+    // 검색된 노드 목록에 추가
+    setSearchedNodes(new Set([address]));
+
+    const rowIndex = Math.floor(address / ROW_SIZE);
+    const scrollTo = rowIndex * ROW_HEIGHT;
+
+    // 스크롤 위치 이동
+    containerRef.current.scrollTop = scrollTo;
+
+    // 해당 범위의 메모리 로드
+    loadMemoryRange(address, address + BUFFER_SIZE);
+  };
 
   // 전체 메모리 크기에 따른 스크롤 영역 생성
   const totalRows = Math.ceil(totalMemorySize / ROW_SIZE);
@@ -111,6 +145,28 @@ export default function MemoryViewer() {
           디버그
         </button> */}
       </div>
+
+      <div className="flex items-center mt-2 space-x-2">
+        <input
+          type="text"
+          value={searchAddress}
+          onChange={e => setSearchAddress(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              handleSearch();
+            }
+          }}
+          placeholder="16진수 주소 입력 (예: 0x1A2B)"
+          className="border border-gray-300 p-1 rounded text-sm w-48 font-mono"
+        />
+        <button
+          onClick={handleSearch}
+          className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        >
+          <Search size={16} />
+        </button>
+      </div>
+
       <div
         ref={containerRef}
         className="w-full mt-2 flex justify-start items-start px-2 overflow-y-auto flex-1 min-h-0 h-full max-h-[700px]"
@@ -134,6 +190,7 @@ export default function MemoryViewer() {
               getMemoryValue={getMemoryValue}
               ROW_SIZE={ROW_SIZE}
               ROW_HEIGHT={ROW_HEIGHT}
+              searchedNodes={searchedNodes}
             />
           </div>
         </div>
@@ -192,6 +249,7 @@ function ValueColumn({
   getMemoryValue,
   ROW_SIZE,
   ROW_HEIGHT,
+  searchedNodes,
 }: {
   totalRows: number;
   visibleRowRange: { start: number; end: number };
@@ -200,6 +258,7 @@ function ValueColumn({
   getMemoryValue: (address: number) => MemoryNodeData | null;
   ROW_SIZE: number;
   ROW_HEIGHT: number;
+  searchedNodes: Set<number>; // Props로 전달
 }) {
   // 보이는 행만 렌더링
   const visibleRows = [];
@@ -243,6 +302,8 @@ function ValueColumn({
                 const node = getMemoryValue(byteAddr);
                 const label = rowLabels.find(l => idx >= l.start && idx <= l.end);
                 const isChanged = changedNodes.has(byteAddr);
+                // 검색된 노드 여부
+                const isSearched = searchedNodes.has(byteAddr);
 
                 // 디버깅: 첫 번째 행의 첫 번째 값만 로그 출력
                 if (rowIndex === 0 && idx === 0) {
@@ -259,6 +320,7 @@ function ValueColumn({
                     status={node?.status}
                     labelHighlight={!!label}
                     isChanged={isChanged}
+                    isSearched={isSearched}
                   />
                 );
               })}
@@ -322,11 +384,13 @@ function MemoryNode({
   status,
   labelHighlight,
   isChanged,
+  isSearched,
 }: {
   val: string;
   status?: MemoryNodeStatus;
   labelHighlight?: boolean;
   isChanged?: boolean;
+  isSearched?: boolean;
 }) {
   const statusClasses = {
     normal: '',
@@ -340,7 +404,7 @@ function MemoryNode({
         statusClasses[status || 'normal']
       } ${labelHighlight ? '!text-orange-500 font-semibold' : ''} ${
         isChanged ? 'memory-flash' : ''
-      }`}
+      } ${isSearched ? 'search-flash' : ''}`}
     >
       {val}
     </span>
