@@ -12,8 +12,11 @@ import java.util.List;
  */
 public class DirectiveEXTREF extends DirectiveEXTDEF {
 
-    public DirectiveEXTREF(Location loc, String label, Mnemonic mnemonic, List<String> names) {
-        super(loc, label, mnemonic, names);
+    public DirectiveEXTREF(Location loc,
+                           String label, Location labelLoc,
+                           Mnemonic mnemonic, Location mnemonicLoc,
+                           List<String> names,
+                           List<Location> nameLocs) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc, names, nameLocs);
     }
-
 }

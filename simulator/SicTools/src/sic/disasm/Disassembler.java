@@ -79,20 +79,32 @@ public class Disassembler {
         Location loc = new Location(-1,-1,-1);
         switch (mnemonic.format) {
             case F1:
-                return new InstructionF1(loc, "", mnemonic);
+                return new InstructionF1(loc, "", null,
+                        mnemonic, null);
             case F2n:
-                return new InstructionF2n(loc, "", mnemonic, fetch() >> 4);
+                return new InstructionF2n(loc, "", null,
+                        mnemonic, null,
+                        fetch() >> 4, null);
             case F2r:
-                return new InstructionF2r(loc, "", mnemonic, fetch() >> 4);
+                return new InstructionF2r(loc, "", null,
+                        mnemonic, null,
+                        fetch() >> 4, null);
             case F2rn:
                 b1 = fetch();
-                return new InstructionF2rn(loc, "", mnemonic, (b1 & 0xF0) >> 4, (b1 & 0x0F) + 1);
+                return new InstructionF2rn(loc, "", null,
+                        mnemonic, null,
+                        (b1 & 0xF0) >> 4, null,
+                        (b1 & 0x0F) + 1, null);
             case F2rr:
                 b1 = fetch();
-                return new InstructionF2rr(loc, "", mnemonic, (b1 & 0xF0) >> 4, b1 & 0x0F);
+                return new InstructionF2rr(loc, "", null,
+                        mnemonic, null,
+                        (b1 & 0xF0) >> 4, null,
+                        b1 & 0x0F, null);
             case F3:
                 fetch(); fetch(); // should be zero?
-                return new InstructionF3(loc, "", mnemonic);
+                return new InstructionF3(loc, "", null,
+                        mnemonic, null);
             case F3m:
             case F4m:
                 b1 = fetch(); b2 = fetch();
@@ -100,12 +112,18 @@ public class Disassembler {
                 if (flags.isExtended()) {
                     int operand = flags.operandF4(b1, b2, fetch());
                     mnemonic = mnemonics.get("+" + name);
-                    return new InstructionF4m(loc, "", mnemonic, flags, operand, null);
+                    return new InstructionF4m(loc, "", null,
+                            mnemonic, null,
+                            flags, operand,
+                            null, null);
                 }
                 // F3 or Sic
                 int operand = flags.isSic() ? flags.operandSic(b1, b2) : flags.operandF3(b1, b2);
                 if (flags.isPCRelative()) operand = flags.operandPCRelative(operand);
-                return new InstructionF3m(loc, "", mnemonic, flags, operand, null);
+                return new InstructionF3m(loc, "", null,
+                        mnemonic, null,
+                        flags, operand,
+                        null, null);
         }
         return null;
     }
@@ -115,7 +133,9 @@ public class Disassembler {
         if (instruction == null) {
             Data data = new DataHex(mnemonics.get("BYTE").opcode);
             data.setData((byte)machine.memory.getByteRaw(loc));
-            return new StorageData(new Location(-1,-1,-1), "", mnemonics.get("BYTE"), data);
+            return new StorageData(new Location(-1,-1,-1), "", null,
+                    mnemonics.get("BYTE"), null,
+                    data, null);
         }
         return instruction;
     }

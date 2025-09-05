@@ -12,8 +12,10 @@ import sic.common.Mnemonic;
  */
 public class DirectiveBASE extends DirectiveFe {
 
-    public DirectiveBASE(Location loc, String label, Mnemonic mnemonic, Expr expr) {
-        super(loc, label, mnemonic, expr);
+    public DirectiveBASE(Location loc, String label, Location labelLoc,
+                         Mnemonic mnemonic, Location mnemonicLoc,
+                         Expr expr, Location exprLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
     }
 
     @Override

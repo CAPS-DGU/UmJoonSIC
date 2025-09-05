@@ -16,8 +16,16 @@ import sic.common.SICXE;
  */
 public class InstructionF3m extends InstructionF34Base {
 
-    public InstructionF3m(Location loc, String label, Mnemonic mnemonic, Flags flags, int operand, String symbol) {
-        super(loc, label, mnemonic, flags, operand, symbol);
+    public InstructionF3m(Location loc,
+                          String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation,
+                          Flags flags,
+                          int operand,
+                          String symbol, Location symbolLocation) {
+        super(loc, label, labelLocation,
+                mnemonic, mnemonicLocation,
+                flags, operand,
+                symbol, symbolLocation);
     }
 
     @Override

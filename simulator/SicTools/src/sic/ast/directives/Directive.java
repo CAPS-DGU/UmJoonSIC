@@ -11,8 +11,9 @@ import sic.common.Mnemonic;
  */
 public abstract class Directive extends Command {
 
-    public Directive(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public Directive(Location loc, String label, Location labelLoc,
+                     Mnemonic mnemonic, Location mnemonicLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     @Override

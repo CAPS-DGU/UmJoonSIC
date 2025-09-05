@@ -12,8 +12,9 @@ import sic.common.Mnemonic;
  */
 public class DirectiveLTORG extends Directive {
 
-    public DirectiveLTORG(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public DirectiveLTORG(Location loc, String label, Location labelLoc,
+                          Mnemonic mnemonic, Location mnemonicLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     @Override

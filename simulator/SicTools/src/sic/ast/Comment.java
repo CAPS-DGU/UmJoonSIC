@@ -10,7 +10,7 @@ import sic.asm.Location;
 public class Comment extends Command {
 
     public Comment(Location loc, String comment) {
-        super(loc, null, null);
+        super(loc, null, null,null,null);
         setComment(comment);
     }
 

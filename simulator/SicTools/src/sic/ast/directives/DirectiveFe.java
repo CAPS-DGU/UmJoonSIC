@@ -1,6 +1,7 @@
 package sic.ast.directives;
 
 import sic.asm.AsmError;
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.ast.Program;
 import sic.common.Mnemonic;
@@ -13,12 +14,17 @@ import sic.ast.expression.Expr;
  */
 public abstract class DirectiveFe extends Directive {
 
+    public static final Key<String> EXPR = Key.of("expr");
+
     public final Expr expr;     // expression, can be null
     protected int value;        // value of the expression (when evaluated)
 
-    public DirectiveFe(Location loc, String label, Mnemonic mnemonic, Expr expr) {
-        super(loc, label, mnemonic);
+    public DirectiveFe(Location loc, String label, Location labelLoc,
+                       Mnemonic mnemonic, Location mnemonicLoc,
+                       Expr expr, Location exprLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
         this.expr = expr;
+        putLoc(EXPR, exprLoc);
     }
 
     @Override

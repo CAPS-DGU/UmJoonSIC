@@ -156,6 +156,7 @@ public class Main {
     static final class MemoryReq { Object addr; Object start; Object end; }
 
     public static void main(String[] args) {
+        SIM = new Simulation();
         int portNum = 9090; // default
         if (args != null && args.length > 0) {
             try {

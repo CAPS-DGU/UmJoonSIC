@@ -14,9 +14,18 @@ import sic.asm.AsmError;
  */
 public class InstructionF4m extends InstructionF34Base {
 
-    public InstructionF4m(Location loc, String label, Mnemonic mnemonic, Flags flags, int operand, String symbol) {
-        super(loc, label, mnemonic, flags, operand, symbol);
-        flags.setExtended();
+    public InstructionF4m(Location loc,
+                          String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation,
+                          Flags flags,
+                          int operand,
+                          String symbol, Location symbolLocation) {
+        super(loc, label, labelLocation,
+                mnemonic, mnemonicLocation,
+                flags, operand,
+                symbol, symbolLocation);
+
+        flags.setExtended(); // Format 4 explicitly sets extended bit
     }
 
     @Override

@@ -15,7 +15,7 @@ public class InstructionLiteral extends Instruction {
     protected StorageData literal;
 
     public InstructionLiteral(InstructionF34Base command, StorageData literal) {
-        super(command.loc, command.label, command.mnemonic);
+        super(command.loc, command.label, command.locOf(LABEL), command.mnemonic, command.loc);
         this.command = command;
         this.literal = literal;
     }

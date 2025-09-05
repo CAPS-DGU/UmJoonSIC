@@ -41,6 +41,7 @@ public class Parser extends Lexer {
     }
 
     public Command parseIfCommand() throws AsmError {
+        Location labelLoc = null;
         Location loc = loc();
         String label = readIfLabel();
         skipWhitespace();
@@ -48,18 +49,27 @@ public class Parser extends Lexer {
             skipLinesAndComments();
             checkWhitespace("Missing whitespace after label '%s'", label);
         }
-        else loc = loc();
+        else{
+            labelLoc = loc;
+            loc = loc();
+            labelLoc.length = loc.col - labelLoc.col;
+        }
+
+        Location mnemonicLoc = loc();
         String name = readIfMnemonic();
         if (name == null) {
             if (label == null) return null; // no instruction present
             throw new AsmError(loc(), 1, "Missing mnemonic");
         }
+
         // name != null
         Mnemonic mnemonic = mnemonics.get(name);
+        mnemonicLoc.length = loc.col - mnemonicLoc.col;
+
         if (mnemonic == null)
             throw new AsmError(loc(), 1, "Invalid mnemonic '%s'", name);
         skipWhitespace();
-        return operandParser.parse(loc, label, mnemonic);
+        return operandParser.parse(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     public Program parseProgram() {

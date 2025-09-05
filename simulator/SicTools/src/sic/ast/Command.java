@@ -1,9 +1,14 @@
 package sic.ast;
 
 import sic.asm.AsmError;
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.common.Conversion;
 import sic.common.Mnemonic;
+
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * TODO: write a short description
@@ -17,12 +22,35 @@ public abstract class Command extends Node {
     public final Mnemonic mnemonic;
     protected String comment;
 
-    public Command(Location loc, String label, Mnemonic mnemonic) {
+    // Type-safe bag of per-field locations
+    private final Map<Key<?>, Location> locations = new HashMap<>();
+
+    public static final Key<String>  LABEL    = Key.of("label");
+    public static final Key<Mnemonic> MNEM    = Key.of("mnemonic");
+    public static final Key<String>  COMMENT  = Key.of("comment");
+
+    protected Command(Location loc, String label, Location labelLoc,
+                      Mnemonic mnemonic, Location mnemonicLoc) {
         super();
         this.loc = loc;
         this.label = label;
         this.mnemonic = mnemonic;
+        putLoc(LABEL, labelLoc);
+        putLoc(MNEM,  mnemonicLoc);
     }
+
+    protected <T> void putLoc(Key<T> key, Location loc) {
+        locations.put(key, loc); // null allowed if you want to signal “unknown”
+    }
+
+    public <T> Location locOf(Key<T> key) {
+        return locations.get(key);
+    }
+
+    /** Optional: convenience getters preserving old field usage */
+    public Location getLabelLocation()    { return locOf(LABEL); }
+    public Location getMnemonicLocation() { return locOf(MNEM);  }
+    public Location getCommentLocation()  { return locOf(COMMENT); }
 
     @Override
     public String toString() {

@@ -15,6 +15,8 @@ public class ExprOp extends Expr {
 
     private Expr left;
     private Expr right;
+    public Location leftLoc;
+    public Location rightLoc;
 
     public ExprOp(String name, Location loc, int leftBP) {
         super(name, loc, leftBP);
@@ -35,13 +37,17 @@ public class ExprOp extends Expr {
 
     @Override
     public Expr parse(ExpressionParser parser) throws AsmError {
-        if ("*".equals(name))
+        if ("*".equals(name)) {
             return new ExprStar(loc);
-        if ("+".equals(name))
+        }
+        if ("+".equals(name)) {
             return parser.parseExpression(leftBP);
-        if ("-".equals(name)) { //TODO: not very good
-            left = new ExprInt(loc, 0);
-            right = parser.parseExpression(leftBP);
+        }
+        if ("-".equals(name)) {
+            this.left = new ExprInt(loc, 0);
+            this.leftLoc = left.loc;
+            this.right = parser.parseExpression(leftBP);
+            this.rightLoc = right.loc;
         }
         return this;
     }
@@ -49,9 +55,12 @@ public class ExprOp extends Expr {
     @Override
     public Expr parseLeft(ExpressionParser parser, Expr left) throws AsmError {
         this.left = left;
+        this.leftLoc = left.loc;
         this.right = parser.parseExpression(leftBP);
+        this.rightLoc = right.loc;
         return this;
     }
+
 
     @Override
     public boolean hasSyms() {
