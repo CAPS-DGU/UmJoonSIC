@@ -156,7 +156,7 @@ export default function MemoryViewer() {
               handleSearch();
             }
           }}
-          placeholder="memory address"
+          placeholder="16진수 주소 입력 (예: 0x1A2B)"
           className="border border-gray-300 p-1 rounded text-sm w-48 font-mono"
         />
         <button
