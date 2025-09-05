@@ -1,5 +1,6 @@
 import {
   useMemoryViewStore,
+  type MachineMode,
   type MemoryNodeData,
   type MemoryNodeStatus,
   type MemoryLabel,
@@ -267,14 +268,14 @@ function ValueColumn({
                 // 원본 라벨의 절대 위치 사용
                 const originalLabel = labels.find(l => l.name === label.name);
                 if (!originalLabel) return null;
-                
+
                 // 현재 행에서의 상대 위치 계산
                 const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
                 const relativeEnd = Math.min(originalLabel.end, rowEndAddr) - rowStartAddr;
-                
+
                 const left = relativeStart * 24 + 4; // w-6 + gap
                 const width = (relativeEnd - relativeStart + 1) * 24 - 8;
-                
+
                 return (
                   <div
                     key={`line-${idx}`}
@@ -290,7 +291,7 @@ function ValueColumn({
                   // 전체 labels 배열에서 이 라벨이 처음 나타나는 행인지 확인
                   const originalLabel = labels.find(l => l.name === label.name);
                   if (!originalLabel) return false;
-                  
+
                   // 원본 라벨의 시작 주소가 현재 행에 속하는지 확인
                   const labelStartRow = Math.floor(originalLabel.start / ROW_SIZE);
                   return labelStartRow === rowIndex;
@@ -345,15 +346,3 @@ function MemoryNode({
     </span>
   );
 }
-
-const MOCK_MEMORY_DATA: MemoryNodeData[] = Array.from({ length: 64 }, (_, i) => ({
-  value: (i + 0x20).toString(16).toUpperCase().padStart(2, '0'),
-  status: i % 5 === 0 ? 'highlighted' : 'normal',
-}));
-
-const MOCK_LABELS: MemoryLabel[] = [
-  { start: 1012, end: 1015, name: 'playerHP' }, // 4 bytes
-  { start: 1020, end: 1025, name: 'score' }, // 6 bytes
-  { start: 1030, end: 1037, name: 'inventory' }, // 8 bytes
-  { start: 1048, end: 1052, name: 'position' }, // 5 bytes. 다음 행에 걸쳐 있음
-];
