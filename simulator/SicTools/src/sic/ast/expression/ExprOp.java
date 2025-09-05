@@ -7,7 +7,12 @@ import sic.ast.Program;
 import java.util.Set;
 
 /**
- * TODO: write a short description
+ * Binary (and unary minus) operator node.
+ * Enforces strict SIC form via requireSICForm():
+ *  - At most one symbol in the entire expression.
+ *  - If a symbol appears, only + or - may combine it at this node.
+ *
+ * Unary minus is represented as (0 - right).
  *
  * @author jure
  */
@@ -61,7 +66,6 @@ public class ExprOp extends Expr {
         return this;
     }
 
-
     @Override
     public boolean hasSyms() {
         return left.hasSyms() || right.hasSyms();
@@ -91,8 +95,43 @@ public class ExprOp extends Expr {
         return left.canEval(program) && right.canEval(program);
     }
 
+    /**
+     * Strict SIC rule:
+     *  - If expression contains more than one symbol total -> error.
+     *  - If exactly one symbol appears somewhere under this node,
+     *    the top-level operator must be '+' or '-'.
+     *  - Recursively enforce the same on children.
+     */
+    @Override
+    public void requireSICForm() throws AsmError {
+        // First ensure children are themselves SIC-compliant
+        if (left != null)  left.requireSICForm();
+        if (right != null) right.requireSICForm();
+
+        int lSyms = (left  != null) ? left.countSyms()  : 0;
+        int rSyms = (right != null) ? right.countSyms() : 0;
+        int totalSyms = lSyms + rSyms;
+
+        if (totalSyms > 1) {
+            throw new AsmError(loc, String.valueOf(this).length(),
+                    "SIC expression may reference at most one symbol");
+        }
+
+        if (totalSyms == 1) {
+            if (!"+".equals(name) && !"-".equals(name)) {
+                throw new AsmError(loc, String.valueOf(this).length(),
+                        "Operator '%s' not allowed with a symbol in SIC (use only + or -)", name);
+            }
+            // Additionally ensure that the symbol is not combined with another symbol
+            // (already guaranteed by totalSyms==1), and the other side can be any constant expression.
+        }
+    }
+
     @Override
     public int eval(Program program) throws AsmError {
+        // Enforce SIC form before computing result
+        requireSICForm();
+
         if ("+".equals(name))
             return left.eval(program) + right.eval(program);
         if ("-".equals(name))
@@ -105,5 +144,4 @@ public class ExprOp extends Expr {
             return left.eval(program) % right.eval(program);
         return 0;
     }
-
 }

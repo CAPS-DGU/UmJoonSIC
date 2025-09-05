@@ -193,7 +193,8 @@ public class Main {
                 case "sic" -> SIM = new SicSimulation();
                 case "sicxe" -> SIM = new SicxeSimulation();
                 default -> {
-                    return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
+                    SIM = new SicSimulation();
+                    //return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
                 }
             }
             return gson.toJson(new Msg(true, "Simulation initialized (" + t + ")"));

@@ -1,193 +1,142 @@
 package sic.common;
 
 /**
- * SIC/XE computer specifications.
- * Conversions between SIC/XE and Java types.
+ * SIC computer specifications (SIC-only; XE removed).
+ * Kept under the same class name for compatibility with existing code.
  *
- * @author jure
+ * Types:
+ *  - sicaddr (15-bit):        0 .. 0x7FFF
+ *  - word (24-bit):           0 .. 0xFFFFFF
+ *  - sword (signed 24-bit):   -0x800000 .. 0x7FFFFF
+ *  - byte (8-bit):            0 .. 0xFF
+ *
+ * XE-specific 20-bit addr and 12-bit displacements are not used by SIC,
+ * but some helpers remain for compatibility where harmless.
  */
 public class SICXE {
 
-    /* SIC/XE types:
-	 * addr (20-bit):           0 .. 0xFFFFF
-	 * sicaddr (15-bit):        0 .. 0x7FFF
-	 * word (24-bit):           0 .. 0xFFFFFF
-	 * sword (signed 24-bit):   -0x800000 .. 0x7FFFFF
-	 * disp (12-bit):           0 .. 0xFFF
-	 * sdisp (signed 12-bit):   -0x800 ... 0x7FF
-	 * float: 48-bit float
-	 * data: bytes of data
-	 */
+    /* ===== SIC addresses: 15-bit memory (32 KiB) ===== */
+    public static final int SIZE_SICMEM   = 1 << 15;   // 32768 bytes
+    public static final int MASK_SICADDR  = 0x7FFF;
+    public static final int MIN_SICADDR   = 0;
+    public static final int MAX_SICADDR   = SIZE_SICMEM - 1;
 
-    // ************ addresses: SIC/XE 20 bit memory
+    // Backward-compatibility aliases (old code might reference these XE names)
+    public static final int SIZE_MEM      = SIZE_SICMEM;
+    public static final int MASK_ADDR     = MASK_SICADDR;
+    public static final int MIN_ADDR      = MIN_SICADDR;
+    public static final int MAX_ADDR      = MAX_SICADDR;
 
-    public static final int SIZE_MEM = 1 << 20;  // 1 MB
-    public static final int MASK_ADDR = 0xFFFFF;
-    public static final int MIN_ADDR = 0;
-    public static final int MAX_ADDR = SIZE_MEM - 1;
+    public static int intToSicAddr(int val) { return val & MASK_SICADDR; }
+    public static int sicAddrToInt(int val) { return val; }
+    public static boolean isSicAddr(int val){ return MIN_SICADDR <= val && val <= MAX_SICADDR; }
 
-    public static int intToAddr(int val) {
-        return val & MASK_ADDR;
-    }
+    // Back-compat wrappers
+    public static int intToAddr(int val)    { return intToSicAddr(val); }
+    public static int addrToInt(int val)    { return val; }
+    public static boolean isAddr(int val)   { return isSicAddr(val); }
 
-    public static int addrToInt(int val) {
-        return val;
-    }
+    /* ===== Words: unsigned and signed 24-bit ===== */
+    public static final int MASK_WORD   = 0xFFFFFF;
+    public static final int MIN_WORD    = 0;
+    public static final int MAX_WORD    = (1 << 24) - 1;
 
-    public static boolean isAddr(int val) {
-        return MIN_ADDR <= val && val <= MAX_ADDR;
-    }
-
-    // ************ addresses: SIC 15 bit memory
-
-    public static final int SIZE_SICMEM = 1 << 15;  // 32 kB
-    public static final int MASK_SICADDR = 0x7FFF;
-    public static final int MIN_SICADDR = 0;
-    public static final int MAX_SICADDR = SIZE_SICMEM - 1;
-
-    public static int intToSicAddr(int val) {
-        return val & MASK_SICADDR;
-    }
-
-    public static int sicAddrToInt(int val) {
-        return val;
-    }
-
-    public static boolean isSicAddr(int val) {
-        return MIN_SICADDR <= val && val <= MAX_SICADDR;
-    }
-
-    // ************ words: unsigned and signed
-
-    public static final int MASK_WORD = 0xFFFFFF;
-    public static final int MIN_WORD = 0;
-    public static final int MAX_WORD = (1 << 24) - 1;
-
-    // if val > MAX_SWORD then returns sword
     public static int intToWord(int val) {
+        // Wrap to 24 bits (two's complement if negative)
         if (val >= 0) return val & MASK_WORD;
         return ~(-val - 1) & MASK_WORD;
     }
+    public static int wordToInt(int val)  { return val; }
+    public static boolean isWord(int val) { return MIN_WORD <= val && val <= MAX_WORD; }
 
-    public static int wordToInt(int val) {
-        return val;
-    }
+    public static final int MASK_SWORD   = 0x7FFFFF;
+    public static final int MIN_SWORD    = -(1 << 23);
+    public static final int MAX_SWORD    = (1 << 23) - 1;
 
-    public static boolean isWord(int val) {
-        return MIN_WORD <= val && val <= MAX_WORD;
-    }
-
-    public static final int MASK_SWORD = 0x7FFFFF;
-    public static final int MIN_SWORD = -(1 << 23);
-    public static final int MAX_SWORD = (1 << 23) - 1;
-
-    public static int intToSword(int val) {
-        return intToWord(val);
-    }
-
+    public static int intToSword(int val) { return intToWord(val); }
     public static int swordToInt(int val) {
-        if (val <= MAX_SWORD) return val;
-        return -(~val & MASK_SWORD) - 1;
+        if (val <= MAX_SWORD) return val;               // positive or small
+        return -(~val & MASK_SWORD) - 1;                // sign-extend 24-bit
     }
+    public static boolean isSword(int val){ return MIN_SWORD <= val && val <= MAX_SWORD; }
 
-    public static boolean isSword(int val) {
-        return MIN_SWORD <= val && val <= MAX_SWORD;
-    }
-
-    // ************ displacement: unsigned and signed
-
-    public static final int MASK_DISP = 0xFFF;
-    public static final int MIN_DISP = 0;
-    public static final int MAX_DISP = (1 << 12) - 1;
+    /* ===== Displacement helpers (not used by SIC, kept for compatibility) =====
+       SIC does not use 12-bit PC/base displacements, but some code may still
+       reference these helpers. Leave definitions intact; they won't be used in
+       SIC-only assembly, and keeping them avoids widespread refactors.
+    */
+    public static final int MASK_DISP   = 0x0FFF;
+    public static final int MIN_DISP    = 0;
+    public static final int MAX_DISP    = (1 << 12) - 1;
 
     public static int intToDisp(int val) {
         if (val >= 0) return val & MASK_DISP;
-        return MAX_DISP + 1 + val;  // ~(-val - 1) & MASK_DISP;
+        return MAX_DISP + 1 + val; // two's complement wrap to 12 bits
     }
+    public static int dispToInt(int val)  { return val; }
+    public static boolean isDisp(int val) { return MIN_DISP <= val && val <= MAX_DISP; }
 
-    public static int dispToInt(int val) {
-        return val;
-    }
+    public static final int MASK_SDISP   = 0x07FF;          // 11 bits
+    public static final int MIN_SDISP    = -(1 << 11);      // -2048
+    public static final int MAX_SDISP    = (1 << 11) - 1;   //  2047
 
-    public static boolean isDisp(int val) {
-        return MIN_DISP <= val && val <= MAX_DISP;
-    }
-
-    public static final int MASK_SDISP = 0x7FF;
-    public static final int MIN_SDISP = -(1 << 11);
-    public static final int MAX_SDISP = (1 << 11) - 1;
-
-    public static int intToSdisp(int val) {
-        return intToDisp(val);
-    }
+    public static int intToSdisp(int val) { return intToDisp(val); }
 
     public static int sdispToInt(int val) {
-        if (val <= MAX_SWORD) return val;
-        return -(~val & MASK_SWORD) - 1;
+        // Correct 11-bit sign extension (not MAX_SWORD)
+        if (val <= MAX_SDISP) return val;                 // fits positive 11-bit
+        // Negative: sign-extend 11-bit two's complement to int
+        return val | ~MASK_SDISP;
     }
 
-    public static boolean isSdisp(int val) {
-        return MIN_SDISP <= val && val <= MAX_SDISP;
-    }
+    public static boolean isSdisp(int val) { return MIN_SDISP <= val && val <= MAX_SDISP; }
 
-    public static boolean isCdisp(int val) {
-        // combined displacement: signed and unsigned
-        return MIN_SDISP <= val && val <= MAX_DISP;
-    }
+    /** Combined displacement (legacy): keep behavior for compatibility. */
+    public static boolean isCdisp(int val) { return MIN_SDISP <= val && val <= MAX_DISP; }
 
-    // ************ floats
+    /* ===== Floats (48-bit) — retained for data utilities compatibility ===== */
+    public static long floatToBits(double value) { return Double.doubleToLongBits(value) >> 16; }
+    public static double bitsToFloat(long bits)  { return Double.longBitsToDouble(bits << 16); }
 
-    public static long floatToBits(double value) {
-        return Double.doubleToLongBits(value) >> 16;
-    }
-
-    public static double bitsToFloat(long bits) {
-        return Double.longBitsToDouble(bits << 16);
-    }
-
-    // ************ byte: unsigned and signed
-
-    public static final int MIN_BYTE = 0;
-    public static final int MAX_BYTE = (1 << 8) - 1;
+    /* ===== Byte limits ===== */
+    public static final int MIN_BYTE  = 0;
+    public static final int MAX_BYTE  = (1 << 8) - 1;
 
     public static final int MIN_SBYTE = -(1 << 7);
     public static final int MAX_SBYTE = (1 << 7) - 1;
 
-    // ************ data (array of bytes) initializers
-
+    /* ===== Data helpers ===== */
     public static byte[] intToDataByte(int val) {
-        byte[] data = new byte[1];
-        data[0] = (byte)(val & 0xFF);
-        return data;
+        return new byte[] { (byte) (val & 0xFF) };
     }
 
     public static byte[] intToDataWord(int val) {
-        byte[] data = new byte[3];
-        data[0] = (byte)((val >> 16)  & 0xFF);
-        data[1] = (byte)((val >> 8) & 0xFF);
-        data[2] = (byte)(val & 0xFF);
-        return data;
+        // 24-bit big-endian
+        return new byte[] {
+                (byte) ((val >> 16) & 0xFF),
+                (byte) ((val >> 8)  & 0xFF),
+                (byte) (val & 0xFF)
+        };
     }
 
     public static byte[] doubleToDataFloat(double val) {
         long bits = floatToBits(val);
-        byte[] data = new byte[6];
-        data[0] = (byte)((bits >> 40)  & 0xFF);
-        data[1] = (byte)((bits >> 32) & 0xFF);
-        data[2] = (byte)((bits >> 24) & 0xFF);
-        data[3] = (byte)((bits >> 16) & 0xFF);
-        data[4] = (byte)((bits >> 8) & 0xFF);
-        data[5] = (byte)(bits & 0xFF);
-        return data;
+        return new byte[] {
+                (byte)((bits >> 40) & 0xFF),
+                (byte)((bits >> 32) & 0xFF),
+                (byte)((bits >> 24) & 0xFF),
+                (byte)((bits >> 16) & 0xFF),
+                (byte)((bits >> 8)  & 0xFF),
+                (byte)(bits & 0xFF)
+        };
     }
 
-    // ************ devices
+    /* ===== Devices (unchanged) ===== */
     public static final int DEVICE_COUNT = 256;
-    public static final int MIN_DEVICE = 0;
-    public static final int MAX_DEVICE = DEVICE_COUNT - 1;
+    public static final int MIN_DEVICE   = 0;
+    public static final int MAX_DEVICE   = DEVICE_COUNT - 1;
     public static final int DEVICE_STDIN = 0;
-    public static final int DEVICE_STDOUT = 1;
-    public static final int DEVICE_STDERR = 2;
-    public static final int DEVICE_FREE = 3;
-
+    public static final int DEVICE_STDOUT= 1;
+    public static final int DEVICE_STDERR= 2;
+    public static final int DEVICE_FREE  = 3;
 }

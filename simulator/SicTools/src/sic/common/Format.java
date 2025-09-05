@@ -7,23 +7,14 @@ package sic.common;
  */
 public enum Format {
 
-    F1,
-    F2n, F2r, F2rn, F2rr,
     F3, F3m,
-    F4m,
     D, De, De0, Ds0, Ds_,
     Se, Sd, Sd_;
 
     public String hint() {
         switch (this) {
-            case F1:    return "";
-            case F2n:   return "n";
-            case F2r:   return "r";
-            case F2rn:  return "r,n";
-            case F2rr:  return "r,r";
             case F3:    return "";
             case F3m:   return "([#@]n|s|*)|=l";
-            case F4m:   return "([#@]n|s|*)|=l";
             case D:     return "";
             case De:    return "e";
             case De0:   return "e?";

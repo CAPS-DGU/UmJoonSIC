@@ -63,11 +63,6 @@ public class StorageSymbol extends Symbol {
                 dataType = DataType.WORD;
                 elementSize = 3;
                 break;
-            case FLOT:
-            case RESF:
-                dataType = DataType.FLOAT;
-                elementSize = 6;
-                break;
         }
 
         elementCount = command.size() / elementSize;

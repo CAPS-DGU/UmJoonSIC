@@ -6,10 +6,13 @@ import sic.ast.Program;
 
 import java.util.Set;
 
-// TODO: detection of absolute expressions, see p. 76
-
 /**
- * TODO: write a short description
+ * Base class for expression AST nodes.
+ * SIC/XE policy is enforced (when desired) via requireSICForm(), which subclasses may override.
+ *
+ * In strict SIC, callers should do:
+ *   expr.requireSICForm();
+ *   int value = expr.eval(program);
  *
  * @author jure
  */
@@ -33,6 +36,7 @@ public abstract class Expr {
         throw new AsmError(loc, String.format("%s", this).length(), "unexpected token '%s'", this);
     }
 
+    /** Collect all symbol names contained in this expression (may return null for constant-only). */
     public abstract Set<String> extractSyms();
 
     public int countSyms() {
@@ -44,10 +48,19 @@ public abstract class Expr {
         return countSyms() > 0;
     }
 
+    /** Heuristic helper some subclasses use; not required for SIC enforcement. */
     public abstract int countAddSub();
 
     public abstract boolean canEval(Program program);
 
     public abstract int eval(Program program) throws AsmError;
 
+    /**
+     * SIC-only validation hook.
+     * Default is no-op; nodes that can combine subexpressions (e.g., ExprOp) should override.
+     * Callers should invoke this prior to eval() when assembling in SIC-only mode.
+     */
+    public void requireSICForm() throws AsmError {
+        // Default: leaf nodes are fine (ExprInt, ExprSym, ExprStar, etc.)
+    }
 }

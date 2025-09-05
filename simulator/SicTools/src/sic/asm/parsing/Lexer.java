@@ -5,11 +5,23 @@ import sic.asm.Location;
 import sic.common.Conversion;
 
 /**
- *  * Lexer - source code tokenization
+ *  * Lexer - source code tokenization (SIC-only defaults)
+ *
+ * Enforces:
+ *  - Decimal-by-default integer parsing (configurable via DEFAULT_INTEGER_RADIX).
+ *  - Rejects SIC/XE extended format '+' on mnemonics.
+ *  - Provides a helper to reject XE addressing ('#', '@') at operand starts.
  *
  * @author jure
  */
 public class Lexer extends Input {
+
+    // ===== Configuration switches (easy to flip later) =====
+    /** Default radix for plain integers; set to 16 if professor wants hex-by-default. */
+    public static final int DEFAULT_INTEGER_RADIX = 10;
+
+    /** Allow 0b/0o/0x prefixed literals. Keep false for strict SIC. */
+    public static final boolean ALLOW_PREFIXED_RADIX = false;
 
     // ************ isXXX()
 
@@ -80,9 +92,12 @@ public class Lexer extends Input {
         return null;
     }
 
-    public String readIfMnemonic() {
+    public String readIfMnemonic() throws AsmError {
         int mark = pos;
-        advanceIf('+');
+        // In pure SIC, '+' (format 4) must not be accepted.
+        if (advanceIf('+')) {
+            throw new AsmError(loc(), 1, "Extended format '+' is not allowed in SIC");
+        }
         skipAlphanumeric();
         if (mark == pos) return null;
         return extract(mark);
@@ -91,34 +106,34 @@ public class Lexer extends Input {
     // ************ SIC/XE tokens
 
     public void skipComma() throws AsmError {
-         skipWhitespace();
-         advance(',');
-         skipWhitespace();
+        skipWhitespace();
+        advance(',');
+        skipWhitespace();
     }
 
     public boolean skipIfComma() {
-         skipWhitespace();
-         boolean res = advanceIf(',');
-         skipWhitespace();
-         return res;
+        skipWhitespace();
+        boolean res = advanceIf(',');
+        skipWhitespace();
+        return res;
     }
 
     public boolean skipIfIndexed() throws AsmError {
         if (skipIfComma()) {
-            advance('X');
+            advance('X');  // Only ',X' allowed in SIC
             return true;
         }
         return false;
     }
 
     public int readRegister() throws AsmError {
-         Location prevLoc = loc();
-         char ch = advance();
-         int reg = Conversion.nameToReg(ch);
-         if (reg < 0)
-             throw new AsmError(prevLoc, 1, "Invalid register '%c'", ch);
-         return reg;
-     }
+        Location prevLoc = loc();
+        char ch = advance();
+        int reg = Conversion.nameToReg(ch);
+        if (reg < 0)
+            throw new AsmError(prevLoc, 1, "Invalid register '%c'", ch);
+        return reg;
+    }
 
     public String readSymbol() throws AsmError {
         String sym = readAlphanumeric();
@@ -131,57 +146,62 @@ public class Lexer extends Input {
     }
 
     /**
-      * Parse integer in any of the available formats.
-      * Formats: standard, 0bBIN, 0oOCT, 0xHEX.
-      * If minus sign is present it must be immediately followed by the number.
-      * @param lo ... lower limit
-      * @param hi ... upper limit
-      * @return parsed integer number
-      * @throws sic.asm.AsmError
-      */
+     * Parse integer using configurable defaults.
+     * - Default is decimal (DEFAULT_INTEGER_RADIX = 10).
+     * - Optional 0b/0o/0x prefixes are honored only if ALLOW_PREFIXED_RADIX = true.
+     * If minus sign is present it must be immediately followed by the number.
+     */
     public int readInt(int lo, int hi) throws AsmError {
-        Location prevLoc = loc();
-        // first detect radix
-        int radix = -1;
+        Location startLoc = loc();
+
+        // sign
         boolean negative = advanceIf('-');
-        if (peek() == '0') {
-            // 0bBIN, 0oOCT, 0xHEX
+
+        int radix = DEFAULT_INTEGER_RADIX;
+
+        // Optional radix prefixes, only if enabled
+        if (ALLOW_PREFIXED_RADIX && peek() == '0') {
             switch (peek(1)) {
-                case 'b': radix = 2; break;
-                case 'o': radix = 8; break;
+                case 'b': radix = 2;  break;
+                case 'o': radix = 8;  break;
                 case 'x': radix = 16; break;
+                default:  break;
             }
-            // we got radix != 10
-            if (radix != -1) {
-                advance();
-                advance();
-            } else radix = 10;
-        } else if (Character.isDigit(peek()))
-            radix = 10;
-        else
-            throw new AsmError(loc(), 1, "Number expected");
-        // read digits
-        int num;
-        try {
-            num = Integer.parseInt(readDigits(radix), radix);
-        } catch (NumberFormatException e) {
-            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Invalid number");
+            if (radix != DEFAULT_INTEGER_RADIX) {
+                advance(); // '0'
+                advance(); // radix letter
+            }
+        } else {
+            // No prefixes allowed (strict SIC). Ensure next is a digit in chosen radix.
+            if (Character.digit(peek(), radix) == -1)
+                throw new AsmError(loc(), 1, "Number expected");
         }
+
+        // Read digits
+        int num;
+        int digitsStartCol = col;
+        try {
+            String digits = readDigits(radix);
+            num = Integer.parseInt(digits, radix);
+        } catch (NumberFormatException e) {
+            throw new AsmError(startLoc, Math.max(col - digitsStartCol, 1), "Invalid number");
+        }
+
         // number must not be followed by letter or digit
         if (Character.isLetterOrDigit(peek()))
             throw new AsmError(loc(), 1, "invalid digit '%c'", peek());
-        // check range
+
         if (negative) num = -num;
+
         if (num < lo || num > hi)
-            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Number '%d' out of range [%d..%d]", num, lo, hi);
+            throw new AsmError(startLoc, Math.max(col - startLoc.col, 1),
+                    "Number '%d' out of range [%d..%d]", num, lo, hi);
+
         return num;
     }
 
     /**
-     * Parse a 48-bit double.
-     * If minus sign is present it must be immediately followed by the number.
-     * @return parsed double
-     * @throws sic.asm.AsmError
+     * Parse a 48-bit double (kept for compatibility, though SIC dropped FLOT/float usage).
      */
     public double readFloat() throws AsmError {
         Location prevLoc = loc();  // mirror readInt: capture start for error span
@@ -214,7 +234,7 @@ public class Lexer extends Input {
         // Apply sign
         if (negative) num = -num;
 
-        // Check range
+        // Check range (very permissive placeholder)
         double sicDoubleLimit = Math.pow(2, 11 + 36) - 1;
         double lo = -sicDoubleLimit;
         double hi = sicDoubleLimit;
@@ -276,4 +296,11 @@ public class Lexer extends Input {
         return buf.toString();
     }
 
+    // ===== Helper for parser: call at start of operand parsing to block XE addressing =====
+    public void ensureNotXEAddressingStart() throws AsmError {
+        char c = peek();
+        if (c == '#' || c == '@') {
+            throw new AsmError(loc(), 1, "Immediate/indirect addressing ('%c') is not allowed in SIC", c);
+        }
+    }
 }

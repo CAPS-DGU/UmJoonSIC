@@ -94,46 +94,13 @@ public class Machine {
 
     private boolean execF1(int opcode) {
         // Format 1: no operand
-        switch (opcode) {
-            case Opcode.FLOAT:	registers.setF((double) registers.getAs()); break;
-            case Opcode.FIX:	registers.setA((int) registers.getF()); break;
-            case Opcode.NORM:	notImplemented("NORM"); break;
-            case Opcode.SIO:	notImplemented("SIO"); break;
-            case Opcode.HIO:	notImplemented("HIO"); break;
-            case Opcode.TIO:	notImplemented("TIO"); break;
-            default:			return false;
-        }
-        return true;
+        return false;
     }
 
     private boolean execF2(int opcode, int operand) {
         // Format 2: OP o1, o2 - two 4-bit operands
-        int o1 = (operand & 0xF0) >> 4;
-        int o2 = (operand & 0x0F);
-        switch (opcode) {
-            case Opcode.ADDR:	registers.set(o2, registers.get(o2) + registers.get(o1)); break;
-            case Opcode.SUBR:	registers.set(o2, registers.get(o2) - registers.get(o1)); break;
-            case Opcode.MULR:	registers.set(o2, registers.get(o2) * registers.get(o1)); break;
-            case Opcode.DIVR:
-                    int divisor = registers.get(o1);
-                    if (divisor == 0) {
-                            System.out.println("division by zero");
-                    } else {
-                            registers.set(o2, registers.gets(o2) / divisor);
-                    }
-                    break;
-            case Opcode.COMPR:	registers.setSWAfterCompare(registers.gets(o1) - registers.gets(o2)); break;
-            case Opcode.SHIFTL:	registers.set(o1, registers.get(o1) << (o2 + 1) | registers.get(o1) >> (24 - o2 - 1)); break;
-            case Opcode.SHIFTR:	registers.set(o1, registers.gets(o1) >> (o2 + 1)); break;
-            case Opcode.RMO:	registers.set(o2, registers.get(o1)); break;
-            case Opcode.CLEAR:	registers.set(o1, 0); break;
-            case Opcode.TIXR:	registers.setX(registers.getX()+1);
-                                registers.setSWAfterCompare(registers.getXs() - registers.gets(o1));
-                break;
-            case Opcode.SVC:	notImplemented("SVC"); break;
-            default: return false;
-        }
-        return true;
+        // Not allowed
+        return false;
     }
 
     // load
@@ -197,10 +164,6 @@ public class Machine {
             case Opcode.STX:	storeWord(flags, operand, registers.getX()); break;
             case Opcode.STL:	storeWord(flags, operand, registers.getL()); break;
             case Opcode.STCH:	storeByte(flags, operand, registers.getA()); break;
-            case Opcode.STB:	storeWord(flags, operand, registers.getB()); break;
-            case Opcode.STS:	storeWord(flags, operand, registers.getS());	break;
-            case Opcode.STF:	storeFloat(flags, operand, registers.getF()); break;
-            case Opcode.STT:	storeWord(flags, operand, registers.getT()); break;
             case Opcode.STSW:	storeWord(flags, operand, registers.getSW()); break;
             // jumps
             case Opcode.JEQ:	if (registers.isEqual()) registers.setPC(resolveAddr(flags, operand)); break;
@@ -215,10 +178,6 @@ public class Machine {
             case Opcode.LDX:	registers.setX(loadWord(flags, operand)); break;
             case Opcode.LDL:	registers.setL(loadWord(flags, operand)); break;
             case Opcode.LDCH:	registers.setALo(loadByte(flags, operand)); break;
-            case Opcode.LDB:	registers.setB(loadWord(flags, operand)); break;
-            case Opcode.LDS:	registers.setS(loadWord(flags, operand)); break;
-            case Opcode.LDF:	registers.setF(loadFloat(flags, operand)); break;
-            case Opcode.LDT:	registers.setT(loadWord(flags, operand)); break;
             // arithmetic
             case Opcode.ADD:	registers.setA(registers.getA() + loadWord(flags, operand)); break;
             case Opcode.SUB:	registers.setA(registers.getA() - loadWord(flags, operand)); break;
@@ -240,18 +199,7 @@ public class Machine {
             case Opcode.RD:		registers.setALo(devices.read(loadByte(flags, operand)));  break;
             case Opcode.WD:		devices.write(loadByte(flags, operand), registers.getALo()); break;
             case Opcode.TD:		registers.setSWAfterCompare(devices.test(loadByte(flags, operand)) ? -1 : 0); break;
-            // floating point arithmetic
-            case Opcode.ADDF:	registers.setF(registers.getF() + loadFloat(flags, operand)); break;
-            case Opcode.SUBF:	registers.setF(registers.getF() - loadFloat(flags, operand)); break;
-            case Opcode.MULF:	registers.setF(registers.getF() * loadFloat(flags, operand)); break;
-            case Opcode.DIVF:	registers.setF(registers.getF() / loadFloat(flags, operand)); break;
-            case Opcode.COMPF:  double sub = registers.getF() - loadFloat(flags, operand);
-                                registers.setSWAfterCompare(sub > 0 ? 1 : (sub < 0 ? -1 : 0));
-                                break;
-            // others
-            case Opcode.LPS:	notImplemented("LPS"); break;
-            case Opcode.STI:	notImplemented("STI"); break;
-            case Opcode.SSK:	notImplemented("SSK"); break;
+
             default: return false;
         }
         return true;

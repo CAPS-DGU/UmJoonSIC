@@ -24,16 +24,7 @@ public class ResolveSymbols extends Visitor {
         c.resolve(program);
     }
 
-    public void visit(InstructionF4m c) throws AsmError {
-        c.resolve(program);
-    }
-
     public void visit(DirectiveEND directive) throws AsmError {
         program.setFirst(directive.expr.eval(program));
     }
-
-    public void visit(InstructionLiteral c) throws AsmError {
-        visit(c.command);
-    }
-
 }

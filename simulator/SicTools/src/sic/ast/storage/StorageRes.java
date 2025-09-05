@@ -11,16 +11,16 @@ import sic.common.Opcode;
 import java.util.Arrays;
 
 /**
- * Support for storage-reservation directives. This class supports both standard
- * directives: RESB (reserve bytes) and RESW (reserver words).
- * In addition, it also supports RESF (reserve floats).
+ * Storage-reservation directives for SIC:
+ *  - RESB (bytes)
+ *  - RESW (words, 3 bytes each)
  *
- * @author jure
+ * No RESF in pure SIC.
  */
 public class StorageRes extends Storage {
     public static final Key<String> EXPR = Key.of("expr");
-    public final Expr expr;  // expression
-    private int count;  // value of expression
+    public final Expr expr;      // expression
+    private int count;           // evaluated count (number of units)
 
     public StorageRes(Location loc, String label, Location labelLoc,
                       Mnemonic mnemonic, Location mnemonicLoc,
@@ -40,26 +40,41 @@ public class StorageRes extends Storage {
         switch (mnemonic.opcode) {
             case Opcode.RESB: return count;
             case Opcode.RESW: return 3 * count;
-            case Opcode.RESF: return 6 * count;
+            default:          return 0; // unsupported in SIC
         }
-        return 0;  // error
     }
 
     public void resolve(Program program) throws AsmError {
+        // Enforce strict SIC expression form: at most one symbol; if present, only +/- constant
+        expr.requireSICForm();
+
         count = expr.eval(program);
+
+        if (count < 0) {
+            throw new AsmError(locOf(EXPR), Math.max(1, operandToString().length()),
+                    "Negative count not allowed: %d", count);
+        }
+
+        // Optional: sanity check very large reservations to avoid overflow.
+        // (SIC address space is 15-bit; loaders/sections may impose tighter limits elsewhere.)
+        long bytes = (mnemonic.opcode == Opcode.RESW) ? (long)count * 3L : (long)count;
+        if (bytes > 0x7FFF) {
+            // Warning or error; choose policy. Using error here:
+            throw new AsmError(locOf(EXPR), Math.max(1, operandToString().length()),
+                    "Reservation too large for SIC: %d bytes", bytes);
+        }
     }
 
     @Override
     public void emitRawCode(byte[] data, int loc) {
         int s = size();
         if (s <= 0) return;
-        // fill with zeros?
-        Arrays.fill(data, loc, loc + size() - 1, (byte)0);
+        // Arrays.fill uses exclusive end index — fill exactly 's' bytes starting at loc
+        Arrays.fill(data, loc, loc + s, (byte)0);
     }
 
     @Override
     public boolean emitText(StringBuilder buf) {
         return true; // no text emitted, but indicate flush
     }
-
 }
