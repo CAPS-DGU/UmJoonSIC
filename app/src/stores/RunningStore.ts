@@ -5,10 +5,11 @@ import axios from 'axios';
 import { useListFileStore, type ListFileRow } from './ListFileStore';
 import { useWatchStore } from './pannel/WatchStore';
 import { useRegisterStore } from './RegisterStore';
-import { useEditorTabStore } from './EditorTabStore';
+import { useEditorTabStore, type EditorTab } from './EditorTabStore';
 import { useMemoryViewStore } from './MemoryViewStore';
 import { useErrorStore } from './pannel/ErrorStore';
 import type { AssemblerError, LinkerError } from '@/types/DTO';
+import { toProjectRelativePath } from '@/lib/file-name';
 
 interface RunningState {
   isRunning: boolean;
@@ -112,6 +113,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       // 실패 → 에러 스토어에 기록
       try {
         const files: LoadedFile[] = data.files;
+        const { addTab, setActiveTab } = useEditorTabStore.getState();
+
         files.forEach(file => {
           if (file.assemblerErrors?.length) {
             addErrors(
@@ -121,12 +124,44 @@ export const useRunningStore = create<RunningState>((set, get) => ({
                 col: err.col,
                 length: err.length,
                 message: err.message,
-                type: 'load', // assembler error → load 타입
+                type: 'load',
               })),
             );
           }
         });
-        console.error('Failed to load', data.message);
+
+        const firstErrorFile = files
+          .map(file => {
+            if (file.assemblerErrors?.length) {
+              return { file, err: file.assemblerErrors[0] };
+            }
+            return null;
+          })
+          .find(Boolean); // null이 아닌 첫 번째 요소 반환
+
+        if (firstErrorFile) {
+          const { file, err } = firstErrorFile;
+          const tabs = useEditorTabStore.getState().tabs as EditorTab[];
+
+          const tabExists = tabs.find(t => t.filePath === file.fileName);
+          const relativeFileName = toProjectRelativePath(projectPath, file.fileName);
+          if (!tabExists) {
+            addTab({
+              idx: tabs.length,
+              title: relativeFileName.split('/').pop()!,
+              filePath: relativeFileName,
+              isModified: false,
+              isActive: true,
+              fileContent: '',
+              breakpoints: [],
+              cursor: { line: err.row, column: err.col },
+            });
+          }
+
+          const tabIdx = tabs.findIndex(t => t.filePath === file.fileName);
+          if (tabIdx !== -1) setActiveTab(tabIdx);
+        }
+
         stopRunning();
       } catch (e) {
         console.error('Failed to parse load error response', e);
