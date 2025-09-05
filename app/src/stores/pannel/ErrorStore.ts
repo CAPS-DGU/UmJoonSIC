@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { useProjectStore } from '@/stores/ProjectStore';
+import { toProjectRelativePath } from '@/lib/file-name';
 
 export type CompileErrorType = 'syntax' | 'load';
 
@@ -18,8 +20,17 @@ interface ErrorStore {
 
 export const useErrorStore = create<ErrorStore>(set => ({
   errors: {},
-  addErrors: (fileName, errors) =>
-    set(state => ({ errors: { ...state.errors, [fileName]: errors } })),
+  addErrors: (fileName, errors) => {
+    const projectPath = useProjectStore.getState().projectPath;
+    const relativeFileName = toProjectRelativePath(projectPath, fileName);
+    fileName = relativeFileName; // 프로젝트 루트 기준 상대경로로 저장
+    set(state => ({
+      errors: {
+        ...state.errors,
+        [fileName]: errors, // 무조건 교체
+      },
+    }));
+  },
   clearErrors: (fileName, type) =>
     set(state => {
       const newErrors = { ...state.errors };
