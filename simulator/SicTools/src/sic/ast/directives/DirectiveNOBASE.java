@@ -11,8 +11,9 @@ import sic.common.Mnemonic;
  */
 public class DirectiveNOBASE extends Directive {
 
-    public DirectiveNOBASE(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public DirectiveNOBASE(Location loc, String label, Location labelLoc,
+                           Mnemonic mnemonic, Location mnemonicLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     @Override

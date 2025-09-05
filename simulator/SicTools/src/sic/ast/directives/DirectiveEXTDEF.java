@@ -13,10 +13,16 @@ import java.util.List;
 public class DirectiveEXTDEF extends Directive {
 
     public final List<String> names;
+    public final List<Location> nameLocs; // aligned 1:1 with names
 
-    public DirectiveEXTDEF(Location loc, String label, Mnemonic mnemonic, List<String> names) {
-        super(loc, label, mnemonic);
-        this.names = names;
+    public DirectiveEXTDEF(Location loc,
+                           String label, Location labelLoc,
+                           Mnemonic mnemonic, Location mnemonicLoc,
+                           List<String> names,
+                           List<Location> nameLocs) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
+        this.names = List.copyOf(names);
+        this.nameLocs = List.copyOf(nameLocs);
     }
 
     @Override
@@ -29,5 +35,4 @@ public class DirectiveEXTDEF extends Directive {
         }
         return buf.toString();
     }
-
 }

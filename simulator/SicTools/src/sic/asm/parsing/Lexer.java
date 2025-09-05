@@ -1,6 +1,7 @@
 package sic.asm.parsing;
 
 import sic.asm.AsmError;
+import sic.asm.Location;
 import sic.common.Conversion;
 
 /**
@@ -34,7 +35,7 @@ public class Lexer extends Input {
         while (isWhitespace()) advance();
     }
 
-    public String skipLinesAndComments() {
+    public String skipLinesAndComments() throws AsmError {
         StringBuilder comments = new StringBuilder();
         while (isWhitespace() || isNewLine() || peek() == '.') {
             String comment = readIfComment(true, true);
@@ -66,7 +67,7 @@ public class Lexer extends Input {
 
     // ************ SIC/XE if-tokens
 
-    public String readIfComment(boolean requireDot, boolean skipEmptyLines) {
+    public String readIfComment(boolean requireDot, boolean skipEmptyLines) throws AsmError {
         boolean hasDot = advanceIf('.');
         if ((requireDot || col == 1) && !hasDot) return null;
         String comment = readUntil('\n').trim();
@@ -111,10 +112,11 @@ public class Lexer extends Input {
     }
 
     public int readRegister() throws AsmError {
+         Location prevLoc = loc();
          char ch = advance();
          int reg = Conversion.nameToReg(ch);
          if (reg < 0)
-             throw new AsmError(loc(), 1, "Invalid register '%c'", ch);
+             throw new AsmError(prevLoc, 1, "Invalid register '%c'", ch);
          return reg;
      }
 
@@ -138,6 +140,7 @@ public class Lexer extends Input {
       * @throws sic.asm.AsmError
       */
     public int readInt(int lo, int hi) throws AsmError {
+        Location prevLoc = loc();
         // first detect radix
         int radix = -1;
         boolean negative = advanceIf('-');
@@ -162,7 +165,7 @@ public class Lexer extends Input {
         try {
             num = Integer.parseInt(readDigits(radix), radix);
         } catch (NumberFormatException e) {
-            throw new AsmError(loc(), 1, "Invalid number");
+            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Invalid number");
         }
         // number must not be followed by letter or digit
         if (Character.isLetterOrDigit(peek()))
@@ -170,7 +173,7 @@ public class Lexer extends Input {
         // check range
         if (negative) num = -num;
         if (num < lo || num > hi)
-            throw new AsmError(loc(), 1, "Number '%d' out of range [%d..%d]", num, lo, hi);
+            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Number '%d' out of range [%d..%d]", num, lo, hi);
         return num;
     }
 
@@ -181,15 +184,18 @@ public class Lexer extends Input {
      * @throws sic.asm.AsmError
      */
     public double readFloat() throws AsmError {
+        Location prevLoc = loc();  // mirror readInt: capture start for error span
+
         // Check sign
         boolean negative = advanceIf('-');
 
         // Read numbers before dot
         double num;
         try {
+            prevLoc = loc();
             num = Double.parseDouble(readDigits(10));
         } catch (NumberFormatException e) {
-            throw new AsmError(loc(), 1, "Invalid number");
+            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Invalid number");
         }
 
         // Check for dot
@@ -197,7 +203,7 @@ public class Lexer extends Input {
             try {
                 num += Double.parseDouble("0." + readDigits(10));
             } catch (NumberFormatException e) {
-                throw new AsmError(loc(), 1, "Invalid number");
+                throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Invalid number");
             }
         }
 
@@ -213,16 +219,17 @@ public class Lexer extends Input {
         double lo = -sicDoubleLimit;
         double hi = sicDoubleLimit;
         if (num < lo || num > hi)
-            throw new AsmError(loc(), 1, "Number '%d' out of range [%d..%d]", num, lo, hi);
+            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col, 1), "Number '%d' out of range [%d..%d]", num, lo, hi);
 
         return num;
     }
 
     public String readEscapedString(char terminator) throws AsmError {
         StringBuilder buf = new StringBuilder();
+        Location prevLoc = loc();
         for (char c = advance(); c != terminator; c = advance()) {
             if (!ready() || c == '\n') {
-                throw new AsmError(loc(), 1, "Unterminated byte string");
+                throw new AsmError(prevLoc, 1, "Unterminated byte string");
             }
             if (c == '\\') {
                 c = advance();
@@ -250,19 +257,21 @@ public class Lexer extends Input {
                         break;
                     case 'x':
                         int mark = pos();
+                        prevLoc = loc();
                         advance(2);
                         String str = extract(mark);
                         try {
                             c = (char) Integer.parseInt(str, 16);
                         } catch (NumberFormatException e) {
-                            throw new AsmError(loc(), 1, "Hexadecimal byte expected");
+                            throw new AsmError(prevLoc, Math.max(loc().col - prevLoc.col,1), "Hexadecimal byte expected");
                         }
                         break;
                     default:
-                        throw new AsmError(loc(), 1, "Unknown escape sequence '\\%c'", c);
+                        throw new AsmError(prevLoc, 2, "Unknown escape sequence '\\%c'", c);
                 }
             }
             buf.append(c);
+            prevLoc = loc();
         }
         return buf.toString();
     }

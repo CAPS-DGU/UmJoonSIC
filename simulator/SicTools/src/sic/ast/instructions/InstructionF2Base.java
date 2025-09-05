@@ -10,8 +10,9 @@ import sic.common.Mnemonic;
  */
 public abstract class InstructionF2Base extends Instruction {
 
-    public InstructionF2Base(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public InstructionF2Base(Location loc, String label, Location labelLocation,
+                             Mnemonic mnemonic, Location mnemonicLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
     }
 
     @Override

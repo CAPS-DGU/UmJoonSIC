@@ -12,8 +12,9 @@ import sic.common.Mnemonic;
  */
 public class DirectiveCSECT extends Directive {
 
-    public DirectiveCSECT(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public DirectiveCSECT(Location loc, String label, Location labelLoc,
+                          Mnemonic mnemonic, Location mnemonicLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     @Override
@@ -24,8 +25,9 @@ public class DirectiveCSECT extends Directive {
 
     @Override
     public void append(Program program) throws AsmError {
-        if (!hasLabel())
-            throw new AsmError(loc, 1, "Missing label at CSECT");
+        if (!hasLabel()) {
+            throw new AsmError(new Location(loc.pos, loc.row, 1, loc.length), 1, "Missing label at CSECT");
+        }
         super.append(program);
     }
 

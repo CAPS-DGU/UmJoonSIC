@@ -1,6 +1,7 @@
 package sic.ast.data;
 
 import sic.asm.AsmError;
+import sic.asm.Location;
 import sic.asm.parsing.Parser;
 import sic.common.Conversion;
 
@@ -29,9 +30,10 @@ public class DataHex extends Data {
     public void parse(Parser parser, boolean allowList) throws AsmError {
         parser.advance('X');
         parser.advance('\'');
+        Location prevLoc = parser.loc();
         String str = parser.readUntil('\'');
         if (str.length() % 2 == 1)
-            throw new AsmError(parser.loc(), 1, "Invalid length of hex encoding '%s'", str);
+            throw new AsmError(prevLoc, str.length(), "Invalid length of hex encoding '%s'", str);
         data = Conversion.hexToBytes(str);
         if (allowList) super.parse(parser, true);
     }

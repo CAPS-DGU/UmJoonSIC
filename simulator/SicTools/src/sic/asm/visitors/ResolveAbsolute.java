@@ -19,11 +19,11 @@ public class ResolveAbsolute extends Visitor {
 
     public void visit(DirectiveSTART d) throws AsmError {
         if (program.start() != program.locctr())
-            throw new AsmError(d.loc, 1, "START must precede all instructions");
+            throw new AsmError(d.getMnemonicLocation(), d.mnemonic.name.length(), "START must precede all instructions");
         if (program.name() != null)
-            throw new AsmError(d.loc, 1, "Multiple STARTs are not allowed");
+            throw new AsmError(d.getMnemonicLocation(), d.mnemonic.name.length(), "Multiple STARTs are not allowed");
         if (d.label().length() > 6)
-            throw new AsmError(d.loc, 1, "Program name too long");
+            throw new AsmError(d.getLabelLocation(), d.label.length(), "Program name too long");
         d.resolve(program);
         program.setName(d.label());
         program.setStart(d.value());

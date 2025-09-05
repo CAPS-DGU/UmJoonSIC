@@ -16,14 +16,22 @@ import sic.common.SICXE;
  */
 public class InstructionF3m extends InstructionF34Base {
 
-    public InstructionF3m(Location loc, String label, Mnemonic mnemonic, Flags flags, int operand, String symbol) {
-        super(loc, label, mnemonic, flags, operand, symbol);
+    public InstructionF3m(Location loc,
+                          String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation,
+                          Flags flags,
+                          int operand,
+                          String symbol, Location symbolLocation) {
+        super(loc, label, labelLocation,
+                mnemonic, mnemonicLocation,
+                flags, operand,
+                symbol, symbolLocation);
     }
 
     @Override
     public void checkSymbol(Program program, Symbol symbol) throws AsmError {
         if (symbol.isImported())
-            throw new AsmError(loc, 1, "External symbol '%s' is not allowed here", symbol);
+            throw new AsmError(locOf(SYMBOL), symbol.name.length(), "External symbol '%s' is not allowed here", symbol);
     }
 
     @Override

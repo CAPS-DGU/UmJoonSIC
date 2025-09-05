@@ -11,8 +11,9 @@ import sic.common.Mnemonic;
  */
 public abstract class Instruction extends Command {
 
-    protected Instruction(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    protected Instruction(Location loc, String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
     }
 
 }

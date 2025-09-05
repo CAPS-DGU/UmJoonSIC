@@ -41,6 +41,7 @@ public class Parser extends Lexer {
     }
 
     public Command parseIfCommand() throws AsmError {
+        Location labelLoc = null;
         Location loc = loc();
         String label = readIfLabel();
         skipWhitespace();
@@ -48,25 +49,37 @@ public class Parser extends Lexer {
             skipLinesAndComments();
             checkWhitespace("Missing whitespace after label '%s'", label);
         }
-        else loc = loc();
+        else{
+            labelLoc = loc;
+            loc = loc();
+            labelLoc.length = loc.col - labelLoc.col;
+        }
+
+        Location mnemonicLoc = loc();
         String name = readIfMnemonic();
         if (name == null) {
             if (label == null) return null; // no instruction present
             throw new AsmError(loc(), 1, "Missing mnemonic");
         }
+
         // name != null
         Mnemonic mnemonic = mnemonics.get(name);
+
         if (mnemonic == null)
-            throw new AsmError(loc(), 1, "Invalid mnemonic '%s'", name);
+            throw new AsmError(mnemonicLoc, name.length(), "Invalid mnemonic '%s'", name);
         skipWhitespace();
-        return operandParser.parse(loc, label, mnemonic);
+        return operandParser.parse(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     public Program parseProgram() {
         program = new Program();
         // advance to the beginning of command
         while (ready() && col > 1)
-            advanceUntil('\n');
+            try{
+                advanceUntil('\n');
+            } catch (AsmError e){
+                errorCatcher.add(e);
+            }
         // do the lines
         while (ready()) {
             assert col() == 1;
@@ -76,11 +89,15 @@ public class Parser extends Lexer {
             try {
                 command = parseIfCommand();
                 skipWhitespace();
-                comment = readIfComment(Options.requireCommentDot, Options.skipEmptyLines);
+                comment = readIfComment(true, Options.skipEmptyLines);
                 if (command == null && comment == null) advance('\n'); // advance over the empty line
             } catch (AsmError e) {
                 errorCatcher.add(e);
-                advanceUntil('\n');
+                try {
+                    advanceUntil('\n');
+                } catch (AsmError e1) {
+                    errorCatcher.add(e1);
+                }
                 continue;
             }
             // check what we got
