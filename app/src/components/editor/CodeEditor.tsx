@@ -51,37 +51,79 @@ export default function CodeEditor() {
     hasRunRef.current = true; // 한 번만 실행
   }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
 
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor || !activeTab || !result) return;
+useEffect(() => {
+  const editor = editorRef.current;
+  if (!editor || !activeTab || !result) return;
 
-    const model = editor.getModel();
-    if (!model) return;
+  const model = editor.getModel();
+  if (!model) return;
 
-    const fileResult = result.files.find(
-      f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
-    );
+  const fileResult = result.files.find(
+    f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
+  );
 
-    if (!monaco || !fileResult) {
-      return;
-    }
+  if (!monaco || !fileResult) return;
 
-    if (!fileResult || !fileResult.compileErrors?.length) {
-      monaco.editor.setModelMarkers(model, 'sicxe', []);
-      return;
-    }
+  if (!fileResult.assemblerErrors?.length) {
+    monaco.editor.setModelMarkers(model, 'sicxe', []);
+    return;
+  }
 
-    const markers = fileResult.compileErrors.map(err => ({
+  const clampLine = (line: number) =>
+    Math.max(1, Math.min(line, model.getLineCount()));
+
+  const clampColumn = (line: number, col: number) => {
+    const maxCol = model.getLineMaxColumn(line);
+    return Math.max(1, Math.min(col, maxCol));
+  };
+
+  const markers = fileResult.assemblerErrors.map(err => {
+    // Detect if incoming positions are 0-based (common from parsers/lexers)
+    const probablyZeroBased = err.row === 0 || err.col === 0;
+
+    const rawLine = (err.row ?? 1);
+    const rawCol  = (err.col ?? 1);
+
+    const startLineNumber = clampLine(probablyZeroBased ? rawLine + 1 : rawLine);
+
+    // Monaco columns are 1-based; endColumn is the column **after** the last char
+    const startColumnBase1 = probablyZeroBased ? rawCol + 1 : rawCol;
+    const startColumn = clampColumn(startLineNumber, startColumnBase1);
+
+    const length = Math.max(err.length ?? 1, 1);
+    const endColumn = clampColumn(startLineNumber, startColumn + length);
+
+    const marker: monaco.editor.IMarkerData = {
       severity: monaco.MarkerSeverity.Error,
       message: err.message,
-      startLineNumber: clampLine(err.row, model),
-      startColumn: clampLine(err.col, model),
-      endLineNumber: clampLine(err.row, model),
-      endColumn: clampLine(err.col + (err.length ?? 1), model), // length 없으면 1로
-    }));
+      startLineNumber,
+      startColumn,
+      endLineNumber: startLineNumber,
+      endColumn,
+    };
 
-    monaco.editor.setModelMarkers(model, 'sicxe', markers);
-  }, [result, activeTab, monaco]);
+    // Helpful debug log
+    console.debug('[assembler-error]', {
+      fileName: fileResult.fileName,
+      message: err.message,
+      errRow: err.row,
+      errCol: err.col,
+      errLength: err.length,
+      computed: {
+        startLineNumber,
+        startColumn,
+        endColumn,
+        lineText: model.getLineContent(startLineNumber),
+      },
+    });
+
+    return marker;
+  });
+
+  monaco.editor.setModelMarkers(model, 'sicxe', markers);
+}, [result, activeTab, monaco]);
+
+
 
   const handleEditorDidMount = (
     editor: monaco_editor.editor.IStandaloneCodeEditor,

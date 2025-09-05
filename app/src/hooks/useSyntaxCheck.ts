@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useErrorStore } from '@/stores/pannel/ErrorStore';
 
 // ----- 타입 정의 -----
-export interface CompileError {
+export interface AssemblerError {
   row: number;
   col: number;
   length?: number;
@@ -13,7 +13,7 @@ export interface CompileError {
 export interface SyntaxCheckFileResult {
   fileName: string;
   ok: boolean;
-  compileErrors?: CompileError[] | null;
+  assemblerErrors?: AssemblerError[] | null;
 }
 
 export interface SyntaxCheckResult {
@@ -49,8 +49,8 @@ export function useSyntaxCheck() {
 
       // ----- Zustand 에러 스토어 갱신 -----
       fileNames.forEach((fileName, idx) => {
-        const newErrors: (CompileError & { type: 'syntax' })[] =
-          data.files[idx]?.compileErrors?.map(err => ({
+        const newErrors: (AssemblerError & { type: 'syntax' })[] =
+          data.files[idx]?.assemblerErrors?.map(err => ({
             ...err,
             type: 'syntax',
           })) ?? [];
