@@ -21,6 +21,7 @@ public class Symbol extends Node implements Comparable<Symbol> {
 
     public final String name;           // name of the symbol
     public final Location loc;          // location of the definition
+    public final int length;
     private Scope scope;
     private boolean absolute;           // is the symbol absolute
     public LabelType labelType;         // is it before code or data
@@ -34,6 +35,7 @@ public class Symbol extends Node implements Comparable<Symbol> {
     public Symbol(String name, Location loc, int value, boolean isData) {
         this.name = name;
         this.loc = loc;
+        this.length = name.length();
         this.scope = Scope.LOCAL;
         this.value = value;
         this.expr = null;
@@ -45,6 +47,7 @@ public class Symbol extends Node implements Comparable<Symbol> {
     public Symbol(String name, Location loc, Expr expr) {
         this.name = name;
         this.loc = loc;
+        this.length = name.length();
         this.scope = Scope.LOCAL;
         this.expr = expr;
         this.dependencyCount = expr.countSyms();
@@ -55,6 +58,7 @@ public class Symbol extends Node implements Comparable<Symbol> {
     public Symbol(String name, Location loc) {
         this.name = name;
         this.loc = loc;
+        this.length = name.length();
         this.value = 0;
         this.expr = null;
         this.scope = Scope.IMPORTED;

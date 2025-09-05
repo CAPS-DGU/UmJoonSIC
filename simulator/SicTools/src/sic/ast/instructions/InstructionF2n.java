@@ -1,5 +1,6 @@
 package sic.ast.instructions;
 
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.common.Conversion;
 import sic.common.Mnemonic;
@@ -12,10 +13,15 @@ import sic.common.Mnemonic;
 public class InstructionF2n extends InstructionF2Base {
 
     public final int number;
+    public static final Key<Integer> NUMBER = Key.of("number");
 
-    public InstructionF2n(Location loc, String label, Mnemonic mnemonic, int number) {
-        super(loc, label, mnemonic);
+    public InstructionF2n(Location loc,
+                          String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation,
+                          int number, Location numberLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
         this.number = number;
+        putLoc(NUMBER, numberLocation);
     }
 
     @Override

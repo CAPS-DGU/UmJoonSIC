@@ -13,15 +13,20 @@ import sic.common.Mnemonic;
  */
 public class DirectiveEQU extends DirectiveFe {
 
-    public DirectiveEQU(Location loc, String label, Mnemonic mnemonic, Expr expr) {
-        super(loc, label, mnemonic, expr);
+    public DirectiveEQU(Location loc, String label, Location labelLoc,
+                        Mnemonic mnemonic, Location mnemonicLoc,
+                        Expr expr, Location exprLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
     }
 
     @Override
     public void append(Program program) throws AsmError {
-        if (!hasLabel())
-            throw new AsmError(loc, 1, "Missing label at EQU");
+        if (!hasLabel()) {
+            throw new AsmError(new Location(loc.pos, loc.row, 1, loc.length), 1, "Missing label at EQU");
+        }
         super.append(program);
+
+
     }
 
 }

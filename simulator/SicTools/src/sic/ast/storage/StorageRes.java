@@ -1,6 +1,7 @@
 package sic.ast.storage;
 
 import sic.asm.AsmError;
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.ast.Program;
 import sic.ast.expression.Expr;
@@ -17,13 +18,16 @@ import java.util.Arrays;
  * @author jure
  */
 public class StorageRes extends Storage {
-
+    public static final Key<String> EXPR = Key.of("expr");
     public final Expr expr;  // expression
     private int count;  // value of expression
 
-    public StorageRes(Location loc, String label, Mnemonic mnemonic, Expr expr) {
-        super(loc, label, mnemonic);
+    public StorageRes(Location loc, String label, Location labelLoc,
+                      Mnemonic mnemonic, Location mnemonicLoc,
+                      Expr expr, Location exprLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
         this.expr = expr;
+        putLoc(EXPR, exprLoc);
     }
 
     @Override

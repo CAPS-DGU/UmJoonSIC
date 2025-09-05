@@ -1,5 +1,6 @@
 package sic.ast.instructions;
 
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.common.Mnemonic;
 import sic.common.Conversion;
@@ -10,12 +11,16 @@ import sic.common.Conversion;
  * @author jure
  */
 public class InstructionF2r extends InstructionF2Base {
+    public static final Key<String> REGISTER = Key.of("register");
 
     public final int register;
 
-    public InstructionF2r(Location loc, String label, Mnemonic mnemonic, int register) {
-        super(loc, label, mnemonic);
+    public InstructionF2r(Location loc, String label, Location labelLocation,
+                          Mnemonic mnemonic, Location mnemonicLocation,
+                          int register, Location registerLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
         this.register = register;
+        putLoc(REGISTER, registerLocation);
     }
 
     @Override

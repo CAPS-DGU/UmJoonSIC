@@ -1,6 +1,7 @@
 package sic.ast.instructions;
 
 import sic.asm.AsmError;
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.ast.Program;
 import sic.ast.Symbol;
@@ -14,19 +15,33 @@ import sic.common.Mnemonic;
  */
 public abstract class InstructionF34Base extends Instruction {
 
-    // operand
-    protected final Flags flags;        // flags nixbpe
-    protected int value;                // if operand is a value
-    protected String symbol;            // if operand is a symbol
-    protected int resolvedValue;        // resolved value of the symbol
-    protected Symbol resolvedSymbol;    // resolved symbol
+    public static final Key<String> SYMBOL = Key.of("symbol");
 
-    public InstructionF34Base(Location loc, String label, Mnemonic mnemonic, Flags flags, int value, String symbol) {
-        super(loc, label, mnemonic);
+    // operand
+    protected final Flags flags;        // flags nixbpe — no location
+    protected int value;                // value as literal
+    protected String symbol;            // symbolic operand
+    protected int resolvedValue;        // resolved value after pass
+    protected Symbol resolvedSymbol;    // resolved symbol object
+
+    public InstructionF34Base(Location loc,
+                              String label, Location labelLocation,
+                              Mnemonic mnemonic, Location mnemonicLocation,
+                              Flags flags,
+                              int value,
+                              String symbol, Location symbolLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
         this.flags = flags;
         this.value = value;
         this.symbol = symbol;
-        if (mnemonic.isExtended()) this.flags.setExtended();
+
+        if (symbol != null) {
+            putLoc(SYMBOL, symbolLocation);
+        }
+
+        if (mnemonic.isExtended()) {
+            this.flags.setExtended();
+        }
     }
 
     public boolean operandIsValue() {
@@ -60,14 +75,14 @@ public abstract class InstructionF34Base extends Instruction {
         } else {
             resolvedSymbol = program.section().symbols.get(symbol);
             if (resolvedSymbol == null)
-                throw new AsmError(loc, 1, "Undefined symbol '%s'", symbol);
+                throw new AsmError(locOf(SYMBOL), symbol.length(), "Undefined symbol '%s'", symbol);
             checkSymbol(program, resolvedSymbol);
             resolvedValue = resolvedSymbol.value();
         }
         // resolve addressing
         if (resolveAddressing(program)) return;
         // otherwise no suitable addressing found
-        throw new AsmError(loc, 1, "Cannot address symbol '%s'", symbol);
+        throw new AsmError(locOf(SYMBOL), symbol.length(), "Cannot address symbol '%s'", symbol);
     }
 
     @Override

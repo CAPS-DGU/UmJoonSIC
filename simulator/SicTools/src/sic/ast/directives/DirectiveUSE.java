@@ -1,6 +1,7 @@
 package sic.ast.directives;
 
 import sic.asm.AsmError;
+import sic.asm.Key;
 import sic.asm.Location;
 import sic.ast.Program;
 import sic.common.Mnemonic;
@@ -12,11 +13,15 @@ import sic.common.Mnemonic;
  */
 public class DirectiveUSE extends Directive {
 
+    public static final Key<String> BLOCK = Key.of("block");
     public final String blockName;
 
-    public DirectiveUSE(Location loc, String label, Mnemonic mnemonic, String blockName) {
-        super(loc, label, mnemonic);
+    public DirectiveUSE(Location loc, String label, Location labelLoc,
+                        Mnemonic mnemonic, Location mnemonicLoc,
+                        String blockName, Location blockLoc) {
+        super(loc, label, labelLoc, mnemonic, mnemonicLoc);
         this.blockName = blockName;
+        putLoc(BLOCK, blockLoc);
     }
 
     @Override

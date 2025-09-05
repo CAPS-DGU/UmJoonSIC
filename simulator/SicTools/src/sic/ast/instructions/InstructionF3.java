@@ -13,8 +13,9 @@ public class InstructionF3 extends Instruction {
 
     private final Flags flags;
 
-    public InstructionF3(Location loc, String label, Mnemonic mnemonic) {
-        super(loc, label, mnemonic);
+    public InstructionF3(Location loc, String label, Location labelLocation,
+                         Mnemonic mnemonic, Location mnemonicLocation) {
+        super(loc, label, labelLocation, mnemonic, mnemonicLocation);
         flags = new Flags(Flags.SIMPLE, Flags.NONE);
     }
 

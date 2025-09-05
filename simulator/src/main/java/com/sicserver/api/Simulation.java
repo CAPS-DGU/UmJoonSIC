@@ -402,10 +402,15 @@ public class Simulation {
                     per.assemblerErrors = catcher.errs.stream()
                             .map(err -> {
                                 AssemblerError ae = new AssemblerError();
-                                ae.row = err.loc.row;
-                                ae.col = err.loc.col;
+                                if (err.loc != null) {
+                                    ae.row = err.loc.row;
+                                    ae.col = err.loc.col;
+                                } else {
+                                    ae.row = 0;
+                                    ae.col = 0;
+                                }
                                 ae.length = err.length;
-                                ae.message = err.getMessage();
+                                ae.message = (err.getMessage() != null) ? err.getMessage() : "Unknown Error";
                                 return ae;
                             })
                             .toList();

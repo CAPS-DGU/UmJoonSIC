@@ -26,16 +26,22 @@ public class ResolveRelative extends Visitor {
     }
 
     public void visit(DirectiveEXTDEF d) throws AsmError {
-        for (String name : d.names)
-            program.section().symbols.exportSymbol(name, d.loc);
+        for (int i = 0; i < d.names.size(); i++) {
+            String name = d.names.get(i);
+            program.section().symbols.exportSymbol(
+                    name,
+                    d.loc,
+                    d.nameLocs.get(i)
+            );
+        }
     }
 
     public void visit(DirectiveSTART d) throws AsmError {
-        program.section().symbols.exportSymbol(d.label(), d.loc);
+        program.section().symbols.exportSymbol(d.label(), d.loc, d.getLabelLocation());
     }
 
     public void visit(DirectiveCSECT d) throws AsmError {
-        program.section().symbols.exportSymbol(d.label(), d.loc);
+        program.section().symbols.exportSymbol(d.label(), d.loc, d.getLabelLocation());
     }
 
 }
