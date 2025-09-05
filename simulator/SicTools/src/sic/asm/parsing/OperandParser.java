@@ -56,7 +56,7 @@ public class OperandParser {
             Location postLoc = parser.loc();
 
             if (sym.length() > maxLength) {
-                throw new AsmError(startLoc, 1, "Symbol name '%s' too long", sym);
+                throw new AsmError(startLoc, sym.length(), "Symbol name '%s' too long", sym);
             }
 
             int len = postLoc.row == startLoc.row
@@ -233,7 +233,7 @@ public class OperandParser {
             if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
                 flags.setIndexed();
             else
-                throw new AsmError(operandLoc, parser.loc().col - operandLoc.col, "Indexed addressing not supported here");
+                throw new AsmError(operandLoc, Math.max(1,parser.loc().col - operandLoc.col), "Indexed addressing not supported here");
         }
         return new InstructionF3m(loc, label, labelLoc, mnemonic, mnemonicLoc, flags, operand, symbol, symbolLoc);
     }
@@ -277,7 +277,7 @@ public class OperandParser {
             if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
                 flags.setIndexed();
             else
-                throw new AsmError(operandLoc, parser.loc().col - operandLoc.col, "Indexed addressing not supported here");
+                throw new AsmError(operandLoc, Math.max(1, parser.loc().col - operandLoc.col), "Indexed addressing not supported here");
         }
         return new InstructionF4m(loc, label, labelLoc, mnemonic, mnemonicLoc, flags, operand, symbol, symbolLoc);
     }

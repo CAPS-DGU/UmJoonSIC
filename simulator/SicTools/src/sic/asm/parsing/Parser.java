@@ -64,10 +64,9 @@ public class Parser extends Lexer {
 
         // name != null
         Mnemonic mnemonic = mnemonics.get(name);
-        mnemonicLoc.length = loc.col - mnemonicLoc.col;
 
         if (mnemonic == null)
-            throw new AsmError(loc(), 1, "Invalid mnemonic '%s'", name);
+            throw new AsmError(mnemonicLoc, name.length(), "Invalid mnemonic '%s'", name);
         skipWhitespace();
         return operandParser.parse(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
@@ -76,7 +75,11 @@ public class Parser extends Lexer {
         program = new Program();
         // advance to the beginning of command
         while (ready() && col > 1)
-            advanceUntil('\n');
+            try{
+                advanceUntil('\n');
+            } catch (AsmError e){
+                errorCatcher.add(e);
+            }
         // do the lines
         while (ready()) {
             assert col() == 1;
@@ -86,11 +89,15 @@ public class Parser extends Lexer {
             try {
                 command = parseIfCommand();
                 skipWhitespace();
-                comment = readIfComment(Options.requireCommentDot, Options.skipEmptyLines);
+                comment = readIfComment(true, Options.skipEmptyLines);
                 if (command == null && comment == null) advance('\n'); // advance over the empty line
             } catch (AsmError e) {
                 errorCatcher.add(e);
-                advanceUntil('\n');
+                try {
+                    advanceUntil('\n');
+                } catch (AsmError e1) {
+                    errorCatcher.add(e1);
+                }
                 continue;
             }
             // check what we got

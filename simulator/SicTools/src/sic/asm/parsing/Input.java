@@ -107,8 +107,18 @@ public class Input {
 
     public void advance(char ch) throws AsmError {
         if (advanceIf(ch)) return;
-        throw new AsmError(loc(), 1, "Expected '%c'", ch);
+
+        String display;
+        switch (ch) {
+            case '\n': display = "\\n"; break;
+            case '\r': display = "\\r"; break;
+            case '\t': display = "\\t"; break;
+            default:   display = String.valueOf(ch); break;
+        }
+
+        throw new AsmError(loc(), 1, "Expected '%s'", display);
     }
+
 
     public boolean advanceIf(String str) {
         for (int i = 0; i < str.length(); i++)
@@ -117,12 +127,19 @@ public class Input {
         return true;
     }
 
-    public void advanceUntil(char delimiter) {
-        while (ready() && peek() != delimiter) advance();
+    public void advanceUntil(char delimiter) throws AsmError {
+        while (ready() && peek() != delimiter) {
+            advance();
+        }
+
+        if (!ready() && peek() != delimiter && delimiter != '\n' && delimiter != '\r') {
+            throw new AsmError(loc(), 1, "Expected character %c not found", delimiter);
+        }
+
         advance();
     }
 
-    public String readUntil(char delimiter) {
+    public String readUntil(char delimiter) throws AsmError {
         int mark = pos;
         advanceUntil(delimiter);
         return extract(mark, pos - 1);

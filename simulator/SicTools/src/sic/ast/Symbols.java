@@ -85,7 +85,7 @@ public class Symbols {
     private void define(Symbol sym) throws AsmError {
         if (sym.name == null || "".equals(sym.name)) return;
         if (isDefined(sym.name))
-            throw new AsmError(sym.loc, 1, "Duplicate symbol '%s'", sym.name);
+            throw new AsmError(sym.loc, sym.name.length(), "Duplicate symbol '%s'", sym.name);
         if (sym.name.length() > maxLength) maxLength = sym.name.length();
         syms.put(sym.name, sym);
     }
@@ -121,10 +121,10 @@ public class Symbols {
         }
     }
 
-    public void exportSymbol(String name, Location loc) throws AsmError {
+    public void exportSymbol(String name, Location loc, Location symbolLoc) throws AsmError {
         Symbol sym = syms.get(name);
         if (sym == null)
-            throw new AsmError(loc, 1, "Cannot export undefined symbol '%s'", name);
+            throw new AsmError(symbolLoc, name.length(), "Cannot export undefined symbol '%s'", name);
         sym.setExported();
     }
 
