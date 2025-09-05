@@ -4,6 +4,7 @@ import * as monaco_editor from 'monaco-editor';
 
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
+import { useErrorStore } from '@/stores/pannel/ErrorStore';
 import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
 import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
 
@@ -40,7 +41,8 @@ export default function CodeEditor() {
     formatDocument,
   } = useAutoIndentation(editorRef, monaco);
 
-  const { result, runCheck } = useSyntaxCheck();
+  const { runCheck } = useSyntaxCheck();
+  const errors = useErrorStore(state => state.errors);
   const hasRunRef = useRef(false);
 
   useEffect(() => {
@@ -49,29 +51,25 @@ export default function CodeEditor() {
 
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
-  }, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
+  }, [activeTab, runCheck]);
+  //}, [activeTab?.filePath, activeTab?.fileContent, runCheck]);
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || !activeTab || !result) return;
+    if (!editor || !activeTab || !errors) return;
 
     const model = editor.getModel();
     if (!model) return;
-
-    const fileResult = result.files.find(
-      f => f.fileName === activeTab.filePath || f.fileName === `<file-0>`,
-    );
-
-    if (!monaco || !fileResult) {
+    if (!monaco) {
       return;
     }
 
-    if (!fileResult || !fileResult.assemblerErrors?.length) {
+    if (!errors[activeTab.filePath] || !errors[activeTab.filePath].length) {
       monaco.editor.setModelMarkers(model, 'sicxe', []);
       return;
     }
 
-    const markers = fileResult.assemblerErrors.map(err => ({
+    const markers = errors[activeTab.filePath].map(err => ({
       severity: monaco.MarkerSeverity.Error,
       message: err.message,
       startLineNumber: clampLine(err.row, model),
@@ -81,11 +79,9 @@ export default function CodeEditor() {
     }));
 
     monaco.editor.setModelMarkers(model, 'sicxe', markers);
-  }, [result, activeTab, monaco]);
+  }, [errors, activeTab, monaco]);
 
-  const handleEditorDidMount = (
-    editor: monaco_editor.editor.IStandaloneCodeEditor,
-  ) => {
+  const handleEditorDidMount = (editor: monaco_editor.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
     const setupEditorAfterFontLoad = async () => {

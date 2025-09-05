@@ -6,10 +6,17 @@ import type { CompileError } from '@/stores/pannel/ErrorStore';
 // 경고 메시지 타입 정의
 interface WarningMessage {
   file: string;
+  filePath: string;
   message: string;
   line?: number;
   col?: number;
 }
+
+const getFileName = (filePath: string) => {
+  const parts = filePath.split(/[/\\]/);
+  return parts[parts.length - 1];
+};
+
 const getFileIcon = (fileName: string) => {
   if (fileName === 'project.sic') return <Settings className="text-gray-500 mr-2 w-4 h-4" />;
   if (fileName.toLowerCase().endsWith('.lst'))
@@ -22,7 +29,8 @@ const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => 
   const grouped: Record<string, WarningMessage[]> = {};
   Object.entries(errors).forEach(([file, errs]) => {
     grouped[file] = errs.map(err => ({
-      file,
+      file: getFileName(file),
+      filePath: file,
       message: err.message,
       line: err.row,
       col: err.col,
@@ -31,7 +39,7 @@ const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => 
   return grouped;
 };
 
-const WarningPanel = () => {
+export default function WarningPanel() {
   const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const errors = useErrorStore(state => state.errors);
 
@@ -83,7 +91,12 @@ const WarningPanel = () => {
                   }`}
                 />
                 {getFileIcon(fileName)}
-                <span className="text-sm">{fileName}</span>
+                <p className="text-sm">
+                  <span className="font-semibold">{groupedWarnings[fileName][0].file}</span>
+                  <span className="text-gray-400 text-xs ml-1 italic">
+                    ({groupedWarnings[fileName][0].filePath})
+                  </span>
+                </p>
                 <div className="ml-auto flex items-center">
                   <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
                   <span className="text-sm">{groupedWarnings[fileName].length}</span>
@@ -111,6 +124,4 @@ const WarningPanel = () => {
       </div>
     </div>
   );
-};
-
-export default WarningPanel;
+}
