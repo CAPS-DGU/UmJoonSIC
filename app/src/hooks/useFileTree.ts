@@ -13,10 +13,15 @@ type IntermediateFileNode = { __type: 'file' };
 type IntermediateFolderNode = { __type: 'folder'; __children: Record<string, IntermediateNode> };
 type IntermediateNode = IntermediateFileNode | IntermediateFolderNode;
 
+function normalizePath(path: string) {
+  return path.replace(/\\/g, '/'); // 윈도우 경로 → POSIX 스타일
+}
+
 function convertToFileStructure(fileTree: string[]): FileStructure[] {
   const root: Record<string, IntermediateNode> = {};
 
-  fileTree.forEach(path => {
+  fileTree.forEach(originalPath => {
+    const path = normalizePath(originalPath);
     const isFolder = path.endsWith('/');
     const parts = path.split('/').filter(Boolean);
 

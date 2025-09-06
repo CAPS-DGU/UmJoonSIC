@@ -3,19 +3,28 @@ import { FilePlus, FolderPlus, RefreshCcw } from 'lucide-react';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useFileTree, type FileStructure } from '@/hooks/useFileTree';
+
 import { FileTreeItem } from '@/components/fileTree/FileTreeItem';
 import { ContextMenu } from '@/components/fileTree/ContextMenu';
+import { NewFileDialog } from '@/components/fileTree/NewFileDialog';
 
 export default function SideBar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     show: boolean;
     x: number;
     y: number;
     item: FileStructure | null;
   }>({ show: false, x: 0, y: 0, item: null });
-  const { projectName, fileTree, refreshFileTree, selectedFileOrFolder, setSelectedFileOrFolder } =
-    useProjectStore();
+  const {
+    projectName,
+    fileTree,
+    refreshFileTree,
+    selectedFileOrFolder,
+    setSelectedFileOrFolder,
+    settings,
+  } = useProjectStore();
   const { tabs, addTab } = useEditorTabStore();
 
   const fileTreeStructure = useFileTree(fileTree);
@@ -38,11 +47,15 @@ export default function SideBar() {
   };
 
   return (
-    <div className="w-60 bg-white border-r border-gray-300 flex flex-col">
+    <div className="w-full bg-white border-r border-gray-300 flex flex-col h-screen">
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
         <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">
-          <button className="p-1 rounded hover:bg-gray-200">
+          <button
+            className="p-1 rounded hover:bg-gray-200"
+            onClick={() => setNewFileDialogOpen(true)}
+            title="새 파일 생성"
+          >
             <FilePlus width={16} height={16} />
           </button>
           <button className="p-1 rounded hover:bg-gray-200">
@@ -66,6 +79,7 @@ export default function SideBar() {
             onContextMenu={(e, item) =>
               setContextMenu({ show: true, x: e.clientX, y: e.clientY, item })
             }
+            projectFiles={settings.asm}
           />
         ))}
       </div>
@@ -78,6 +92,20 @@ export default function SideBar() {
           onClose={() => setContextMenu({ show: false, x: 0, y: 0, item: null })}
         />
       )}
+
+      {/* 새 파일 다이얼로그 연결 */}
+      <NewFileDialog
+        open={newFileDialogOpen}
+        onOpenChange={setNewFileDialogOpen}
+        currentFolder={
+          selectedFileOrFolder.endsWith('/')
+            ? selectedFileOrFolder.slice(0, -1) // 폴더 선택이면 그대로
+            : selectedFileOrFolder // 파일 선택이면 그 파일이 있는 폴더
+        }
+        onFileCreated={() => {
+          refreshFileTree(); // 생성 후 파일 트리 갱신
+        }}
+      />
     </div>
   );
 }
