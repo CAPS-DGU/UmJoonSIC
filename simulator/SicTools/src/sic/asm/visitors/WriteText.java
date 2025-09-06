@@ -3,14 +3,11 @@ package sic.asm.visitors;
 import sic.asm.AsmError;
 import sic.asm.ErrorCatcher;
 import sic.ast.*;
-import sic.ast.directives.DirectiveORG;
-
 import java.io.Writer;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Write H/T/E (and any existing relocation) records.
+ * Pure SIC: no ORG directive visit.
  */
 public class WriteText extends WriteVisitor {
 
@@ -61,16 +58,18 @@ public class WriteText extends WriteVisitor {
         int start = "".equals(section.name) ? program.start() : 0;
         String name = "".equals(section.name) ? program.name() : section.name();
         w("H%s%-6s%s%06X%s%06X\n", space, name, space, start, space, section.size());
-        // define records (exported symbols)
+
+        // define records (exported symbols) — likely empty in pure SIC
         int cnt = 0;
         for (Symbol sym : section.symbols.asSortedList()) if (sym.isExported()) {
-            if (sym.name.equals(name)) continue;  // name of the programm is automatically exported
+            if (sym.name.equals(name)) continue;
             if (cnt == 0) w("D");
             w("%s%-6s%s%06X", space, sym.name, space, sym.value() - start);
             if (++cnt >= 6) { cnt = 0; w("\n"); }
         }
         if (cnt > 0) w("\n");
-        // refer records (imported symbols)
+
+        // refer records (imported symbols) — likely empty in pure SIC
         cnt = 0;
         for (Symbol sym : section.symbols.asSortedList()) if (sym.isImported()) {
             if (cnt == 0) w("R");
@@ -78,16 +77,17 @@ public class WriteText extends WriteVisitor {
             if (++cnt >= 12) { cnt = 0; w("\n"); }
         }
         if (cnt > 0) w("\n");
+
         // text records
         textAddr = start;
         visitBlocks(section.blocks);
         flushBuf();
-        // modification records
+
+        // modification records (if any relocations were added)
         for (Relocation r : section.relocations)
             w(r.flag == 0 ? String.format("M%s%06X%s%02X\n", space, r.address, space, r.length)
-                            :
-                            String.format("M%s%06X%s%02X%s%c%s\n", space, r.address, space, r.length, space, r.flag, r.symbol)
-        );
+                    : String.format("M%s%06X%s%02X%s%c%s\n", space, r.address, space, r.length, space, r.flag, r.symbol));
+
         // end record
         int first = "".equals(section.name) ? program.first() : start;
         w("E%s%06X\n", space, first);
@@ -99,7 +99,7 @@ public class WriteText extends WriteVisitor {
 
     public void visit(Command c) throws AsmError {
         if (c.size() > 0) buf.append(space);
-        
+
         if (recordBytes == 0)
             textAddr = program.locctr();
 
@@ -111,8 +111,5 @@ public class WriteText extends WriteVisitor {
             flushBuf();
     }
 
-    public void visit(DirectiveORG d) {
-        flushBuf();
-    }
-
+    // No visit(DirectiveORG) in pure SIC.
 }

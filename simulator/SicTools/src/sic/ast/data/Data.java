@@ -48,7 +48,6 @@ public abstract class Data {
         switch (opcode) {
             case Opcode.BYTE:  return data.length;
             case Opcode.WORD:  return (data.length + 2) / 3 * 3;
-            case Opcode.FLOT: return (data.length + 5) / 6 * 6;
         }
         return 0;
     }

@@ -9,16 +9,16 @@ import sic.common.Flags;
 import sic.common.Mnemonic;
 
 /**
- * Instruction in Format 3.
+ * Instruction in Format 3 (pure SIC).
  *
- * @author jure
+ * XE features (immediate/indirect, PC/base relative, extended) are not supported.
  */
 public abstract class InstructionF34Base extends Instruction {
 
     public static final Key<String> SYMBOL = Key.of("symbol");
 
     // operand
-    protected final Flags flags;        // flags nixbpe — no location
+    protected final Flags flags;        // flags (only X is meaningful in pure SIC)
     protected int value;                // value as literal
     protected String symbol;            // symbolic operand
     protected int resolvedValue;        // resolved value after pass
@@ -39,9 +39,8 @@ public abstract class InstructionF34Base extends Instruction {
             putLoc(SYMBOL, symbolLocation);
         }
 
-        if (mnemonic.isExtended()) {
-            this.flags.setExtended();
-        }
+        // In pure SIC we do NOT set extended bit (no Format 4).
+        // if (mnemonic.isExtended()) { flags.setExtended(); }
     }
 
     public boolean operandIsValue() {
@@ -50,11 +49,8 @@ public abstract class InstructionF34Base extends Instruction {
 
     @Override
     public String operandToString() {
+        // Only plain number/symbol with optional ,X is allowed.
         String op = operandIsValue() ? Integer.toString(value) : symbol;
-        if (operandIsValue()) {
-            if (flags.isPCRelative()) op = "(PC)" + (value >= 0 ? "+" : "") + op;
-            else if (flags.isBaseRelative()) op = "(B)+" + op;
-        }
         return flags.operandToString(op);
     }
 
@@ -81,8 +77,15 @@ public abstract class InstructionF34Base extends Instruction {
         }
         // resolve addressing
         if (resolveAddressing(program)) return;
-        // otherwise no suitable addressing found
-        throw new AsmError(locOf(SYMBOL), symbol.length(), "Cannot address symbol '%s'", symbol);
+
+        // otherwise no suitable addressing found — build a robust error span
+        final boolean isVal = operandIsValue();
+        final String what = isVal ? Integer.toString(value) : symbol;
+        final Location errLoc = isVal ? this.loc : locOf(SYMBOL);
+        final int span = what != null ? what.length() : 1;
+
+        throw new AsmError(errLoc, span,
+                "Cannot address %s '%s' in pure SIC", isVal ? "value" : "symbol", what);
     }
 
     @Override
@@ -93,10 +96,9 @@ public abstract class InstructionF34Base extends Instruction {
 
     @Override
     public Integer resolveOperandAddress(int addressPC) {
-        if (flags.isPCRelative()) {
-            return addressPC + size() + value;
-        } else if (!flags.isImmediate() && flags.isAbsolute() && !flags.isIndexed()) {
-            return value;
+        // Pure SIC: absolute 15-bit address only; if indexed, we can't return a single address.
+        if (!flags.isIndexed()) {
+            return resolvedValue;
         } else {
             return null;
         }
