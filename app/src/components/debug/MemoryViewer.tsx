@@ -235,6 +235,7 @@ function KeyColumn({
               height: `${ROW_HEIGHT}px`,
               position: 'absolute',
               top: `${rowIndex * ROW_HEIGHT - 6}px`,
+              right: `-15px`,
             }}
           >
             {addr.toString(16).toUpperCase().padStart(4, '0')}
