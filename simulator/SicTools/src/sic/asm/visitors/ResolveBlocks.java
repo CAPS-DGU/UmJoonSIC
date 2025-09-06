@@ -6,15 +6,10 @@ import sic.ast.Block;
 import sic.ast.Command;
 import sic.ast.Program;
 import sic.ast.Section;
-import sic.ast.directives.DirectiveEQU;
-import sic.ast.directives.DirectiveORG;
-import sic.ast.storage.StorageData;
-import sic.ast.storage.StorageRes;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Resolve block starts/sizes and define labels.
+ * Pure SIC: no ORG/EQU handling here.
  */
 public class ResolveBlocks extends Visitor {
 
@@ -52,12 +47,5 @@ public class ResolveBlocks extends Visitor {
         program.section().symbols.defineLabel(c.label(), c.loc, program.locctr(), c);
     }
 
-    public void visit(DirectiveEQU d) {
-        // do nothing: since EQUs should already be defined
-    }
-
-    public void visit(DirectiveORG d) throws AsmError {
-        d.resolve(program);
-    }
-
+    // No visit(DirectiveEQU) and no visit(DirectiveORG) in pure SIC.
 }

@@ -7,6 +7,7 @@ import TabBar from '../editor/TabBar';
 import List from './List';
 import path from 'path-browserify';
 import { useProjectStore } from '@/stores/ProjectStore';
+import { useRegisterStore } from '@/stores/RegisterStore';
 
 export default function ListContainer() {
   const {
@@ -17,11 +18,43 @@ export default function ListContainer() {
     toggleBreakpoint,
     clearBreakpoints,
     getActiveTab,
+    setActiveTab,
   } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const { listFile } = useListFileStore();
   const [breakpoints, setBreakpoints] = useState<number[]>([]);
   const activeTab = getActiveTab();
+  const PC = useRegisterStore(state => state.PC);
+
+  // When PC changes, switch to the first matching List tab per rules
+  useEffect(() => {
+    if (!listFile || listFile.length === 0) return;
+
+    // Find list files whose rows contain the current PC and non-empty rawCode
+    const matches = listFile.filter(file =>
+      file.rows.some(r =>
+        parseInt(r.addressHex, 16) === PC && (r.rawCodeHex?.replaceAll(' ', '') || '') !== ''
+      ),
+    );
+
+    if (matches.length === 0) return; // No match → do not switch
+
+    // If current tab is a ListView with a matching file, do not switch
+    if (activeTab && activeTab.filePath.endsWith('.lst')) {
+      const currentFileNoExt = activeTab.filePath.replace(/\.lst$/i, '');
+      const currentIsMatch = matches.some(m => m.filePath === currentFileNoExt);
+      if (currentIsMatch) return;
+    }
+
+    // Otherwise, switch to the first matching list file tab (if it exists)
+    const firstMatch = matches[0];
+    const targetLstPath = `${firstMatch.filePath}.lst`;
+    const targetTab = tabs.find(t => t.filePath === targetLstPath);
+    if (targetTab) {
+      setActiveTab(targetTab.idx);
+    }
+  }, [PC, listFile, activeTabIdx]);
+
   /*
   useEffect(() => {
     const fetchFileData = async () => {

@@ -8,9 +8,8 @@ import sic.ast.Program;
 import java.util.Set;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * The location counter '*' is disallowed in pure SIC operands (no ORG/EQU math).
+ * Kept only to throw a friendly error if encountered.
  */
 public class ExprStar extends Expr {
 
@@ -25,7 +24,8 @@ public class ExprStar extends Expr {
 
     @Override
     public Expr parse(ExpressionParser parser) throws AsmError {
-        return this;
+        throw new AsmError(loc, 1,
+                "Location counter '*' is not allowed in pure SIC operands");
     }
 
     @Override
@@ -45,12 +45,12 @@ public class ExprStar extends Expr {
 
     @Override
     public boolean canEval(Program program) {
-        return true;
+        return false;
     }
 
     @Override
-    public int eval(Program program) {
-        return program.locctr();
+    public int eval(Program program) throws AsmError {
+        throw new AsmError(loc, 1,
+                "Location counter '*' is not allowed in pure SIC operands");
     }
-
 }

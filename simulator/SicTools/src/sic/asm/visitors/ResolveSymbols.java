@@ -4,15 +4,13 @@ import sic.asm.AsmError;
 import sic.asm.ErrorCatcher;
 import sic.ast.Program;
 import sic.ast.directives.DirectiveEND;
-import sic.ast.instructions.*;
+import sic.ast.instructions.InstructionF3m;
+import sic.ast.instructions.InstructionLiteral;
 
 /**
- * Second pass
- *   resolve symbols
- *   resolve and define program entry (END directive)
- *   manipulate BASE and NOBASE
- *
- * @author jure
+ * Second pass:
+ *   - resolve instruction operands
+ *   - set program entry (END)
  */
 public class ResolveSymbols extends Visitor {
 
@@ -24,16 +22,18 @@ public class ResolveSymbols extends Visitor {
         c.resolve(program);
     }
 
-    public void visit(InstructionF4m c) throws AsmError {
-        c.resolve(program);
-    }
+    // InstructionF4m removed in pure SIC.
 
     public void visit(DirectiveEND directive) throws AsmError {
-        program.setFirst(directive.expr.eval(program));
+        // Pure SIC: END is empty or a single symbol.
+        if (directive.expr == null) {
+            program.setFirst(program.start());
+        } else {
+            program.setFirst(directive.expr.eval(program));
+        }
     }
 
     public void visit(InstructionLiteral c) throws AsmError {
         visit(c.command);
     }
-
 }

@@ -24,7 +24,6 @@ public class DataNum extends Data {
         switch (opcode) {
             case Opcode.BYTE:
             case Opcode.WORD: return Integer.toString(numint) + super.toString();
-            case Opcode.FLOT: return Double.toString(numfloat) + super.toString();
         }
         return "";
     }
@@ -39,10 +38,6 @@ public class DataNum extends Data {
             case Opcode.WORD:
                 numint = parser.readInt(SICXE.MIN_SWORD, SICXE.MAX_WORD);
                 data = SICXE.intToDataWord(numint);
-                break;
-            case Opcode.FLOT:
-                numfloat = parser.readFloat();
-                data = SICXE.doubleToDataFloat(numfloat);
                 break;
         }
         if (allowList) super.parse(parser, true);

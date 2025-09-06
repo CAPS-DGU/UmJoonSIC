@@ -28,8 +28,13 @@ function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
 
 // 에디터 컴포넌트
 export default function CodeEditor() {
+  console.error('CodeEditor rendered');
   const monaco = useMonaco();
-  const { tabs, getActiveTab, setFileContent, setCursor, setIsModified } = useEditorTabStore();
+  const tabs = useEditorTabStore(state => state.tabs);
+  const getActiveTab = useEditorTabStore(state => state.getActiveTab);
+  const setFileContent = useEditorTabStore(state => state.setFileContent);
+  const setCursor = useEditorTabStore(state => state.setCursor);
+  const setIsModified = useEditorTabStore(state => state.setIsModified);
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
 
@@ -55,7 +60,7 @@ export default function CodeEditor() {
 
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
-  }, [activeTab, runCheck]);
+  }, [activeTab?.idx, runCheck]);
 
   // 커서 위치 동기화
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function CodeEditor() {
     setTimeout(() => {
       editor.revealLineInCenter(line);
     }, 50);
-  }, [activeTab]);
+  }, [activeTab?.idx]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -116,7 +121,7 @@ export default function CodeEditor() {
       loadErrorDecorationIdsRef.current,
       newDecorations,
     );
-  }, [errors, activeTab, monaco]);
+  }, [errors, activeTab?.idx, monaco]);
 
   const handleEditorDidMount = (editor: monaco_editor.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;

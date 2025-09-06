@@ -7,16 +7,10 @@ import sic.ast.Program;
 import java.util.Set;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Operators are not allowed in pure SIC operands.
+ * This node is kept only to produce a clear error if the parser ever reaches it.
  */
 public class ExprOp extends Expr {
-
-    private Expr left;
-    private Expr right;
-    public Location leftLoc;
-    public Location rightLoc;
 
     public ExprOp(String name, Location loc, int leftBP) {
         super(name, loc, leftBP);
@@ -24,86 +18,44 @@ public class ExprOp extends Expr {
 
     @Override
     public String toString() {
-        return left + name + right;
-    }
-
-    public Expr left() {
-        return left;
-    }
-
-    public Expr right() {
-        return right;
+        return name;
     }
 
     @Override
     public Expr parse(ExpressionParser parser) throws AsmError {
-        if ("*".equals(name)) {
-            return new ExprStar(loc);
-        }
-        if ("+".equals(name)) {
-            return parser.parseExpression(leftBP);
-        }
-        if ("-".equals(name)) {
-            this.left = new ExprInt(loc, 0);
-            this.leftLoc = left.loc;
-            this.right = parser.parseExpression(leftBP);
-            this.rightLoc = right.loc;
-        }
-        return this;
+        throw new AsmError(loc, name.length(),
+                "Expressions are not allowed in pure SIC (found operator '%s')", name);
     }
 
     @Override
     public Expr parseLeft(ExpressionParser parser, Expr left) throws AsmError {
-        this.left = left;
-        this.leftLoc = left.loc;
-        this.right = parser.parseExpression(leftBP);
-        this.rightLoc = right.loc;
-        return this;
-    }
-
-
-    @Override
-    public boolean hasSyms() {
-        return left.hasSyms() || right.hasSyms();
-    }
-
-    @Override
-    public int countAddSub() {
-        if ("+".equals(name))
-            return left.countSyms() + right.countSyms();
-        if ("-".equals(name))
-            return left.countSyms() - right.countSyms();
-        return Integer.MAX_VALUE;
+        throw new AsmError(loc, name.length(),
+                "Expressions are not allowed in pure SIC (found operator '%s')", name);
     }
 
     @Override
     public Set<String> extractSyms() {
-        Set<String> l = left.extractSyms();
-        Set<String> r = right.extractSyms();
-        if (l == null) return r;
-        if (r == null) return l;
-        l.addAll(r);
-        return l;
+        return null;
+    }
+
+    @Override
+    public boolean hasSyms() {
+        return false;
+    }
+
+    @Override
+    public int countAddSub() {
+        return 0;
     }
 
     @Override
     public boolean canEval(Program program) {
-        return left.canEval(program) && right.canEval(program);
+        return false;
     }
 
     @Override
     public int eval(Program program) throws AsmError {
-        if ("+".equals(name))
-            return left.eval(program) + right.eval(program);
-        if ("-".equals(name))
-            return left.eval(program) - right.eval(program);
-        if ("*".equals(name))
-            return left.eval(program) * right.eval(program);
-        if ("/".equals(name))
-            return left.eval(program) / right.eval(program);
-        if ("%".equals(name))
-            return left.eval(program) % right.eval(program);
-        return 0;
+        throw new AsmError(loc, name.length(),
+                "Expressions are not allowed in pure SIC (found operator '%s')", name);
     }
-
 }
