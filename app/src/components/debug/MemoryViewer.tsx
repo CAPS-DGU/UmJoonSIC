@@ -5,10 +5,12 @@ import {
   type MemoryNodeStatus,
   type MemoryLabel,
 } from '@/stores/MemoryViewStore';
+import { useRegisterStore } from '@/stores/RegisterStore';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Search } from 'lucide-react';
 import '/src/styles/SearchAnimation.css';
-export default function MemoryViewer() {
+
+export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) {
   const memoryValues = useMemoryViewStore(state => state.memoryValues);
   const getMemoryLabelFromWatch = useMemoryViewStore(state => state.getMemoryLabelFromWatch);
   const labels = getMemoryLabelFromWatch();
@@ -19,6 +21,8 @@ export default function MemoryViewer() {
   const loadMemoryRange = useMemoryViewStore(state => state.loadMemoryRange);
   const getMemoryValue = useMemoryViewStore(state => state.getMemoryValue);
   const memoryRange = useMemoryViewStore(state => state.memoryRange);
+  const pc = useRegisterStore(state => state.PC); // ✅ PC 값 가져오기
+
   const containerRef = useRef<HTMLDivElement>(null);
   const ROW_SIZE = 8;
   const BUFFER_SIZE = 512; // 미리 로드할 범위 (위아래 256바이트씩)
@@ -27,6 +31,9 @@ export default function MemoryViewer() {
   const [searchAddress, setSearchAddress] = useState('');
   const [visibleRowRange, setVisibleRowRange] = useState({ start: 0, end: 20 });
   const [searchedNodes, setSearchedNodes] = useState<Set<number>>(new Set());
+
+  // ✅ PC 자동 스크롤 제어용
+  const [pcScrolled, setPcScrolled] = useState(false);
 
   // 애니메이션 완료 후 변경된 노드 목록 초기화
   useEffect(() => {
@@ -50,9 +57,8 @@ export default function MemoryViewer() {
     }
   }, [searchedNodes]);
 
-  //메모리 범위 변경 확인
+  // 메모리 범위 변경 확인
   useEffect(() => {
-    // memoryRange가 바뀌면 새 범위 로드
     loadMemoryRange(memoryRange.start, memoryRange.end);
   }, [memoryRange, loadMemoryRange]);
 
@@ -64,7 +70,6 @@ export default function MemoryViewer() {
     const scrollTop = container.scrollTop;
     const containerHeight = container.clientHeight;
 
-    // 현재 보이는 행 범위 계산
     const startRow = Math.floor(scrollTop / ROW_HEIGHT);
     const endRow = Math.min(
       Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT),
@@ -73,18 +78,15 @@ export default function MemoryViewer() {
 
     setVisibleRowRange({ start: startRow, end: endRow });
 
-    // 현재 보이는 메모리 범위 계산
     const visibleStart = startRow * ROW_SIZE;
     const visibleEnd = Math.min(
       scrollTop / ROW_HEIGHT + containerHeight / ROW_HEIGHT,
       (memoryRange.end - memoryRange.start + 1) / ROW_SIZE,
     );
 
-    // 버퍼를 포함한 로드 범위 계산
     const loadStart = Math.max(0, visibleStart - BUFFER_SIZE);
     const loadEnd = Math.min(totalMemorySize, visibleEnd + BUFFER_SIZE);
 
-    // 필요한 메모리 범위 로드
     loadMemoryRange(loadStart, loadEnd);
   }, [loadMemoryRange, totalMemorySize, ROW_HEIGHT, ROW_SIZE]);
 
@@ -109,6 +111,7 @@ export default function MemoryViewer() {
     console.log('주소 0x0008의 값:', getMemoryValue(8));
     console.log('주소 0x0010의 값:', getMemoryValue(16));
   };
+
   const handleSearch = () => {
     if (!containerRef.current || !searchAddress) return;
 
@@ -118,32 +121,35 @@ export default function MemoryViewer() {
       return;
     }
 
-    // 검색된 노드 목록에 추가
     setSearchedNodes(new Set([address]));
 
     const rowIndex = Math.floor(address / ROW_SIZE);
     const scrollTo = rowIndex * ROW_HEIGHT;
-
-    // 스크롤 위치 이동
     containerRef.current.scrollTop = scrollTo;
 
-    // 해당 범위의 메모리 로드
     loadMemoryRange(address, address + BUFFER_SIZE);
   };
 
-  // 전체 메모리 크기에 따른 스크롤 영역 생성
+  useEffect(() => {
+    if (isExecuting && pc >= 0 && pc < totalMemorySize && !pcScrolled) {
+      setSearchedNodes(new Set([pc]));
+      const rowIndex = Math.floor(pc / ROW_SIZE);
+      const scrollTo = rowIndex * ROW_HEIGHT;
+      if (containerRef.current) {
+        containerRef.current.scrollTop = scrollTo;
+      }
+
+      loadMemoryRange(pc, pc + BUFFER_SIZE);
+      setPcScrolled(true);
+    }
+  }, [isExecuting, pc]);
+
   const totalRows = Math.ceil(totalMemorySize / ROW_SIZE);
 
   return (
     <section className="flex flex-col px-2">
       <div className="flex justify-between items-center">
         <h2 className="text-md font-bold">메모리 뷰어</h2>
-        {/* <button
-          onClick={handleDebugMemory}
-          className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-        >
-          디버그
-        </button> */}
       </div>
 
       <div className="flex items-center mt-2 space-x-2">
@@ -210,7 +216,6 @@ function KeyColumn({
   ROW_SIZE: number;
   ROW_HEIGHT: number;
 }) {
-  // 보이는 행만 렌더링
   const visibleRows = [];
   for (let i = visibleRowRange.start; i < visibleRowRange.end; i++) {
     if (i < totalRows) {
@@ -221,7 +226,6 @@ function KeyColumn({
   return (
     <div className="flex flex-col gap-2 pr-4 relative">
       {visibleRows.map(rowIndex => {
-        // 주소 계산: 행 인덱스 * 행 크기
         const addr = rowIndex * ROW_SIZE;
         return (
           <p
@@ -258,9 +262,8 @@ function ValueColumn({
   getMemoryValue: (address: number) => MemoryNodeData | null;
   ROW_SIZE: number;
   ROW_HEIGHT: number;
-  searchedNodes: Set<number>; // Props로 전달
+  searchedNodes: Set<number>;
 }) {
-  // 보이는 행만 렌더링
   const visibleRows = [];
   for (let i = visibleRowRange.start; i < visibleRowRange.end; i++) {
     if (i < totalRows) {
@@ -271,11 +274,9 @@ function ValueColumn({
   return (
     <div className="flex flex-col gap-2 pl-4 relative">
       {visibleRows.map(rowIndex => {
-        // 주소 계산: 행 인덱스 * 행 크기 (KeyColumn과 동일)
         const rowStartAddr = rowIndex * ROW_SIZE;
         const rowEndAddr = Math.min(rowStartAddr + ROW_SIZE - 1, totalRows * ROW_SIZE - 1);
 
-        // 이 행에 포함되는 라벨만
         const rowLabels = labels
           .filter(l => l.end >= rowStartAddr && l.start <= rowEndAddr)
           .map(l => ({
@@ -294,24 +295,13 @@ function ValueColumn({
               top: `${rowIndex * ROW_HEIGHT}px`,
             }}
           >
-            {/* 값 */}
             <div className="flex relative mb-2">
               {Array.from({ length: ROW_SIZE }, (_, idx) => {
-                // 각 바이트의 주소: 행 시작 주소 + 바이트 인덱스
                 const byteAddr = rowStartAddr + idx;
                 const node = getMemoryValue(byteAddr);
                 const label = rowLabels.find(l => idx >= l.start && idx <= l.end);
                 const isChanged = changedNodes.has(byteAddr);
-                // 검색된 노드 여부
                 const isSearched = searchedNodes.has(byteAddr);
-
-                // 디버깅: 첫 번째 행의 첫 번째 값만 로그 출력
-                if (rowIndex === 0 && idx === 0) {
-                  console.log(
-                    `행 ${rowIndex}, 바이트 ${idx}: 주소 ${byteAddr.toString(16)}의 값:`,
-                    node?.value || '00',
-                  );
-                }
 
                 return (
                   <MemoryNode
@@ -325,17 +315,14 @@ function ValueColumn({
                 );
               })}
 
-              {/* 라벨 밑줄 (모든 라벨에 대해 표시) */}
               {rowLabels.map((label, idx) => {
-                // 원본 라벨의 절대 위치 사용
                 const originalLabel = labels.find(l => l.name === label.name);
                 if (!originalLabel) return null;
 
-                // 현재 행에서의 상대 위치 계산
                 const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
                 const relativeEnd = Math.min(originalLabel.end, rowEndAddr) - rowStartAddr;
 
-                const left = relativeStart * 24 + 4; // w-6 + gap
+                const left = relativeStart * 24 + 4;
                 const width = (relativeEnd - relativeStart + 1) * 24 - 8;
 
                 return (
@@ -347,19 +334,15 @@ function ValueColumn({
                 );
               })}
 
-              {/* 라벨 이름 (시작하는 행에만 표시) */}
               {rowLabels
                 .filter(label => {
-                  // 전체 labels 배열에서 이 라벨이 처음 나타나는 행인지 확인
                   const originalLabel = labels.find(l => l.name === label.name);
                   if (!originalLabel) return false;
-
-                  // 원본 라벨의 시작 주소가 현재 행에 속하는지 확인
                   const labelStartRow = Math.floor(originalLabel.start / ROW_SIZE);
                   return labelStartRow === rowIndex;
                 })
                 .map((label, idx) => {
-                  const left = label.start * 24 + 4; // w-6 + gap
+                  const left = label.start * 24 + 4;
                   const width = (label.end - label.start + 1) * 24 - 8;
                   return (
                     <div
