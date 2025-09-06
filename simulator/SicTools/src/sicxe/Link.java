@@ -1,9 +1,6 @@
 package sicxe;
 
 import sicxe.link.*;
-import sicxe.link.ui.LinkListener;
-import sicxe.link.ui.LinkerCli;
-import sicxe.link.ui.LinkerGui;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -35,23 +32,6 @@ public class Link {
 
             for (int i=processedArgs; i<args.length; i++)
                 inputs.add(args[i]);
-
-            if (options.isGraphical()) {
-                LinkerGui linkerGui = new LinkerGui(options, inputs, new LinkListener() {
-                    @Override
-                    public void onLinked(File f, String message) {
-                        if (f != null) {
-                            LinkerGui.showSuccess(f.getAbsolutePath());
-                        } else {
-                            LinkerGui.showError(message);
-                        }
-                    }
-                });
-                linkerGui.gui();
-            } else {
-                LinkerCli.link(options, inputs);
-            }
-
         } catch (LinkerError le) {
             System.err.println(le.getMessage());
         }

@@ -5,7 +5,6 @@ import java.util.Vector;
 import sicxe.common.Conversion;
 import sicxe.common.Logger;
 import sicxe.common.SICXE;
-import sicxe.sim.addons.Addon;
 
 /**
  * @author jure
@@ -57,15 +56,6 @@ public class Devices {
     public void reset() {
         for (int i = SICXE.DEVICE_FREE; i < devices.length; i++) {
             devices[i].reset();
-        }
-    }
-
-    public void setDevices(Vector<Addon.AddonDevice> devices) {
-        if (devices == null) {
-            return;
-        }
-        for (Addon.AddonDevice d : devices) {
-            setDevice(d.name, d.dev);
         }
     }
 
