@@ -4,15 +4,16 @@ import sic.asm.AsmError;
 import sic.asm.Location;
 import sic.ast.Program;
 import sic.ast.Symbol;
-import sic.common.Conversion;
 import sic.common.Flags;
 import sic.common.Mnemonic;
 import sic.common.SICXE;
 
 /**
- * TODO: write a short description
+ * Format 3, memory operand (pure SIC).
  *
- * @author jure
+ * - Only simple addressing with optional ,X.
+ * - Encodes absolute 15-bit address (no PC/base relative; no immediate/indirect).
+ * - Adds relocation if a relative symbol is addressed absolutely.
  */
 public class InstructionF3m extends InstructionF34Base {
 
@@ -31,40 +32,25 @@ public class InstructionF3m extends InstructionF34Base {
     @Override
     public void checkSymbol(Program program, Symbol symbol) throws AsmError {
         if (symbol.isImported())
-            throw new AsmError(locOf(SYMBOL), symbol.name.length(), "External symbol '%s' is not allowed here", symbol);
+            throw new AsmError(locOf(SYMBOL), symbol.name.length(),
+                    "External symbol '%s' is not allowed here", symbol);
     }
 
     @Override
     public boolean resolveAddressing(Program program) throws AsmError {
-        // if absolute symbol try absolute (direct) addressing
-        if (resolvedSymbol == null || resolvedSymbol.isAbsolute()) {
-            if (flags.isImmediate() ? SICXE.isCdisp(resolvedValue) : SICXE.isDisp(resolvedValue))
-                return true;  // flags bp=0, and no relocation needed since sym is absolute
+        // Pure SIC: require a 15-bit absolute address.
+        if (!SICXE.isSicAddr(resolvedValue)) {
+            return false;
         }
-        // try PC-relative addressing
-        if (program.section().isPCRelativeAddressing(resolvedValue)) {
-            flags.setPCRelative();
-            resolvedValue = SICXE.intToSdisp(program.section().PCDisplacement(resolvedValue));
-            return true;
-        }
-        // try base-relative addressing
-        if (program.section().isBaseAddressing(resolvedValue)) {
-            flags.setBaseRelative();
-            resolvedValue = SICXE.intToDisp(program.section().baseDisplacement(resolvedValue));
-            return true;
-        }
-        // try direct (absolute) addressing, we have relative symbol
-        if (flags.isImmediate() ? SICXE.isSdisp(resolvedValue) : SICXE.isDisp(resolvedValue)) {
-            // relocate: sym is relative but absolutely addressed
+
+        // If the symbol is relative, mark relocation because we use absolute addressing.
+        if (resolvedSymbol != null && !resolvedSymbol.isAbsolute()) {
             program.section().addRelocation(program.locctr() + 1, 3);
-            return true;  // flags bp=0
         }
-        // if simple addressing also try to fallback to old SIC
-        if (flags.isSimple() && SICXE.isSicAddr(resolvedValue)) {
-            flags.set_ni(Flags.SIC);
-            return true;
-        }
-        return false;
+
+        // Ensure ni stays SIC (Flags does this anyway); only X may be set.
+        flags.set_ni(Flags.SIC);
+        return true;
     }
 
     @Override
@@ -74,11 +60,12 @@ public class InstructionF3m extends InstructionF34Base {
 
     @Override
     public void emitRawCode(byte[] data, int loc) {
-        data[loc] = flags.combineWithOpcode(mnemonic.opcode);
-        data[loc + 1] = flags.isSic() ?
-            (byte)(flags.get_x() | (resolvedValue >> 8) & 0x7F)
-            :
-            (byte)(flags.get_xbpe() | (resolvedValue >> 8) & 0x0F);
-        data[loc + 2] = (byte)(resolvedValue & 0xFF);
+        // Pure SIC layout:
+        // byte0: opcode with ni=00
+        // byte1: x bit in MSB, then high 7 bits of 15-bit address
+        // byte2: low 8 bits of address
+        data[loc]     = flags.combineWithOpcode(mnemonic.opcode);
+        data[loc + 1] = (byte) (flags.get_x() | ((resolvedValue >> 8) & 0x7F));
+        data[loc + 2] = (byte) (resolvedValue & 0xFF);
     }
 }
