@@ -21,8 +21,8 @@ function App() {
   const closeProject = useProjectStore(s => s.closeProject);
   const { tabs, activeTabIdx } = useEditorTabStore();
 
-  const [panelHeight, setPanelHeight] = useState(100);
-  const [isResizing, setIsResizing] = useState(false); // ✅ 1. 드래그 상태를 추적하는 state 추가
+  const [panelHeight, setPanelHeight] = useState(250);
+  const [isResizing, setIsResizing] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,7 +95,6 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col">
-      {/* <ToolBar /> */}
       <div className="flex flex-1 overflow-hidden" ref={appRef}>
         <div className="w-64">
           <SideBar />
@@ -110,7 +109,6 @@ function App() {
               <EditorContainer />
             )}
           </div>
-
           <Resizer
             onResize={(newHeight: number) => setPanelHeight(newHeight)}
             containerRef={appRef}
