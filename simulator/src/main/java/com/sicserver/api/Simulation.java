@@ -2,10 +2,8 @@ package com.sicserver.api;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.sicserver.data.CompileErrors;
-import com.sicserver.data.Listing;
-import com.sicserver.data.Relocations;
-import sic.asm.AsmError;
+import sic.asm.ujs.Listing;
+import sic.asm.ujs.Relocations;
 import sic.asm.Assembler;
 import sic.asm.ErrorCatcher;
 import sic.ast.Program;
@@ -17,7 +15,7 @@ import sic.sim.Args;
 import sic.sim.Executor;
 import sic.sim.vm.Machine;
 
-import com.sicserver.alternatives.Linker;
+import sic.link.Linker;
 import sic.link.Options;
 import sic.link.LinkerError;
 
@@ -177,19 +175,19 @@ public class Simulation {
             aggregate.files.add(perFile);
 
             if (path == null || path.isBlank()) {
-                perFile.compileErrors = new ArrayList<>();
-                CompileError ce = new CompileError();
-                ce.row = 0; ce.col = 0; ce.message = "Missing file path"; ce.nonbreaking = false;
-                perFile.compileErrors.add(ce);
+                perFile.assemblerErrors = new ArrayList<>();
+                AssemblerError ae = new AssemblerError();
+                ae.row = 0; ae.col = 0; ae.length=0; ae.message = "Missing file path"; ae.nonbreaking = false;
+                perFile.assemblerErrors.add(ae);
                 continue;
             }
 
             File f = new File(path);
             if (!f.exists() || !f.canRead()) {
-                perFile.compileErrors = new ArrayList<>();
-                CompileError ce = new CompileError();
-                ce.row = 0; ce.col = 0; ce.message = "File not found or cannot be read"; ce.nonbreaking = false;
-                perFile.compileErrors.add(ce);
+                perFile.assemblerErrors = new ArrayList<>();
+                AssemblerError ae = new AssemblerError();
+                ae.row = 0; ae.col = 0; ae.length=0; ae.message = "File not found or cannot be read"; ae.nonbreaking = false;
+                perFile.assemblerErrors.add(ae);
                 continue;
             }
 
@@ -205,8 +203,16 @@ public class Simulation {
 
                     // Collect compile errors (if any)
                     if (catcher.count() > 0) {
-                        CompileErrors ce = new CompileErrors(catcher.errs, source);
-                        perFile.compileErrors = ce.errors;
+                        perFile.assemblerErrors = catcher.errs.stream()
+                                .map(err -> {
+                                    AssemblerError ae = new AssemblerError();
+                                    ae.row = err.loc.row;
+                                    ae.col = err.loc.col;
+                                    ae.length = err.length;
+                                    ae.message = err.getMessage();
+                                    return ae;
+                                })
+                                .toList();
                         this.lastProgram = null;
                         continue; // no listing / obj when there are errors
                     }
@@ -237,32 +243,32 @@ public class Simulation {
 
                 } else if ("obj".equalsIgnoreCase(ext)) {
                     // Raw .obj inputs are not allowed in this API
-                    perFile.compileErrors = new ArrayList<>();
-                    CompileError ce = new CompileError();
-                    ce.row = 0; ce.col = 0; ce.message = ".obj files cannot be loaded directly; include only .asm files.";
-                    ce.nonbreaking = false;
-                    perFile.compileErrors.add(ce);
+                    perFile.assemblerErrors = new ArrayList<>();
+                    AssemblerError ae = new AssemblerError();
+                    ae.row = 0; ae.col = 0; ae.length = 0; ae.message = ".obj files cannot be loaded directly; include only .asm files.";
+                    ae.nonbreaking = false;
+                    perFile.assemblerErrors.add(ae);
 
                 } else {
                     // Unsupported extension -> compile error
-                    perFile.compileErrors = new ArrayList<>();
-                    CompileError ce = new CompileError();
-                    ce.row = 0; ce.col = 0; ce.message = "Unsupported extension: " + ext; ce.nonbreaking = false;
-                    perFile.compileErrors.add(ce);
+                    perFile.assemblerErrors = new ArrayList<>();
+                    AssemblerError ae = new AssemblerError();
+                    ae.row = 0; ae.col = 0; ae.length = 0; ae.message = "Unsupported extension: " + ext; ae.nonbreaking = false;
+                    perFile.assemblerErrors.add(ae);
                 }
             } catch (Exception e) {
                 // Map unexpected exceptions as compileErrors for that file
-                perFile.compileErrors = new ArrayList<>();
-                CompileError ce = new CompileError();
-                ce.row = 0; ce.col = 0; ce.message = "Load failed: " + e.getMessage(); ce.nonbreaking = false;
-                perFile.compileErrors.add(ce);
+                perFile.assemblerErrors = new ArrayList<>();
+                AssemblerError ae = new AssemblerError();
+                ae.row = 0; ae.col = 0; ae.length = 0; ae.message = "Load failed: " + e.getMessage(); ae.nonbreaking = false;
+                perFile.assemblerErrors.add(ae);
                 this.lastProgram = null;
             }
         }
 
         // If multiple inputs and no compile errors, attempt linking the generated objs
         boolean anyCompileErrors = aggregate.files.stream()
-                .anyMatch(fr -> fr.compileErrors != null && !fr.compileErrors.isEmpty());
+                .anyMatch(fr -> fr.assemblerErrors != null && !fr.assemblerErrors.isEmpty());
 
         if (multi && !anyCompileErrors && !generatedObjPaths.isEmpty()) {
             try {
@@ -315,7 +321,7 @@ public class Simulation {
             } catch (LinkerError le) {
                 // For every file that didn't already fail compile, replace listing with linkerError
                 for (FileLoadResult fr : aggregate.files) {
-                    if (fr.compileErrors == null || fr.compileErrors.isEmpty()) {
+                    if (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) {
                         fr.listing = null;
                         LinkerErrorDto leDto = new LinkerErrorDto();
                         leDto.phase = "linker";
@@ -331,7 +337,7 @@ public class Simulation {
             } catch (IOException ioe) {
                 // Handle IO problems reading/writing linked output
                 for (FileLoadResult fr : aggregate.files) {
-                    if (fr.compileErrors == null || fr.compileErrors.isEmpty()) {
+                    if (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) {
                         fr.listing = null;
                         LinkerErrorDto leDto = new LinkerErrorDto();
                         leDto.phase = "io";
@@ -350,7 +356,7 @@ public class Simulation {
         boolean okAll = true;
         for (FileLoadResult fr : aggregate.files) {
             boolean okThis = (fr.listing != null) &&
-                    (fr.compileErrors == null || fr.compileErrors.isEmpty()) &&
+                    (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) &&
                     (fr.linkerError == null);
             if (!okThis) okAll = false;
         }
@@ -392,21 +398,35 @@ public class Simulation {
                 assembler.assemble(src);
 
                 if (catcher.count() > 0) {
-                    CompileErrors ce = new CompileErrors(catcher.errs, src);
                     per.ok = false;
-                    per.compileErrors = ce.errors;
+                    per.assemblerErrors = catcher.errs.stream()
+                            .map(err -> {
+                                AssemblerError ae = new AssemblerError();
+                                if (err.loc != null) {
+                                    ae.row = err.loc.row;
+                                    ae.col = err.loc.col;
+                                } else {
+                                    ae.row = 0;
+                                    ae.col = 0;
+                                }
+                                ae.length = err.length;
+                                ae.message = (err.getMessage() != null) ? err.getMessage() : "Unknown Error";
+                                return ae;
+                            })
+                            .toList();
                     allOk = false;
-                } else {
+                }
+                else {
                     per.ok = true;
-                    per.compileErrors = null;
+                    per.assemblerErrors = null;
                 }
             } catch (Exception e) {
                 // Treat unexpected exceptions as a compile error entry
                 per.ok = false;
-                per.compileErrors = new ArrayList<>();
-                CompileError ce = new CompileError();
+                per.assemblerErrors = new ArrayList<>();
+                AssemblerError ce = new AssemblerError();
                 ce.row = 0; ce.col = 0; ce.message = "Syntax check failed: " + e.getMessage(); ce.nonbreaking = false;
-                per.compileErrors.add(ce);
+                per.assemblerErrors.add(ce);
                 allOk = false;
             }
 
