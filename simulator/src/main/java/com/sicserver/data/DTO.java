@@ -1,5 +1,4 @@
 package com.sicserver.data;
-
 import java.util.List;
 
 /**
@@ -34,9 +33,10 @@ public final class DTO {
     /* =========================
      * Errors
      * ========================= */
-    public static final class CompileError {
+    public static final class AssemblerError {
         public int row;
         public int col;
+        public int length;
         public String message;
         public boolean nonbreaking;
     }
@@ -59,25 +59,31 @@ public final class DTO {
         public Integer elementCount; // number of elements if available
     }
 
-    /** Transport form of a Listing (per source file). */
-    public static final class ListingDTO {
-        public String codeFileName;                            // from Listing.codeFileName
-        public int startAddress;                               // relocated start address
-        public int programLength;                              // length in bytes
-        public List<com.sicserver.data.Listing.Row> rows;      // formatted rows from Listing
-        public List<WatchVar> watch;                           // flattened watch view
+    public interface EngineListingDTO {}  // marker
+
+    public static final class SicListingDTO implements EngineListingDTO {
+        public String codeFileName;
+        public int startAddress;
+        public int programLength;
+        public List<sic.asm.ujs.Listing.Row> rows;
+        public List<WatchVar> watch;
     }
 
-    /* =========================
-     * LOAD results (multi-file)
-     * ========================= */
-    /** Per-file outcome for load/link. Exactly one of {listing, compileErrors, linkerError} is non-null. */
-    public static final class FileLoadResult {
-        public String fileName;                      // input file path or display name
-        public ListingDTO listing;                   // present if assembly succeeded for this file
-        public List<CompileError> compileErrors;     // present if assembly failed for this file
-        public LinkerErrorDto linkerError;           // present if linking surfaced an error for this file
+    public static final class SicxeListingDTO implements EngineListingDTO {
+        public String codeFileName;
+        public int startAddress;
+        public int programLength;
+        public List<sicxe.asm.ujs.Listing.Row> rows;
+        public List<WatchVar> watch;
     }
+
+    public static final class FileLoadResult {
+        public String fileName;
+        public EngineListingDTO listing;          // can be either
+        public List<AssemblerError> assemblerErrors;
+        public LinkerErrorDto linkerError;
+    }
+
 
     /** Aggregated result for a multi-file load. */
     public static final class LoadResult {
@@ -94,7 +100,7 @@ public final class DTO {
     public static final class SyntaxCheckFileResult {
         public String fileName;
         public boolean ok;                        // true if no compile errors
-        public List<CompileError> compileErrors;  // present if not ok
+        public List<AssemblerError> assemblerErrors;  // present if not ok
     }
 
     /** Aggregated result for syntax check. */

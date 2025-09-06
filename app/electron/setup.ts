@@ -3,7 +3,7 @@ import fs from 'fs';
 import { createReadStream } from 'fs';
 import { app, BrowserWindow } from 'electron';
 import * as tar from 'tar';
-import * as AdmZip from 'adm-zip';
+import AdmZip from 'adm-zip';
 import { ChildProcess, spawn } from 'child_process';
 
 export function checkJreExists() {
@@ -266,6 +266,7 @@ async function extractZip(zipPath: string, extractPath: string): Promise<void> {
       if (jreDir) {
         const sourcePath = path.join(tempExtractPath, jreDir);
         const targetPath = path.join(extractPath, 'jre');
+        console.log(`Moving JRE from ${sourcePath} to ${targetPath}`);
 
         if (fs.existsSync(targetPath)) {
           fs.rmSync(targetPath, { recursive: true, force: true });
@@ -303,7 +304,7 @@ async function extractTarGz(tarGzPath: string, extractPath: string): Promise<voi
  * 플랫폼에 따른 압축 해제 함수
  */
 async function extractJre(archivePath: string, extractPath: string): Promise<void> {
-  console.log(`JRE 압축 해제 중: ${archivePath} -> ${extractPath}`);
+  console.log(`JRE unziping: ${archivePath} -> ${extractPath}`);
 
   // 압축 해제 디렉토리 생성
   if (!fs.existsSync(extractPath)) {
@@ -320,17 +321,19 @@ async function extractJre(archivePath: string, extractPath: string): Promise<voi
 
   // 압축 파일 삭제
   fs.unlinkSync(archivePath);
-  console.log('JRE 압축 해제 완료');
+  console.log('JRE unzip complete');
 }
+
+export const jdkFullName = 'jdk-17.0.16+8-jre';
 
 export function getJavaPath() {
   const appDataPath = path.join(app.getPath('appData'), 'umjoonsic');
   if (process.platform === 'win32') {
-    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'bin', 'java.exe');
+    return path.join(appDataPath, 'jre', 'bin', 'java.exe');
   } else if (process.platform === 'darwin') {
-    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'Contents', 'Home', 'bin', 'java');
+    return path.join(appDataPath, jdkFullName, 'Contents', 'Home', 'bin', 'java');
   } else if (process.platform === 'linux') {
-    return path.join(appDataPath, 'jdk-17.0.16+8-jre', 'bin', 'java');
+    return path.join(appDataPath, jdkFullName, 'bin', 'java');
   }
   return null;
 }

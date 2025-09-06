@@ -13,3 +13,7 @@
 .load-error-line {
   background-color: rgba(255, 0, 0, 0.2);
 }
+
+.monaco-editor .view-line.load-error-line {
+  background-color: rgba(255, 0, 0, 0.2);
+}

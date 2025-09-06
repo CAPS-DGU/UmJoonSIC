@@ -54,7 +54,6 @@ function createWindow(): void {
       console.log('server 다운로드');
     }
 
-    // jar 서버 실행 (예시)
     await runServer(server);
 
     setTimeout(() => {
