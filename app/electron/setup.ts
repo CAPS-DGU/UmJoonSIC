@@ -324,16 +324,16 @@ async function extractJre(archivePath: string, extractPath: string): Promise<voi
   console.log('JRE unzip complete');
 }
 
-export const jdk = 'jdk-17.0.16+8-jre';
+export const jdkFullName = 'jdk-17.0.16+8-jre';
 
 export function getJavaPath() {
   const appDataPath = path.join(app.getPath('appData'), 'umjoonsic');
   if (process.platform === 'win32') {
     return path.join(appDataPath, 'jre', 'bin', 'java.exe');
   } else if (process.platform === 'darwin') {
-    return path.join(appDataPath, 'jre', 'Contents', 'Home', 'bin', 'java');
+    return path.join(appDataPath, jdkFullName, 'Contents', 'Home', 'bin', 'java');
   } else if (process.platform === 'linux') {
-    return path.join(appDataPath, 'jre', 'bin', 'java');
+    return path.join(appDataPath, jdkFullName, 'bin', 'java');
   }
   return null;
 }
