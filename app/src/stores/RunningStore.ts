@@ -75,7 +75,9 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   toggleIsRunning: () => set(state => ({ isRunning: !state.isRunning })),
   setLoadedFiles: (files: LoadedFile[]) => set({ loadedFiles: files }),
   fetchBegin: async () => {
-    const res = await axios.post('http://localhost:9090/begin');
+    const { mode } = useMemoryViewStore.getState();
+    console.log('mode: ', mode);
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
     const data = res.data;
     if (data.ok) {
       set({ isReady: true });
@@ -205,7 +207,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   stopRunning: async () => {
     const { clearListFile } = useListFileStore.getState();
     const { clearWatch } = useWatchStore.getState();
-    const res = await axios.post('http://localhost:9090/begin');
+    const { mode } = useMemoryViewStore.getState();
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
     const data = res.data;
     if (data.ok) {
       clearListFile();
