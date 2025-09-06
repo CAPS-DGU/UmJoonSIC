@@ -4,7 +4,7 @@ import sicxe.asm.Location;
 import sicxe.ast.storage.StorageData;
 import sicxe.ast.storage.StorageRes;
 
-import static sic.common.Opcode.*;
+import static sicxe.common.Opcode.*;
 
 public class StorageSymbol extends Symbol {
 

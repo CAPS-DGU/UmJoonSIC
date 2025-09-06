@@ -114,6 +114,7 @@ public class SicSimulation extends SicxeSimulation {
             return gson.toJson(aggregate);
         }
 
+        // we keep this directory structure, even though we no longer link
         File linkerOutDir = new File(outDir, "linker");
         try { ensureDir(linkerOutDir); }
         catch (IOException ioe) {
@@ -125,11 +126,11 @@ public class SicSimulation extends SicxeSimulation {
 
         final String resolvedOutputName =
                 (outputName == null || outputName.isBlank()) ? "out.obj" : outputName;
-        final String resolvedOutputPath =
-                new File(linkerOutDir, resolvedOutputName).getAbsolutePath();
 
-        boolean multi = filePaths.length > 1;
-        List<String> generatedObjPaths = new ArrayList<>();
+        final boolean multi = filePaths.length > 1;
+
+        // keep the object text for direct loading (no linker)
+        final List<String> builtObjTexts = new ArrayList<>();
 
         for (String path : filePaths) {
             FileLoadResult perFile = new FileLoadResult();
@@ -174,21 +175,24 @@ public class SicSimulation extends SicxeSimulation {
                         continue;
                     }
 
+                    // write .obj (same as before) and keep in-memory text for loading
                     String objText;
                     try (Writer w = new StringWriter()) {
                         assembler.generateObj(program, w, false);
                         objText = w.toString();
                     }
+
                     File objOut = new File(outDir, baseNameNoExt(f) + ".obj");
                     writeString(objOut, objText);
-                    generatedObjPaths.add(objOut.getAbsolutePath());
+                    builtObjTexts.add(objText);
 
                     Listing listing = new Listing(program, f.getName());
                     builtListings.put(perFile.fileName, listing);
                     perFile.listing = listingToDTO(listing);
 
                     if (!multi) {
-                        Loader.loadSection(executorSic.machine, new StringReader(objText));
+                        // Single-file: always set PC from this section
+                        Loader.loadSection(executorSic.machine, new StringReader(objText), null);
                         this.lastProgramSic = program;
                     }
 
@@ -216,67 +220,15 @@ public class SicSimulation extends SicxeSimulation {
         boolean anyCompileErrors = aggregate.files.stream()
                 .anyMatch(fr -> fr.assemblerErrors != null && !fr.assemblerErrors.isEmpty());
 
-        if (multi && !anyCompileErrors && !generatedObjPaths.isEmpty()) {
-            try {
-                Options options = new Options();
-                options.setOutputName(resolvedOutputName);
-                options.setOutputPath(resolvedOutputPath);
-                options.setKeep(Boolean.TRUE.equals(keep));
-                options.setGraphical(Boolean.TRUE.equals(graphical));
-                options.setEditing(Boolean.TRUE.equals(editing));
-                options.setForce(Boolean.TRUE.equals(force));
-                options.setVerbose(verbose == null ? true : verbose);
-                if (mainSymbol != null && !mainSymbol.isBlank()) options.setMain(mainSymbol);
-
-                Linker linker = new Linker(generatedObjPaths, options);
-                Section linkedSection = linker.link();
-                sic.link.utils.Writer writer = new sic.link.utils.Writer(linkedSection, options);
-                File file = writer.write();
-
-                Relocations relocs = linker.relocations;
-                if (relocs != null) {
-                    for (FileLoadResult fr : aggregate.files) {
-                        if (fr.listing != null) {
-                            Listing listingObj = builtListings.get(fr.fileName);
-                            if (listingObj != null) {
-                                listingObj.relocate(relocs);
-                                fr.listing = listingToDTO(listingObj);
-                            }
-                        }
-                    }
-                }
-
-                String linkedObjText = Files.readString(file.toPath());
-                Loader.loadSection(executorSic.machine, new StringReader(linkedObjText));
-
-            } catch (LinkerError le) {
-                for (FileLoadResult fr : aggregate.files) {
-                    if (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) {
-                        fr.listing = null;
-                        LinkerErrorDto leDto = new LinkerErrorDto();
-                        leDto.phase = "linker";
-                        leDto.msg = le.getMessage();
-                        fr.linkerError = leDto;
-                    }
-                }
-                aggregate.ok = false;
-                aggregate.message = "Linking failed : " + le.getMessage();
-                aggregate.registers = snapshotRegistersSic();
-                return gson.toJson(aggregate);
-            } catch (IOException ioe) {
-                for (FileLoadResult fr : aggregate.files) {
-                    if (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) {
-                        fr.listing = null;
-                        LinkerErrorDto leDto = new LinkerErrorDto();
-                        leDto.phase = "io";
-                        leDto.msg = ioe.getMessage();
-                        fr.linkerError = leDto;
-                    }
-                }
-                aggregate.ok = false;
-                aggregate.message = "I/O error during linking: " + ioe.getMessage();
-                aggregate.registers = snapshotRegistersSic();
-                return gson.toJson(aggregate);
+        // === NO LINKER ===
+        if (multi && !anyCompileErrors && !builtObjTexts.isEmpty()) {
+            // Load all sections; only set PC for the one whose name matches mainSymbol (if provided)
+            for (String objText : builtObjTexts) {
+                // When mainSymbol is null, Loader.loadSection will not set PC (because we pass non-null)
+                // but the requirement is: in multi-file mode pass 'mainSymbol' (possibly null).
+                // If mainSymbol is null here, loader will set PC for EVERY file if we pass null,
+                // but the spec says: use mainSymbol parameter. So pass it through.
+                Loader.loadSection(executorSic.machine, new StringReader(objText), mainSymbol);
             }
         }
 
@@ -357,35 +309,97 @@ public class SicSimulation extends SicxeSimulation {
     @Override
     public String memory(int start) { return memory(start, null); }
 
+    // Dump 0x1000..0x1038 (inclusive) in 16-byte rows, hex
+    private void debugDumpWindow1000() {
+        final int start = 0x1000;
+        final int end   = 0x1038; // inclusive
+        int addr = start;
+
+        while (addr <= end) {
+            int lineStart = addr;
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("[SIC][memory] DUMP 0x%06X:", lineStart));
+
+            for (int i = 0; i < 16 && addr <= end; i++, addr++) {
+                int v = machineSic.memory.getByteRaw(addr) & 0xFF;
+                sb.append(' ').append(String.format("%02X", v));
+            }
+            System.out.println(sb.toString());
+        }
+    }
     @Override
     public String memory(int start, Integer endInclusive) {
+        // --- Debug: log the request ---
+        System.out.printf("[SIC][memory] request start=%d (0x%06X), endInclusive=%s%n",
+                start, start, (endInclusive == null ? "null" : String.format("%d (0x%06X)", endInclusive, endInclusive)));
+
         try {
             if (endInclusive == null) {
+                int val = machineSic.memory.getByteRaw(start) & 0xFF;
+
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("address", start);
-                r.put("value", machineSic.memory.getByteRaw(start) & 0xFF);
-                return gson.toJson(r);
+                r.put("value", val);
+
+                String json = gson.toJson(r);
+
+                // --- Debug: log the response (single byte) ---
+                System.out.printf("[SIC][memory] response SINGLE address=%d (0x%06X), value=%d (0x%02X)%n",
+                        start, start, val, val);
+
+                // --- Always dump window 0x1000..0x1038 ---
+                debugDumpWindow1000();
+
+                return json;
             } else {
                 int s = Math.min(start, endInclusive);
                 int e = Math.max(start, endInclusive);
                 int len = e - s + 1;
+
                 int[] vals = new int[len];
                 for (int i = 0; i < len; i++) {
                     vals[i] = machineSic.memory.getByteRaw(s + i) & 0xFF;
                 }
+
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("start", s);
                 r.put("end", e);
                 r.put("values", vals);
-                return gson.toJson(r);
+
+                String json = gson.toJson(r);
+
+                // --- Debug: log the response (range) with a short hex preview ---
+                int preview = Math.min(len, 16);
+                StringBuilder hexPreview = new StringBuilder();
+                for (int i = 0; i < preview; i++) {
+                    if (i > 0) hexPreview.append(' ');
+                    hexPreview.append(String.format("%02X", vals[i]));
+                }
+                if (len > preview) hexPreview.append(" ...");
+
+                System.out.printf("[SIC][memory] response RANGE %d..%d (0x%06X..0x%06X), len=%d, first %d bytes (hex)=%s%n",
+                        s, e, s, e, len, preview, hexPreview.toString());
+
+                // --- Always dump window 0x1000..0x1038 ---
+                debugDumpWindow1000();
+
+                return json;
             }
         } catch (Exception ex) {
             Map<String, Object> err = new LinkedHashMap<>();
             err.put("ok", false);
             err.put("message", "Memory read failed: " + ex.getMessage());
-            return gson.toJson(err);
+
+            String json = gson.toJson(err);
+
+            // --- Debug: log the error and still dump the window for context ---
+            System.out.printf("[SIC][memory] ERROR: %s%n", ex.getMessage());
+            debugDumpWindow1000();
+
+            return json;
         }
     }
+
 
     @Override
     public String step() {

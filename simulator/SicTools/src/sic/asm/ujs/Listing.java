@@ -87,26 +87,23 @@ public class Listing extends WriteVisitor {
         }
     }
 
-    // Extract nixbpe as "nixbpe" (6 chars) from raw hex like "17202D  ".
-    // Returns "000000" if input is null/too short to contain first two bytes.
+    // Pure SIC listing flags: show "00x---".
+    // - ni: always "00" in SIC (placeholders in opcode low bits)
+    // - x : real flag from byte1 bit7
+    // - bpe: placeholders that do not exist in SIC encoding → "---"
     private static String flagsFromCode(String code) {
-        if (code == null) return "000000";
+        if (code == null) return "000---"; // ni=00, x=0, bpe=---
         String hex = code.replaceAll("\\s+", "");
-        if (hex.length() < 4) return "000000";
+        if (hex.length() < 4) return "000---";
         try {
-            int b0 = Integer.parseInt(hex.substring(0, 2), 16) & 0xFF;
             int b1 = Integer.parseInt(hex.substring(2, 4), 16) & 0xFF;
-            int n = (b0 >> 1) & 0x1;
-            int i =  b0       & 0x1;
-            int x = (b1 >> 7) & 0x1;
-            int b = (b1 >> 6) & 0x1;
-            int p = (b1 >> 5) & 0x1;
-            int e = (b1 >> 4) & 0x1;
-            return new StringBuilder(6).append(n).append(i).append(x).append(b).append(p).append(e).toString();
+            int x  = (b1 >> 7) & 0x1;  // only X is meaningful in SIC
+            return "00" + x + "---";  // ni + x + bpe
         } catch (NumberFormatException e) {
-            return "000000";
+            return "000---";
         }
     }
+
 
     // Convert a hex string like "17202D  " to spaced 8-bit binary per byte: "00010111 00100000 00101101".
     // Returns "" if input is null/invalid.

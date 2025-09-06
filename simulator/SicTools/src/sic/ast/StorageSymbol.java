@@ -6,14 +6,18 @@ import sic.ast.storage.StorageRes;
 
 import static sic.common.Opcode.*;
 
+/**
+ * Symbol describing storage (BYTE/RESB, WORD/RESW).
+ * Pure SIC: no float storage (FLOT/RESF).
+ */
 public class StorageSymbol extends Symbol {
 
     public enum DataType {
-        BYTE, WORD, FLOAT
+        BYTE, WORD, FLOAT // keep FLOAT to avoid downstream enum references; never assigned in pure SIC
     }
 
     private DataType dataType;
-    private Integer elementSize; // Size of single element in watch; B=1, W=3, F=6
+    private Integer elementSize; // B=1, W=3 (FLOAT unused in pure SIC)
     private Integer elementCount;
 
     public StorageSymbol(String name, Location loc, int value, Command command) {
@@ -21,37 +25,31 @@ public class StorageSymbol extends Symbol {
         bindCommand(command);
     }
 
-    /**
-     * Represents the size of single element (single byte, word, or float)
-     */
+    /** Size of a single element (bytes). */
     public Integer getElementSize() {
         return elementSize;
     }
 
-    /**
-     * Represents the amount of elements; RESW 20 -> count = 20
-     */
+    /** Number of elements (e.g., RESW 20 -> 20). */
     public Integer getElementCount() {
         return elementCount;
     }
 
-    /**
-     * The type that this symbol represents (byte, float, word...)
-     */
+    /** Data kind (BYTE/WORD). */
     public DataType getDataType() {
         return dataType;
     }
 
     /**
-     * Extract the information from the command and update the state.
-     * @param command The command after the label
-     * @return Whether given command was related to data
+     * Extracts info from the following command if it is a storage directive.
+     * @return true if command denotes data storage we understand.
      */
     private boolean bindCommand(Command command) {
         if (!(command instanceof StorageRes || command instanceof StorageData)) {
             return false;
         }
 
+        boolean matched = true;
         switch (command.mnemonic.opcode) {
             case BYTE:
             case RESB:
@@ -63,24 +61,23 @@ public class StorageSymbol extends Symbol {
                 dataType = DataType.WORD;
                 elementSize = 3;
                 break;
-            case FLOT:
-            case RESF:
-                dataType = DataType.FLOAT;
-                elementSize = 6;
-                break;
+            default:
+                matched = false; // (FLOT/RESF removed in pure SIC; anything else is unknown)
         }
 
-        elementCount = command.size() / elementSize;
+        if (matched) {
+            elementCount = elementSize != null && elementSize > 0 ? (command.size() / elementSize) : null;
+        } else {
+            dataType = null;
+            elementSize = null;
+            elementCount = null;
+        }
 
-        return true;
+        return matched;
     }
 
-    /**
-     * Represent only as name so it's nicer in the TreeTable view.
-     */
     @Override
     public String toString() {
         return super.name;
     }
-
 }

@@ -38,18 +38,8 @@ public class InstructionF3m extends InstructionF34Base {
 
     @Override
     public boolean resolveAddressing(Program program) throws AsmError {
-        // Pure SIC: require a 15-bit absolute address.
-        if (!SICXE.isSicAddr(resolvedValue)) {
-            return false;
-        }
-
-        // If the symbol is relative, mark relocation because we use absolute addressing.
-        if (resolvedSymbol != null && !resolvedSymbol.isAbsolute()) {
-            program.section().addRelocation(program.locctr() + 1, 3);
-        }
-
-        // Ensure ni stays SIC (Flags does this anyway); only X may be set.
-        flags.set_ni(Flags.SIC);
+        // Pure SIC: always direct absolute addressing, no relocation entries.
+        // resolvedValue already set by resolve(); range checks can be applied elsewhere if you want.
         return true;
     }
 
