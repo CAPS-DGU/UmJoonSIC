@@ -18,7 +18,7 @@ interface RunningState {
   setIsRunning: (isRunning: boolean) => void;
   toggleIsRunning: () => void;
   fetchBegin: () => void;
-  fetchLoad: () => void;
+  fetchLoad: () => Promise<void>;
   setLoadedFiles: (files: LoadedFile[]) => void;
   loadToListfileAndWatch: () => void;
   stopRunning: () => void;
@@ -206,12 +206,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   },
   stopRunning: async () => {
     const { clearListFile } = useListFileStore.getState();
+    const { closeAllListFileTabs } = useEditorTabStore.getState();
     const { clearWatch } = useWatchStore.getState();
     const { mode } = useMemoryViewStore.getState();
     const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
     const data = res.data;
     if (data.ok) {
       clearListFile();
+      closeAllListFileTabs();
       clearWatch();
       set({ isRunning: false, isReady: false, loadedFiles: [] });
     } else {

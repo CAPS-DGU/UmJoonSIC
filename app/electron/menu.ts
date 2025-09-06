@@ -1,5 +1,6 @@
 // electron/menu.ts
-import { shell } from 'electron';
+import { BrowserWindow } from 'electron';
+import path from 'path';
 
 export const menuList = [
   {
@@ -90,9 +91,21 @@ export const menuList = [
     label: 'Help',
     submenu: [
       {
-        label: 'Learn More',
+        label: 'About UmJoonSIC',
         click: async () => {
-          await shell.openExternal('https://www.dongguk.edu/');
+          const splash = new BrowserWindow({
+            width: 500,
+            height: 300,
+            autoHideMenuBar: true,
+            frame: false,
+            resizable: false,
+            alwaysOnTop: true,
+            skipTaskbar: true,
+            fullscreenable: false,
+            maximizable: false,
+          });
+          splash.loadFile(path.join(__dirname, '../renderer/about.html'))
+
         },
       },
     ],

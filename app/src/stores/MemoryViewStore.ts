@@ -45,9 +45,8 @@ interface MemoryViewState {
   setMemoryValues: (memoryValues: MemoryNodeData[]) => void;
   setLabels: (labels: MemoryLabel[]) => void;
   updateMemoryNode: (index: number, patch: MemoryNodeData) => void;
-  clearChangedNodes: () => void;
-  fetchMemoryValues: () => void;
-
+  clearChangedNodes: () => void; // 변경된 노드 목록 초기화
+  fetchMemoryValues: () => Promise<void>;
   setVisibleRange: (range: { start: number; end: number }) => void;
   setTotalMemorySize: (size: number) => void;
   loadMemoryRange: (start: number, end: number) => Promise<void>;
