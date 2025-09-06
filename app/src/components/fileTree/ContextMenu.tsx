@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import type { FileStructure } from '@/hooks/useFileTree';
+import type { FileStructure } from '@/types/fileTree';
 
 interface Props {
   x: number;

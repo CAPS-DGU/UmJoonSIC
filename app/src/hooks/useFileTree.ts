@@ -1,13 +1,5 @@
 import { useMemo } from 'react';
-
-export type FileItem = { type: 'file'; name: string; relativePath: string };
-export type FolderItem = {
-  type: 'folder';
-  name: string;
-  children: FileStructure[];
-  relativePath: string;
-};
-export type FileStructure = FileItem | FolderItem;
+import type { FileStructure } from '@/types/fileTree';
 
 type IntermediateFileNode = { __type: 'file' };
 type IntermediateFolderNode = { __type: 'folder'; __children: Record<string, IntermediateNode> };
@@ -17,11 +9,11 @@ function normalizePath(path: string) {
   return path.replace(/\\/g, '/'); // 윈도우 경로 → POSIX 스타일
 }
 
-function convertToFileStructure(fileTree: string[]): FileStructure[] {
+function convertToFileStructure(fileTree: FileStructure[]): FileStructure[] {
   const root: Record<string, IntermediateNode> = {};
 
-  fileTree.forEach(originalPath => {
-    const path = normalizePath(originalPath);
+  fileTree.forEach(file => {
+    const path = normalizePath(file.relativePath);
     const isFolder = path.endsWith('/');
     const parts = path.split('/').filter(Boolean);
 
@@ -70,6 +62,6 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
   return toFileStructure(root);
 }
 
-export function useFileTree(fileTree: string[]) {
+export function useFileTree(fileTree: FileStructure[]) {
   return useMemo(() => convertToFileStructure(fileTree), [fileTree]);
 }

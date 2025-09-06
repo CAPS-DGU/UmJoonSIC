@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { FilePlus, FolderPlus, RefreshCcw } from 'lucide-react';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
-import { useFileTree, type FileStructure } from '@/hooks/useFileTree';
+
+import { useFileTree } from '@/hooks/useFileTree';
+import type { FileStructure } from '@/types/fileTree';
 
 import { FileTreeItem } from '@/components/fileTree/FileTreeItem';
 import { ContextMenu } from '@/components/fileTree/ContextMenu';
@@ -98,9 +100,11 @@ export default function SideBar() {
         open={newFileDialogOpen}
         onOpenChange={setNewFileDialogOpen}
         currentFolder={
-          selectedFileOrFolder.endsWith('/')
-            ? selectedFileOrFolder.slice(0, -1) // 폴더 선택이면 그대로
-            : selectedFileOrFolder // 파일 선택이면 그 파일이 있는 폴더
+          selectedFileOrFolder
+            ? selectedFileOrFolder.type === 'folder'
+              ? selectedFileOrFolder.relativePath.slice(0, -1) // 폴더라면 마지막 슬래시 제거
+              : selectedFileOrFolder.relativePath.replace(/\/[^/]+$/, '') // 파일이라면 파일명 제거
+            : '' // 선택된 것이 없으면 빈 문자열
         }
         onFileCreated={() => {
           refreshFileTree(); // 생성 후 파일 트리 갱신

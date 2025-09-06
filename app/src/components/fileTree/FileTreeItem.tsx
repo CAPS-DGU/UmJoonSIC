@@ -1,11 +1,9 @@
 import { ChevronDown, ChevronRight, File, Folder, Settings, List } from 'lucide-react';
-import type { FileStructure } from '@/hooks/useFileTree';
+import type { FileStructure } from '@/types/fileTree';
 
 type StyleRule = (item: FileStructure) => string;
 
-const makeStyleRules = (selected: string, projectFiles: string[]): StyleRule[] => [
-  // 선택된 파일 → 배경
-  item => (selected === item.relativePath ? 'bg-gray-100' : ''),
+const makeStyleRules = (projectFiles: string[]): StyleRule[] => [
   // 프로젝트에 포함된 파일 → 파란색
   item => (projectFiles.includes(item.relativePath) ? 'text-blue-600' : ''),
   // .out 또는 linker 폴더 → 주황색
@@ -19,8 +17,8 @@ interface Props {
   item: FileStructure;
   expanded: Record<string, boolean>;
   toggleFolder: (name: string) => void;
-  selected: string;
-  onSelect: (path: string) => void;
+  selected: FileStructure | null;
+  onSelect: (item: FileStructure) => void;
   onOpenFile: (item: FileStructure) => void;
   onContextMenu: (e: React.MouseEvent, item: FileStructure) => void;
   projectFiles: string[];
@@ -38,12 +36,15 @@ export function FileTreeItem({
 }: Props) {
   if (item.type === 'folder') {
     const isOpen = expanded[item.name];
+
+    console.log('Selected:', selected?.relativePath);
+    console.log('Current Folder:', item.relativePath);
     return (
       <div>
         <div
-          className={`flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200 ${selected === item.relativePath + '/' ? 'bg-gray-100' : ''}`}
+          className={`flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200 ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}`}
           onClick={() => {
-            onSelect(item.relativePath + '/');
+            onSelect(item);
             toggleFolder(item.name);
           }}
           onContextMenu={e => onContextMenu(e, item)}
@@ -58,12 +59,12 @@ export function FileTreeItem({
           <Folder
             width={16}
             height={16}
-            className={makeStyleRules(selected, projectFiles)
+            className={makeStyleRules(projectFiles)
               .map(rule => rule(item))
               .join(' ')}
           />
           <span
-            className={`font-semibold ${makeStyleRules(selected, projectFiles)
+            className={`font-semibold ${makeStyleRules(projectFiles)
               .map(rule => rule(item))
               .join(' ')}`}
           >
@@ -101,16 +102,16 @@ export function FileTreeItem({
 
   return (
     <div
-      className={`pl-7 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer ${selected === item.relativePath ? 'bg-gray-100' : ''}`}
+      className={`pl-7 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}`}
       onClick={() => {
-        onSelect(item.relativePath);
+        onSelect(item);
         onOpenFile(item); // 클릭 시 바로 열기
       }}
       onContextMenu={e => onContextMenu(e, item)}
     >
       {getFileIcon(item.name)}
       <span
-        className={`${makeStyleRules(selected, projectFiles)
+        className={`${makeStyleRules(projectFiles)
           .map(rule => rule(item))
           .join(' ')}`}
       >
