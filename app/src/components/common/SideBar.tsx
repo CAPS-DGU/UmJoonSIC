@@ -9,8 +9,8 @@ import {
   Folder,
   FilePlus,
   Settings,
-  List, // Import the List icon for .lst files
-  Trash2, // Import the Trash icon for delete functionality
+  List,
+  Trash2,
 } from 'lucide-react';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 
@@ -29,14 +29,27 @@ type FolderItem = {
 
 type FileStructure = FileItem | FolderItem;
 
+// ADDED: 'any' 대신 사용할 중간 트리 구조에 대한 명시적 타입 선언
+type IntermediateFileNode = {
+  __type: 'file';
+};
+
+type IntermediateFolderNode = {
+  __type: 'folder';
+  __children: Record<string, IntermediateNode>;
+};
+
+type IntermediateNode = IntermediateFileNode | IntermediateFolderNode;
+
 function convertToFileStructure(fileTree: string[]): FileStructure[] {
-  const root: Record<string, any> = {};
+  // CHANGED: 'any' 대신 IntermediateNode 타입을 사용
+  const root: Record<string, IntermediateNode> = {};
 
   fileTree.forEach(path => {
     const isFolder = path.endsWith('/');
     const parts = path.split('/').filter(Boolean);
 
-    let current = root;
+    let current: Record<string, IntermediateNode> = root;
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const isLast = i === parts.length - 1;
@@ -55,35 +68,53 @@ function convertToFileStructure(fileTree: string[]): FileStructure[] {
         if (!current[part]) {
           current[part] = { __type: 'folder', __children: {} };
         }
-        current = current[part].__children;
+        // CHANGED: 타입 단언을 통해 타입 안정성 확보
+        current = (current[part] as IntermediateFolderNode).__children;
       }
     }
   });
 
-  function toFileStructure(obj: Record<string, any>, parentPath = ''): FileStructure[] {
-    return Object.entries(obj).map(([name, value]) => {
-      const currentPath = parentPath ? `${parentPath}/${name}` : name;
-      if (value.__type === 'folder') {
-        return {
-          type: 'folder',
-          name,
-          children: toFileStructure(value.__children, currentPath),
-          relativePath: currentPath,
-        };
-      } else {
-        return {
-          type: 'file',
-          name,
-          relativePath: currentPath,
-        };
-      }
-    });
+  // CHANGED: 'any' 대신 IntermediateNode 타입을 사용
+  function toFileStructure(
+    obj: Record<string, IntermediateNode>,
+    parentPath = '',
+  ): FileStructure[] {
+    return (
+      Object.entries(obj)
+        .map(([name, value]): FileStructure => {
+          const currentPath = parentPath ? `${parentPath}/${name}` : name;
+          if (value.__type === 'folder') {
+            return {
+              type: 'folder',
+              name,
+              // 재귀 호출
+              children: toFileStructure(value.__children, currentPath),
+              relativePath: currentPath,
+            };
+          } else {
+            return {
+              type: 'file',
+              name,
+              relativePath: currentPath,
+            };
+          }
+        })
+        // ADDED: 정렬 로직 추가
+        .sort((a, b) => {
+          // 폴더가 파일보다 먼저 오도록 정렬
+          if (a.type === 'folder' && b.type === 'file') return -1;
+          if (a.type === 'file' && b.type === 'folder') return 1;
+          // 같은 타입끼리는 이름순으로 정렬
+          return a.name.localeCompare(b.name);
+        })
+    );
   }
 
   return toFileStructure(root);
 }
 
 export default function SideBar() {
+  console.log('SideBar rendered');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
@@ -111,7 +142,6 @@ export default function SideBar() {
   } = useProjectStore();
   const { tabs, addTab, closeTab } = useEditorTabStore();
 
-  // Add the new file to the dummy data
   const dummyFileTree = [...fileTree];
 
   const fileTreeStructure: FileStructure[] = convertToFileStructure(dummyFileTree);
@@ -197,7 +227,6 @@ export default function SideBar() {
     }
   }, [isCreatingFile]);
 
-  // 삭제 확인 다이얼로그
   const confirmDelete = (item: FileStructure): boolean => {
     const itemName = item.name;
     const itemType = item.type === 'file' ? '파일' : '폴더';
@@ -213,7 +242,6 @@ export default function SideBar() {
     }
   };
 
-  // 파일/폴더 삭제 함수
   const handleDelete = async (item: FileStructure) => {
     if (!confirmDelete(item)) {
       return;
@@ -223,8 +251,6 @@ export default function SideBar() {
       let result;
       if (item.type === 'file') {
         result = await window.api.deleteFile(projectPath, item.relativePath);
-
-        // 삭제된 파일이 열려있는 탭이 있다면 닫기
         const tabToRemove = tabs.find(tab => tab.filePath === item.relativePath);
         setSettings({
           asm: settings.asm.filter(
@@ -237,8 +263,6 @@ export default function SideBar() {
         }
       } else {
         result = await window.api.deleteFolder(projectPath, item.relativePath);
-
-        // 삭제된 폴더 내의 파일들이 열려있는 탭들을 닫기
         const tabsToRemove = tabs.filter(tab => tab.filePath.startsWith(item.relativePath));
         tabsToRemove.forEach(tab => closeTab(tab.idx));
         setSettings({
@@ -249,7 +273,6 @@ export default function SideBar() {
 
       if (result.success) {
         refreshFileTree();
-        // 선택된 항목이 삭제된 항목이었다면 선택 해제
         if (
           selectedFileOrFolder === item.relativePath ||
           (item.type === 'folder' && selectedFileOrFolder === item.relativePath + '/')
@@ -264,12 +287,10 @@ export default function SideBar() {
     }
   };
 
-  // 키보드 이벤트 핸들러
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Delete' && selectedFileOrFolder) {
       e.preventDefault();
 
-      // 선택된 항목 찾기
       const findItem = (items: FileStructure[]): FileStructure | null => {
         for (const item of items) {
           if (item.type === 'folder') {
@@ -294,7 +315,6 @@ export default function SideBar() {
     }
   };
 
-  // 우클릭 컨텍스트 메뉴 핸들러
   const handleContextMenu = (e: React.MouseEvent, item: FileStructure) => {
     e.preventDefault();
     setContextMenu({
@@ -305,12 +325,10 @@ export default function SideBar() {
     });
   };
 
-  // 컨텍스트 메뉴 닫기
   const closeContextMenu = () => {
     setContextMenu({ show: false, x: 0, y: 0, item: null });
   };
 
-  // 전역 클릭 이벤트로 컨텍스트 메뉴 닫기
   useEffect(() => {
     const handleClickOutside = () => closeContextMenu();
     document.addEventListener('click', handleClickOutside);
@@ -327,9 +345,10 @@ export default function SideBar() {
               className={`flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200 ${
                 selectedFileOrFolder === item.relativePath + '/' ? 'bg-gray-100' : ''
               }`}
-              onDoubleClick={() => toggleFolder(item.name)}
+              // CHANGED: onClick 핸들러에 toggleFolder 추가, onDoubleClick 제거
               onClick={() => {
                 setSelectedFileOrFolder(item.relativePath + '/');
+                toggleFolder(item.name); // 단일 클릭으로 폴더 열기/닫기
               }}
               onContextMenu={e => handleContextMenu(e, item)}
             >
@@ -352,7 +371,6 @@ export default function SideBar() {
         if (fileName.toLowerCase() === 'project.sic') {
           return <Settings width={16} height={16} />;
         }
-        // Check for .lst extension and return the new icon
         if (fileName.toLowerCase().endsWith('.lst')) {
           return <List width={16} height={16} />;
         }
@@ -466,7 +484,6 @@ export default function SideBar() {
         )}
       </div>
 
-      {/* 컨텍스트 메뉴 */}
       {contextMenu.show && contextMenu.item && (
         <div
           className="fixed bg-white border border-gray-300 rounded shadow-lg z-50"
