@@ -5,8 +5,11 @@ import axios from 'axios';
 import { useListFileStore, type ListFileRow } from './ListFileStore';
 import { useWatchStore } from './pannel/WatchStore';
 import { useRegisterStore } from './RegisterStore';
-import { useEditorTabStore } from './EditorTabStore';
+import { useEditorTabStore, type EditorTab } from './EditorTabStore';
 import { useMemoryViewStore } from './MemoryViewStore';
+import { useErrorStore } from './pannel/ErrorStore';
+import type { AssemblerError, LinkerError } from '@/types/DTO';
+import { toProjectRelativePath } from '@/lib/file-name';
 
 interface RunningState {
   isRunning: boolean;
@@ -15,7 +18,7 @@ interface RunningState {
   setIsRunning: (isRunning: boolean) => void;
   toggleIsRunning: () => void;
   fetchBegin: () => void;
-  fetchLoad: () => void;
+  fetchLoad: () => Promise<void>;
   setLoadedFiles: (files: LoadedFile[]) => void;
   loadToListfileAndWatch: () => void;
   stopRunning: () => void;
@@ -60,8 +63,8 @@ interface Listing {
 interface LoadedFile {
   fileName: string;
   listing: Listing;
-  compileErrors: string[] | null;
-  linkerError: string | null;
+  assemblerErrors?: AssemblerError[];
+  linkerErrors?: LinkerError[];
 }
 
 export const useRunningStore = create<RunningState>((set, get) => ({
@@ -72,7 +75,9 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   toggleIsRunning: () => set(state => ({ isRunning: !state.isRunning })),
   setLoadedFiles: (files: LoadedFile[]) => set({ loadedFiles: files }),
   fetchBegin: async () => {
-    const res = await axios.post('http://localhost:9090/begin');
+    const { mode } = useMemoryViewStore.getState();
+    console.log('mode: ', mode);
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
     const data = res.data;
     if (data.ok) {
       set({ isReady: true });
@@ -84,6 +89,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { projectPath, settings } = useProjectStore.getState();
     const { setMemoryRange } = useMemoryViewStore.getState();
     const { fetchBegin, loadToListfileAndWatch, stopRunning } = get();
+    const { addErrors, clearErrors } = useErrorStore.getState();
+
     await fetchBegin();
     const res = await axios.post('http://localhost:9090/load', {
       filePaths: settings.asm.map(file => path.join(projectPath, file)),
@@ -91,8 +98,10 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       main: settings.main == '' ? undefined : settings.main,
     });
     const data = res.data;
-    console.log(data);
+    console.log('load response: ', data);
+
     if (data.ok) {
+      clearErrors(undefined, 'load'); // 이전 load 에러 정리
       const { setAll } = useRegisterStore.getState();
       setAll(data.registers);
       const files: LoadedFile[] = data.files;
@@ -103,8 +112,62 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       set({ loadedFiles: files });
       loadToListfileAndWatch();
     } else {
-      console.error('Failed to load');
-      stopRunning();
+      // 실패 → 에러 스토어에 기록
+      try {
+        const files: LoadedFile[] = data.files;
+        const { addTab, setActiveTab } = useEditorTabStore.getState();
+
+        files.forEach(file => {
+          if (file.assemblerErrors?.length) {
+            addErrors(
+              file.fileName,
+              file.assemblerErrors.map(err => ({
+                row: err.row,
+                col: err.col,
+                length: err.length,
+                message: err.message,
+                type: 'load',
+              })),
+            );
+          }
+        });
+
+        const firstErrorFile = files
+          .map(file => {
+            if (file.assemblerErrors?.length) {
+              return { file, err: file.assemblerErrors[0] };
+            }
+            return null;
+          })
+          .find(Boolean); // null이 아닌 첫 번째 요소 반환
+
+        if (firstErrorFile) {
+          const { file, err } = firstErrorFile;
+          const tabs = useEditorTabStore.getState().tabs as EditorTab[];
+
+          const tabExists = tabs.find(t => t.filePath === file.fileName);
+          const relativeFileName = toProjectRelativePath(projectPath, file.fileName);
+          if (!tabExists) {
+            addTab({
+              idx: tabs.length,
+              title: relativeFileName.split('/').pop()!,
+              filePath: relativeFileName,
+              isModified: false,
+              isActive: true,
+              fileContent: '',
+              breakpoints: [],
+              cursor: { line: err.row, column: err.col },
+            });
+          }
+
+          const tabIdx = tabs.findIndex(t => t.filePath === file.fileName);
+          if (tabIdx !== -1) setActiveTab(tabIdx);
+        }
+
+        stopRunning();
+      } catch (e) {
+        console.error('Failed to parse load error response', e);
+      }
     }
   },
   loadToListfileAndWatch: async () => {
@@ -143,11 +206,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   },
   stopRunning: async () => {
     const { clearListFile } = useListFileStore.getState();
+    const { closeAllListFileTabs } = useEditorTabStore.getState();
     const { clearWatch } = useWatchStore.getState();
-    const res = await axios.post('http://localhost:9090/begin');
+    const { mode } = useMemoryViewStore.getState();
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
     const data = res.data;
     if (data.ok) {
       clearListFile();
+      closeAllListFileTabs();
       clearWatch();
       set({ isRunning: false, isReady: false, loadedFiles: [] });
     } else {
