@@ -15,6 +15,7 @@ export default function Debug() {
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
+  const [isExecuting, setIsExecuting] = useState(false);
   
   const delay = async (time: number) => {
     await new Promise(resolve => setTimeout(resolve, time));
@@ -31,6 +32,7 @@ export default function Debug() {
     await fetchLoad();
     console.log('run with delay toggleIsRunning', isRunning);
     toggleIsRunning();
+    setIsExecuting(true);
     await fetchMemory();
     fetchVarMemoryValue();
     console.log('run with delay start', useRunningStore.getState().isRunning);
@@ -116,7 +118,7 @@ export default function Debug() {
         <RegisterValue />
       </section>
       <section className="border-b border-gray-200 py-3">
-        <MemoryViewer />
+        <MemoryViewer isExecuting={isExecuting} />
       </section>
     </div>
   );
