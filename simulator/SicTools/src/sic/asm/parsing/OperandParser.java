@@ -2,25 +2,32 @@ package sic.asm.parsing;
 
 import sic.asm.AsmError;
 import sic.asm.Location;
-import sic.asm.Options;
 import sic.ast.Command;
 import sic.ast.data.*;
 import sic.ast.directives.*;
 import sic.ast.expression.Expr;
+import sic.ast.expression.ExprInt;
+import sic.ast.expression.ExprSym;
 import sic.ast.instructions.*;
 import sic.ast.storage.StorageData;
 import sic.ast.storage.StorageRes;
 import sic.common.Flags;
 import sic.common.Mnemonic;
 import sic.common.Opcode;
+import sic.common.SICXE;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Support for parsing of instruction operands.
- *
- * @author jure
+ * Operand parsing for pure SIC.
+ * Supported:
+ *   - F3 (no operand) and F3m (mem, optional ,X)
+ *   - Directives: START (hex digits), END (empty or one symbol), RESB/RESW, BYTE, WORD
+ * Not supported (removed):
+ *   - F1, F2*, F4m
+ *   - BASE/NOBASE/ORG/LTORG/EQU/USE/CSECT/EXTDEF/EXTREF
+ *   - '#' '@' immediate/indirect, '*' location counter
  */
 public class OperandParser {
 
@@ -36,7 +43,7 @@ public class OperandParser {
         parser.checkWhitespace("Missing whitespace after mnemonic '%s'", name);
     }
 
-    // Helper tuple to return names + locations together
+    // Helper tuple to return names + locations together (kept in case other callers rely)
     private static final class Symbols {
         final List<String> names;
         final List<Location> locs;
@@ -46,33 +53,55 @@ public class OperandParser {
         }
     }
 
-    private Symbols parseSymbols(int maxLength) throws AsmError {
-        List<String> names = new ArrayList<>();
-        List<Location> locs = new ArrayList<>();
+    // ===== PURE-SIC helpers =====
 
-        do {
-            Location startLoc = parser.loc();
-            String sym = parser.readSymbol();
-            Location postLoc = parser.loc();
-
-            if (sym.length() > maxLength) {
-                throw new AsmError(startLoc, sym.length(), "Symbol name '%s' too long", sym);
-            }
-
-            int len = postLoc.row == startLoc.row
-                    ? Math.max(1, postLoc.col - startLoc.col)
-                    : Math.max(1, sym.length());
-
-            startLoc.length = len;
-
-            names.add(sym);
-            locs.add(startLoc);
-
-        } while (parser.skipIfComma());
-
-        return new Symbols(names, locs);
+    private static boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') ||
+                (c >= 'A' && c <= 'F') ||
+                (c >= 'a' && c <= 'f');
     }
 
+    /** START operand: plain HEX digits (no 0x prefix). */
+    private Expr parseStartHexExprRequired() throws AsmError {
+        parser.skipWhitespace();
+        Location start = parser.loc();
+        StringBuilder sb = new StringBuilder();
+
+        while (isHexDigit(parser.peek())) {
+            char ch = parser.peek();
+            // consume this character
+            parser.advanceIf(ch);
+            sb.append(ch);
+        }
+
+        if (sb.length() == 0) {
+            throw new AsmError(start, 1, "HEX address expected for START");
+        }
+
+        int value;
+        try {
+            value = Integer.parseInt(sb.toString(), 16);
+        } catch (NumberFormatException e) {
+            throw new AsmError(start, sb.length(), "Invalid HEX address '%s' for START", sb);
+        }
+
+        Location end = parser.loc();
+        start.length = Math.max(1, end.col - start.col);
+        return new ExprInt(start, value);
+    }
+
+    /** END operand: empty or a single symbol (entry point). */
+    private Expr parseEndOperand() throws AsmError {
+        parser.skipWhitespace();
+        // allow empty
+        if (!Character.isLetter(parser.peek()) && parser.peek() != '_') {
+            return null;
+        }
+        Location loc = parser.loc();
+        String sym = parser.readSymbol();
+        loc.length = Math.max(1, parser.loc().col - loc.col);
+        return new ExprSym(loc, sym);
+    }
 
     private Expr parseExpression(boolean throwIfNull) throws AsmError {
         Expr expr = parser.expressionParser.parseExpression();
@@ -83,29 +112,35 @@ public class OperandParser {
 
     public Data parseData(int opcode, boolean allowList) throws AsmError {
         Data data;
-        switch (parser.peek()) {
-            case 'C': data = new DataChr(opcode); break;
-            case 'X': data = new DataHex(opcode); break;
-            case 'F': data = new DataFloat(opcode); break;
-            default: data = new DataNum(opcode); break;
+
+        if (opcode == Opcode.BYTE) {
+            // BYTE: only C'..' or X'..'
+            char c = parser.peek();
+            if (c == 'C') {
+                data = new DataChr(opcode);
+            } else if (c == 'X') {
+                data = new DataHex(opcode);
+            } else {
+                throw new AsmError(parser.loc(), 1, "BYTE requires C'..' or X'..'");
+            }
+        } else if (opcode == Opcode.WORD) {
+            data = new DataNum(opcode);
+        } else {
+            // Should not happen for pure SIC StorageData
+            data = new DataNum(opcode);
         }
+
         data.parse(parser, allowList);
         return data;
     }
 
     private Mnemonic parseLiteralSpec() {
-        Mnemonic mnm;
-        // WORD, FLOaT, or BYTE (default) literal
-        if (parser.advanceIf("BYTE") || parser.advanceIf('B'))
-            mnm = parser.mnemonics.get("BYTE");
-        else if (parser.advanceIf("FLOT") || parser.peek() == 'F')
-            mnm = parser.mnemonics.get("FLOT");
-        else {
-            mnm = parser.mnemonics.get("WORD");
-            parser.advanceIf("WORD"); // WORD is default
-            parser.advanceIf('W');
+        // Pure SIC literals: only BYTE (default). No WORD/FLOT.
+        if (parser.advanceIf("BYTE") || parser.advanceIf('B')) {
+            return parser.mnemonics.get("BYTE");
         }
-        return mnm;
+        // default to BYTE if no keyword
+        return parser.mnemonics.get("BYTE");
     }
 
     private StorageData parseLiteralData() throws AsmError {
@@ -133,197 +168,69 @@ public class OperandParser {
                 data, dataLoc);
     }
 
-    // operand parsing
+    // ===== instruction formats we keep =====
 
-    private Command parseF1(Location loc, String label, Location labelLoc,
-                            Mnemonic mnemonic, Location mnemonicLoc) {
-        return new InstructionF1(loc, label, labelLoc, mnemonic, mnemonicLoc);
-    }
-
-    private Command parseF2n(Location loc, String label, Location labelLoc,
-                             Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location numberLoc = parser.loc();
-        int n = parser.readInt(0, 15);
-        Location postNumberLoc = parser.loc();
-        numberLoc.length = postNumberLoc.col - numberLoc.col;
-        return new InstructionF2n(loc, label, labelLoc, mnemonic, mnemonicLoc, n, numberLoc);
-    }
-
-    private Command parseF2r(Location loc, String label, Location labelLoc,
-                             Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location registerLoc = parser.loc();
-        int r = parser.readRegister();
-        Location postRegisterLoc = parser.loc();
-        registerLoc.length = postRegisterLoc.col - registerLoc.col;
-        return new InstructionF2r(loc, label, labelLoc, mnemonic, mnemonicLoc, r, registerLoc);
-    }
-
-    private Command parseF2rn(Location loc, String label, Location labelLoc,
-                              Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location registerLoc = parser.loc();
-        int r = parser.readRegister();
-        Location postRegisterLoc = parser.loc();
-        registerLoc.length = postRegisterLoc.col - registerLoc.col;
-
-        parser.skipComma();
-
-        Location numberLoc = parser.loc();
-        int n = parser.readInt(1, 16);
-        Location postNumberLoc = parser.loc();
-        numberLoc.length = postNumberLoc.col - numberLoc.col;
-
-        return new InstructionF2rn(loc, label, labelLoc, mnemonic, mnemonicLoc, r, registerLoc, n, numberLoc);
-    }
-
-    private Command parseF2rr(Location loc, String label, Location labelLoc,
-                              Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location register1Loc = parser.loc();
-        int r1 = parser.readRegister();
-        Location postRegister1Loc = parser.loc();
-        register1Loc.length = postRegister1Loc.col - register1Loc.col;
-
-        parser.skipComma();
-
-        Location register2Loc = parser.loc();
-        int r2 = parser.readRegister();
-        Location postRegister2Loc = parser.loc();
-        register2Loc.length = postRegister2Loc.col - register2Loc.col;
-
-        return new InstructionF2rr(loc, label, labelLoc, mnemonic, mnemonicLoc, r1, register1Loc, r2,  register2Loc);
-    }
-
-    private Command parseF3(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
+    private Command parseF3(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) {
         return new InstructionF3(loc, label, labelLoc, mnemonic, mnemonicLoc);
     }
 
     private Command parseF3m(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
         checkWhitespace(mnemonic.name);
-        Flags flags = new Flags();
-        int operand;
-        String symbol;
-        // check if literal
+        Flags flags = new Flags(Flags.SIMPLE, Flags.NONE);
+
+        // literal?
         if (parser.advanceIf('=')) {
-            InstructionF34Base cmd = new InstructionF3m(loc, label, labelLoc, mnemonic, mnemonicLoc, new Flags(Flags.SIMPLE, Flags.NONE), 0, null, null);
+            InstructionF34Base cmd = new InstructionF3m(
+                    loc, label, labelLoc, mnemonic, mnemonicLoc,
+                    new Flags(Flags.SIMPLE, Flags.NONE), 0, null, null);
             StorageData lit = parseLiteralData();
             return new InstructionLiteral(cmd, lit);
         }
 
+        int operand = 0;
+        String symbol = null;
         Location symbolLoc = null;
+
         Location operandLoc = parser.loc();
-        // otherwise no literal: detect TA use
-        if (parser.advanceIf('#')) flags.set_ni(Flags.IMMEDIATE);
-        else if (parser.advanceIf('@')) flags.set_ni(Flags.INDIRECT);
-        else flags.set_ni(Flags.SIMPLE);
-        // read operand: number, symbol, '*'
-        if (Character.isDigit(parser.peek()) || parser.peek() == '-') {
-            operand = parser.readInt(flags.minOperand(), flags.maxOperand());
-            symbol = null;
+
+        // read operand: number (decimal) OR symbol
+        if (Character.isDigit(parser.peek())) {
+            operand = parser.readInt(0, SICXE.MAX_ADDR);
         } else if (Character.isLetter(parser.peek()) || parser.peek() == '_') {
-            operand = 0;
             symbolLoc = parser.loc();
             symbol = parser.readSymbol();
-        } else if (parser.peek() == '*') {
-            operand = 0;
-            symbolLoc = parser.loc();
-            symbol = "*";
-        } else
-            throw new AsmError(parser.loc(), 1, "Invalid character '%c", parser.peek());
-        // check for indexed addressing (only if simple)
-        if (parser.skipIfIndexed()) {
-            if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
-                flags.setIndexed();
-            else
-                throw new AsmError(operandLoc, Math.max(1,parser.loc().col - operandLoc.col), "Indexed addressing not supported here");
+        } else {
+            throw new AsmError(parser.loc(), 1, "Invalid character '%c'", parser.peek());
         }
+
+        // Only optional ,X indexing
+        if (parser.skipIfIndexed()) {
+            flags.setIndexed();
+        }
+
         return new InstructionF3m(loc, label, labelLoc, mnemonic, mnemonicLoc, flags, operand, symbol, symbolLoc);
     }
 
-    private Command parseF4m(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        checkWhitespace(mnemonic.name);
-        Flags flags = new Flags();
-        flags.setExtended();
-        int operand;
-        String symbol;
-        // check if literal
-        if (parser.advanceIf('=')) {
-            InstructionF34Base cmd = new InstructionF4m(loc, label, labelLoc, mnemonic, mnemonicLoc, new Flags(Flags.SIMPLE, Flags.NONE), 0, null, null);
-            StorageData lit = parseLiteralData();
-            return new InstructionLiteral(cmd, lit);
-        }
-
-        Location symbolLoc = null;
-        Location operandLoc = parser.loc();
-
-        // otherwise no literal: detect TA use
-        if (parser.advanceIf('#')) flags.set_ni(Flags.IMMEDIATE);
-        else if (parser.advanceIf('@')) flags.set_ni(Flags.INDIRECT);
-        else flags.set_ni(Flags.SIMPLE);
-        // read operand: number, symbol, '*'
-        if (Character.isDigit(parser.peek()) || parser.peek() == '-') {
-            operand = parser.readInt(flags.minOperand(), flags.maxOperand());
-            symbol = null;
-        } else if (Character.isLetter(parser.peek()) || parser.peek() == '_') {
-            operand = 0;
-            symbolLoc = parser.loc();
-            symbol = parser.readSymbol();
-        } else if (parser.peek() == '*') {
-            operand = 0;
-            symbolLoc = parser.loc();
-            symbol = "*";
-        } else
-            throw new AsmError(parser.loc(), 1, "Invalid character '%c", parser.peek());
-        // check for indexed addressing (only if simple)
-        if (parser.skipIfIndexed()) {
-            if (flags.isSimple() || flags.isIndirect() && Options.indirectX)
-                flags.setIndexed();
-            else
-                throw new AsmError(operandLoc, Math.max(1, parser.loc().col - operandLoc.col), "Indexed addressing not supported here");
-        }
-        return new InstructionF4m(loc, label, labelLoc, mnemonic, mnemonicLoc, flags, operand, symbol, symbolLoc);
-    }
-
-    private Command parseD(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        switch (mnemonic.opcode) {
-            case Opcode.CSECT:  return new DirectiveCSECT(loc, label, labelLoc, mnemonic, mnemonicLoc);
-            case Opcode.LTORG:  return new DirectiveLTORG(loc, label, labelLoc, mnemonic, mnemonicLoc);
-            case Opcode.NOBASE: return new DirectiveNOBASE(loc, label, labelLoc, mnemonic, mnemonicLoc);
-        }
-        return null;
-    }
+    // ===== directives we keep =====
 
     private Command parseDe(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location exprLoc = parser.loc();
-        Expr expr = parseExpression(true);
         switch (mnemonic.opcode) {
-            case Opcode.BASE:  return new DirectiveBASE(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
-            case Opcode.START: return new DirectiveSTART(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
-            case Opcode.END:   return new DirectiveEND(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
-            case Opcode.EQU:   return new DirectiveEQU(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
-        }
-        return null;
-    }
-
-    private Command parseDe0(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location exprLoc = parser.loc();
-        Expr expr = parseExpression(false);  // expr may be null
-        return new DirectiveORG(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
-    }
-
-    private Command parseDs0(Location loc, String label, Location labelLoc, Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Location blockLoc = parser.loc();
-        String blockName = parser.readIfSymbol();
-        return new DirectiveUSE(loc, label, labelLoc, mnemonic, mnemonicLoc, blockName, blockLoc);
-    }
-
-    private Command parseDs_(Location loc,
-                             String label, Location labelLoc,
-                             Mnemonic mnemonic, Location mnemonicLoc) throws AsmError {
-        Symbols s = parseSymbols(6);
-        switch (mnemonic.opcode) {
-            case Opcode.EXTDEF:
-                return new DirectiveEXTDEF(loc, label, labelLoc, mnemonic, mnemonicLoc, s.names, s.locs);
-            case Opcode.EXTREF:
-                return new DirectiveEXTREF(loc, label, labelLoc, mnemonic, mnemonicLoc, s.names, s.locs);
+            case Opcode.START: {
+                Location exprLoc = parser.loc();
+                Expr expr = parseStartHexExprRequired();
+                // adjust stored span (already set inside helper)
+                return new DirectiveSTART(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
+            }
+            case Opcode.END: {
+                Location exprLoc = parser.loc();
+                Expr expr = parseEndOperand(); // may be null
+                // If present, must be a symbol
+                if (expr != null && !(expr instanceof ExprSym)) {
+                    throw new AsmError(expr.loc, expr.toString().length(),
+                            "END operand must be a single symbol (or empty)");
+                }
+                return new DirectiveEND(loc, label, labelLoc, mnemonic, mnemonicLoc, expr, exprLoc);
+            }
             default:
                 return null;
         }
@@ -357,30 +264,18 @@ public class OperandParser {
         return new StorageData(loc, label, labelLoc, mnemonic, mnemonicLoc, data, prevLoc, false);
     }
 
-
-    // cover all formats
+    // ===== top-level dispatcher (pure SIC) =====
 
     public Command parse(Location loc, String label, Location labelLocation,
                          Mnemonic mnemonic, Location mnemonicLocation) throws AsmError {
         switch (mnemonic.format) {
-            case F1:    return parseF1(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F2n:   return parseF2n(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F2r:   return parseF2r(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F2rn:  return parseF2rn(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F2rr:  return parseF2rr(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F3:    return parseF3(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F3m:   return parseF3m(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case F4m:   return parseF4m(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case D:     return parseD(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case De:    return parseDe(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case De0:   return parseDe0(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case Ds0:    return parseDs0(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case Ds_:   return parseDs_(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case Se:    return parseSe(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case Sd:    return parseSd(loc, label, labelLocation, mnemonic, mnemonicLocation);
-            case Sd_:   return parseSd_(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case F3:   return parseF3(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case F3m:  return parseF3m(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case De:   return parseDe(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case Se:   return parseSe(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case Sd:   return parseSd(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            case Sd_:  return parseSd_(loc, label, labelLocation, mnemonic, mnemonicLocation);
+            default:   return null;
         }
-        return null;
     }
-
 }
