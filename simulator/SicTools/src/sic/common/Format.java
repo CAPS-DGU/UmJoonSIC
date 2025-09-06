@@ -1,37 +1,34 @@
 package sic.common;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Pure SIC formats and operand hints.
+ * XE-only formats removed; operands restricted per pure SIC rules.
  */
 public enum Format {
 
-    F1,
-    F2n, F2r, F2rn, F2rr,
-    F3, F3m,
-    F4m,
-    D, De, De0, Ds0, Ds_,
-    Se, Sd, Sd_;
+    F3,        // 3-byte op without operand (e.g., RSUB)
+    F3m,       // 3-byte op with memory operand (symbol/decimal, optional ,X)
+    D,         // directive without operand
+    De,        // decimal numeric operand (e.g., WORD n, RESB n, RESW n)
+    De0,       // optional single symbol (e.g., END [symbol])
+    Ds0,       // single symbol
+    Ds_,       // symbol list (comma-separated)
+    Se,        // START address: hex digits without prefix
+    Sd,        // BYTE C'…' or X'…'
+    Sd_;       // list: (C'…'|X'…'), ...
 
     public String hint() {
         switch (this) {
-            case F1:    return "";
-            case F2n:   return "n";
-            case F2r:   return "r";
-            case F2rn:  return "r,n";
-            case F2rr:  return "r,r";
             case F3:    return "";
-            case F3m:   return "([#@]n|s|*)|=l";
-            case F4m:   return "([#@]n|s|*)|=l";
+            case F3m:   return "(n|s)(,X)?";
             case D:     return "";
-            case De:    return "e";
-            case De0:   return "e?";
+            case De:    return "n";
+            case De0:   return "s?";
             case Ds0:   return "s";
             case Ds_:   return "s,...";
-            case Se:    return "n|s";
-            case Sd:    return "(C|X|n)";
-            case Sd_:   return "(C|X|n),...";
+            case Se:    return "hex";
+            case Sd:    return "(C|X)";
+            case Sd_:   return "(C|X),...";
         }
         return null;
     }
