@@ -14,12 +14,13 @@ export default function Debug() {
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
-
+  const [isExecuting, setIsExecuting] = useState(false);
   const handleRun = async (time?: number) => {
     fetchLoad();
     fetchMemory();
     fetchVarMemoryValue();
     toggleIsRunning();
+    setIsExecuting(true);
   };
 
   const [showModeMenu, setShowModeMenu] = useState<boolean>(false);
@@ -91,7 +92,7 @@ export default function Debug() {
         <RegisterValue />
       </section>
       <section className="border-b border-gray-200 py-3">
-        <MemoryViewer />
+        <MemoryViewer isExecuting={isExecuting} />
       </section>
     </div>
   );

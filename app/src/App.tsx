@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import React, { useState, useEffect, useRef } from 'react';
 import SideBar from '@/components/common/SideBar';
 import ToolBar from '@/components/common/ToolBar';
@@ -23,9 +21,8 @@ function App() {
   const closeProject = useProjectStore(s => s.closeProject);
   const { tabs, activeTabIdx } = useEditorTabStore();
 
-  const [panelHeight, setPanelHeight] = useState(100);
+  const [panelHeight, setPanelHeight] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
-
   const appRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +31,6 @@ function App() {
     };
 
     window.addEventListener('create-new-project', handleCreateNewProject);
-
     return () => {
       window.removeEventListener('create-new-project', handleCreateNewProject);
     };
@@ -60,31 +56,6 @@ function App() {
     };
   }, [closeProject]);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing || !appRef.current) return;
-
-      const appRect = appRef.current.getBoundingClientRect();
-      const newPanelHeight = appRect.bottom - STATUS_BAR_HEIGHT - e.clientY;
-
-      setPanelHeight(Math.max(0, newPanelHeight));
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    if (isResizing) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing]);
-
   if (projectName === '') {
     return (
       <div className="flex flex-col items-center justify-center h-screen w-screen">
@@ -99,7 +70,6 @@ function App() {
             <button
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
               onClick={() => {
-                // File > New Project 메뉴와 동일하게 커스텀 이벤트 발생
                 window.dispatchEvent(new Event('create-new-project'));
               }}
             >
@@ -108,7 +78,6 @@ function App() {
             <button
               className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
               onClick={() => {
-                // File > Open Project 메뉴와 동일하게 커스텀 이벤트 발생
                 window.dispatchEvent(new Event('open-project'));
               }}
             >
@@ -126,7 +95,6 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col">
-      {/* <ToolBar /> */}
       <div className="flex flex-1 overflow-hidden" ref={appRef}>
         <div className="w-64">
           <SideBar />
@@ -141,8 +109,17 @@ function App() {
               <EditorContainer />
             )}
           </div>
-          <Resizer onMouseDown={() => setIsResizing(true)} />
-          <div className="transition-all duration-200 ease-in-out" style={{ height: panelHeight }}>
+          <Resizer
+            onResize={(newHeight: number) => setPanelHeight(newHeight)}
+            containerRef={appRef}
+            statusBarHeight={STATUS_BAR_HEIGHT}
+            onDragStart={() => setIsResizing(true)}
+            onDragEnd={() => setIsResizing(false)}
+          />
+          <div
+            className={isResizing ? '' : 'transition-all duration-200 ease-in-out'}
+            style={{ height: panelHeight }}
+          >
             <Pannel />
           </div>
         </div>
