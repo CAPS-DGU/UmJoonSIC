@@ -52,5 +52,52 @@ export function useProjectFiles() {
     }
   };
 
-  return { createFile, deleteFile };
+  const createFolder = async (folder: FileStructure | null, folderName: string) => {
+    const trimmed = folderName.trim();
+    if (!trimmed) return;
+
+    const folderRelativePath =
+      folder && folder.type === 'folder'
+        ? folder.relativePath.split('/').slice(0, -1).join('/')
+        : '';
+    const folderPath = `${projectPath}/${folderRelativePath}`.replace(/\/+/g, '/');
+    const result = await window.api.createNewFolder(folderPath, folderName.trim());
+    console.log('Creating folder at:', folderPath, 'with name:', folderName.trim());
+    console.log('Create folder result:', result);
+
+    if (result.success) {
+      refreshFileTree();
+      const newFolder: FileStructure = {
+        type: 'folder',
+        name: folderName.trim(),
+        relativePath: folderRelativePath + '/' + folderName.trim(),
+        children: [],
+      };
+      setSelectedFileOrFolder(newFolder);
+    } else {
+      throw new Error(result.message ?? '폴더 생성 실패');
+    }
+  };
+
+  const deleteFolder = async (folder: FileStructure) => {
+    const folderRelativePath =
+      folder && folder.type === 'folder'
+        ? folder.relativePath.split('/').slice(0, -1).join('/')
+        : '';
+    const folderPath = `${projectPath}/${folderRelativePath}`.replace(/\/+/g, '/');
+    const res = await window.api.deleteFolder(folderPath, folder.name);
+    console.log('Deleting folder at:', folderPath);
+    console.log('Delete folder result:', res);
+    if (res.success) {
+      refreshFileTree();
+      const currentSelected = useProjectStore.getState().selectedFileOrFolder;
+      if (currentSelected?.relativePath === folder.relativePath) {
+        setSelectedFileOrFolder(null);
+      }
+    } else {
+      throw new Error(res.message);
+    }
+  };
+
+  return { createFile, deleteFile, createFolder, deleteFolder };
 }

@@ -10,10 +10,12 @@ import type { FileStructure } from '@/types/fileTree';
 import { FileTreeItem } from '@/components/fileTree/FileTreeItem';
 import { ContextMenu } from '@/components/fileTree/ContextMenu';
 import { NewFileDialog } from '@/components/fileTree/NewFileDialog';
+import { NewFolderDialog } from '@/components/fileTree/NewFolderDialog';
 
 export default function SideBar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     show: boolean;
     x: number;
@@ -29,7 +31,7 @@ export default function SideBar() {
     settings,
   } = useProjectStore();
   const { tabs, addTab } = useEditorTabStore();
-  const { deleteFile } = useProjectFiles();
+  const { deleteFile, deleteFolder } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
 
@@ -62,7 +64,11 @@ export default function SideBar() {
           >
             <FilePlus width={16} height={16} />
           </button>
-          <button className="p-1 rounded hover:bg-gray-200">
+          <button
+            className="p-1 rounded hover:bg-gray-200"
+            onClick={() => setNewFolderDialogOpen(true)}
+            title="새 폴더 생성"
+          >
             <FolderPlus width={16} height={16} />
           </button>
           <button className="p-1 rounded hover:bg-gray-200" onClick={refreshFileTree}>
@@ -92,7 +98,13 @@ export default function SideBar() {
           x={contextMenu.x}
           y={contextMenu.y}
           item={contextMenu.item}
-          onDelete={item => deleteFile(item)}
+          onDelete={item => {
+            if (item.type === 'file') {
+              deleteFile(item).then(() => {});
+            } else if (item.type === 'folder') {
+              deleteFolder(item).then(() => {});
+            }
+          }}
           onClose={() => setContextMenu({ show: false, x: 0, y: 0, item: null })}
         />
       )}
@@ -103,6 +115,15 @@ export default function SideBar() {
         onOpenChange={setNewFileDialogOpen}
         currentFolder={selectedFileOrFolder}
         onFileCreated={() => {
+          refreshFileTree(); // 생성 후 파일 트리 갱신
+        }}
+      />
+      {/* 새 폴더 다이얼로그 연결 */}
+      <NewFolderDialog
+        open={newFolderDialogOpen}
+        onOpenChange={setNewFolderDialogOpen}
+        currentFolder={selectedFileOrFolder}
+        onFolderCreated={() => {
           refreshFileTree(); // 생성 후 파일 트리 갱신
         }}
       />
