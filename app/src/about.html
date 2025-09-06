@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About</title>
+    <style>
+        :root {
+            --bg: #f7fafc;            /* light bg */
+            --bg-grad-1: rgba(59,130,246,0.08);
+            --bg-grad-2: rgba(99,102,241,0.06);
+            --card: #ffffff;          /* white card */
+            --text: #0f172a;          /* slate-900 */
+            --muted: #475569;         /* slate-600 */
+            --primary: #2563eb;       /* blue-600 */
+            --ring: rgba(37,99,235,0.25);
+            --divider: rgba(15,23,42,0.08);
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: radial-gradient(1200px 600px at 10% -20%, var(--bg-grad-1), transparent),
+                        radial-gradient(900px 500px at 90% 10%, var(--bg-grad-2), transparent),
+                        var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.6;
+        }
+
+        .container {
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 880px;
+            background: var(--card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+            padding: 28px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border-bottom: 1px solid var(--divider);
+            padding-bottom: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            font-size: 12px;
+            color: var(--primary);
+            background: rgba(37,99,235,0.10);
+            border: 1px solid var(--ring);
+            padding: 2px 8px;
+            border-radius: 999px;
+        }
+
+        .section {
+            padding: 18px 0;
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 16px;
+            border-bottom: 1px dashed var(--divider);
+        }
+        .section:last-child { border-bottom: 0; }
+
+        .section h3 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .content p { margin: 0 0 6px 0; }
+        .content p:last-child { margin-bottom: 0; }
+
+        ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 6px;
+        }
+        li { color: var(--text); }
+
+        .footer {
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <main class="card" role="main" aria-labelledby="about-title">
+            <header class="header">
+                <h1 id="about-title">About <span class="badge">BSD-2</span></h1>
+            </header>
+
+            <section class="section" aria-labelledby="professors">
+                <h3 id="professors">책임 교수</h3>
+                <div class="content">
+                    <p>동국대학교 컴퓨터·AI 학부 교수 정준호, 한인</p>
+                </div>
+            </section>
+
+            <section class="section" aria-labelledby="team">
+                <h3 id="team">개발 총괄</h3>
+                <div class="content">
+                    <ul>
+                        <li>컴퓨터공학과 20학번 정상원</li>
+                        <li>약학과 23학번 원종인</li>
+                        <li>컴퓨터·AI학부 24학번 송윤석</li>
+                        <li>AI융합소프트웨어학부 24학번 안지민</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="section" aria-labelledby="license">
+                <h3 id="license">라이선스</h3>
+                <div class="content">
+                    <p>BSD-2 라이선스</p>
+                </div>
+            </section>
+
+            <section class="section" aria-labelledby="review">
+                <h3 id="review">검수</h3>
+                <div class="content">
+                    <p>동국대학교 프로그래밍 중앙동아리 CAPS</p>
+                </div>
+            </section>
+
+            <footer class="footer" aria-label="meta">
+                <span>© Dongguk University</span>
+                <span>•</span>
+                <span>CAPS</span>
+            </footer>
+        </main>
+    </div>
+</body>
+</html>

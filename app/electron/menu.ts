@@ -93,19 +93,15 @@ export const menuList = [
       {
         label: 'About UmJoonSIC',
         click: async () => {
-          const splash = new BrowserWindow({
-            width: 500,
-            height: 300,
+          const aboutWindow = new BrowserWindow({
+            width: 800,
+            height: 600,
+            show: false,
             autoHideMenuBar: true,
-            frame: false,
-            resizable: false,
-            alwaysOnTop: true,
-            skipTaskbar: true,
-            fullscreenable: false,
-            maximizable: false,
           });
-          splash.loadFile(path.join(__dirname, '../renderer/about.html'))
-
+          aboutWindow.loadFile(path.join(__dirname, '../renderer/about.html'))
+          aboutWindow.center();
+          aboutWindow.show();
         },
       },
     ],
