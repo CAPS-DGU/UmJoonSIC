@@ -1,5 +1,0 @@
-mod3	START 0
-main	LDA x
-	ORG 4000
-x	WORD 0x12345
-	END mod3
