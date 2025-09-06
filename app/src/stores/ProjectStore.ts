@@ -18,6 +18,7 @@ interface ProjectState {
   closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
   addAsmFile: (file: FileStructure) => void;
+  removeAsmFile: (relativePath: string) => void;
   saveSettings: () => Promise<{ success: boolean; message?: string }>;
   setSettings: (settings: { asm: string[]; main: string }) => void;
 }
@@ -50,6 +51,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       });
       saveSettings();
     }
+  },
+  removeAsmFile: (relativePath: string) => {
+    const { settings, fileTree, saveSettings } = get();
+    set({
+      settings: { ...settings, asm: settings.asm.filter(p => p !== relativePath) },
+      fileTree: fileTree.filter(f => f.relativePath !== relativePath),
+    });
+    saveSettings();
   },
   saveSettings: () => {
     const { settings, projectPath } = get();

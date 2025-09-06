@@ -4,6 +4,7 @@ import { useProjectStore } from '@/stores/ProjectStore';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 
 import { useFileTree } from '@/hooks/useFileTree';
+import { useProjectFiles } from '@/hooks/useProjectFiles';
 import type { FileStructure } from '@/types/fileTree';
 
 import { FileTreeItem } from '@/components/fileTree/FileTreeItem';
@@ -28,6 +29,7 @@ export default function SideBar() {
     settings,
   } = useProjectStore();
   const { tabs, addTab } = useEditorTabStore();
+  const { deleteFile } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
 
@@ -90,7 +92,7 @@ export default function SideBar() {
           x={contextMenu.x}
           y={contextMenu.y}
           item={contextMenu.item}
-          onDelete={item => console.log('삭제', item)}
+          onDelete={item => deleteFile(item)}
           onClose={() => setContextMenu({ show: false, x: 0, y: 0, item: null })}
         />
       )}
@@ -99,13 +101,7 @@ export default function SideBar() {
       <NewFileDialog
         open={newFileDialogOpen}
         onOpenChange={setNewFileDialogOpen}
-        currentFolder={
-          selectedFileOrFolder
-            ? selectedFileOrFolder.type === 'folder'
-              ? selectedFileOrFolder.relativePath.slice(0, -1) // 폴더라면 마지막 슬래시 제거
-              : selectedFileOrFolder.relativePath.replace(/\/[^/]+$/, '') // 파일이라면 파일명 제거
-            : '' // 선택된 것이 없으면 빈 문자열
-        }
+        currentFolder={selectedFileOrFolder}
         onFileCreated={() => {
           refreshFileTree(); // 생성 후 파일 트리 갱신
         }}

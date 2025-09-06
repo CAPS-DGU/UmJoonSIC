@@ -36,9 +36,6 @@ export function FileTreeItem({
 }: Props) {
   if (item.type === 'folder') {
     const isOpen = expanded[item.name];
-
-    console.log('Selected:', selected?.relativePath);
-    console.log('Current Folder:', item.relativePath);
     return (
       <div>
         <div

@@ -6,13 +6,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { useProjectStore } from '@/stores/ProjectStore';
+import { useProjectFiles } from '@/hooks/useProjectFiles';
 import type { FileStructure } from '@/types/fileTree';
 
 interface NewFileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentFolder: string;
+  currentFolder: FileStructure | null;
   onFileCreated?: () => void;
 }
 
@@ -23,48 +23,28 @@ export function NewFileDialog({
   onFileCreated,
 }: NewFileDialogProps) {
   const [fileName, setFileName] = useState('');
-  const [fileExt, setFileExt] = useState('.asm'); // 기본 확장자
+  const [fileExt, setFileExt] = useState('.asm');
   const inputRef = useRef<HTMLInputElement>(null);
-  const { projectPath, addAsmFile, refreshFileTree } = useProjectStore();
+  const { createFile } = useProjectFiles();
 
   useEffect(() => {
     if (open) {
       setFileName('');
       setFileExt('.asm');
-      setTimeout(() => inputRef.current?.focus(), 0);
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
     }
   }, [open]);
 
   const handleCreate = async () => {
-    const trimmed = fileName.trim();
-    if (!trimmed) return;
-
-    const relativePath = currentFolder
-      ? `${currentFolder}/${trimmed}${fileExt}`
-      : `${trimmed}${fileExt}`;
-    const fullPath = `${projectPath}/${relativePath}`.replace(/\/+/g, '/');
-
-    try {
-      console.log('Creating file at:', fullPath);
-      const res = await window.api.createNewFile(fullPath, `${trimmed}${fileExt}`);
-      if (res.success) {
-        const newFile: FileStructure = {
-          type: 'file',
-          name: `${trimmed}${fileExt}`,
-          relativePath: relativePath,
-        };
-
-        if (fileExt === '.asm') addAsmFile(newFile);
-        refreshFileTree();
-        onFileCreated?.();
-        setFileName('');
+    createFile(currentFolder, fileName, fileExt)
+      .then(newFile => {
+        if (newFile && onFileCreated) onFileCreated();
         onOpenChange(false);
-      } else {
-        alert(`파일 생성 실패: ${res.message}`);
-      }
-    } catch (err) {
-      alert(`파일 생성 중 오류 발생: ${err}`);
-    }
+      })
+      .catch(err => {
+        alert(`파일 생성 실패: ${err.message}`);
+      });
   };
 
   return (
