@@ -28,13 +28,31 @@ interface ListFileState {
   clearListFile: () => void;
 }
 
+//operand Hex transfer
+const processOperand = (operand: string): string => {
+  if (!isNaN(Number(operand)) && operand.trim() !== '') {
+    return Number(operand).toString(16).toUpperCase();
+  }
+  return operand; // if string -> return
+};
+
+// Merged rows
+const processRows = (rows: ListFileRow[]): ListFileRow[] =>
+  rows.map(row => ({
+    ...row,
+    operand: processOperand(row.operand),
+    nixbpe: '0', // NIXBPE를 0으로 초기화
+  }));
+
 export const useListFileStore = create<ListFileState>(set => ({
   listFile: [],
   setListFile: (filePath, rows) =>
-    set(state => ({ listFile: [...state.listFile, { filePath, rows }] })),
+    set(state => ({
+      listFile: [...state.listFile, { filePath, rows: processRows(rows) }],
+    })),
   addListFile: (filePath, rows) =>
     set(state => ({
-      listFile: [...state.listFile, { filePath, rows: [...rows] }],
+      listFile: [...state.listFile, { filePath, rows: processRows(rows) }],
     })),
   clearListFile: () => set({ listFile: [] }),
 }));
