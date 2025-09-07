@@ -5,6 +5,7 @@ module.exports = {
   packagerConfig: {
     asar: true,
     icon: './src/assets/icon',
+    executableName: 'UmJoonSIC',
   },
   rebuildConfig: {},
   makers: [
@@ -66,3 +67,5 @@ module.exports = {
     }),
   ],
 };
+
+

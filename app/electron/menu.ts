@@ -1,5 +1,5 @@
 // electron/menu.ts
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import path from 'path';
 
 export const menuList = [
@@ -108,6 +108,12 @@ export const menuList = [
 
         },
       },
+      {
+        label: 'How to use',
+        click: async () => {
+          shell.openExternal('https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link');
+        }
+      }
     ],
   },
 ];
