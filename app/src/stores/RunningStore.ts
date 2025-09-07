@@ -17,6 +17,8 @@ interface RunningState {
   isPaused: boolean;
   isReady: boolean;
   loadedFiles: LoadedFile[];
+  delayTime: number;
+  setDelayTime: (delayTime: number) => void;
   setIsRunning: (isRunning: boolean) => void;
   toggleIsRunning: () => void;
   fetchBegin: () => void;
@@ -75,6 +77,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   isPaused: true,
   isReady: false,
   loadedFiles: [],
+  delayTime: 1000,
+  setDelayTime: delayTime => set({ delayTime }),
   setIsPaused: isPaused => set({ isPaused }),
   setIsRunning: isRunning => set({ isRunning }),
   toggleIsRunning: () => set(state => ({ isRunning: !state.isRunning })),

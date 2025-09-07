@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { File, ChevronRight, AlertTriangle, Settings, List } from 'lucide-react';
+import { File, ChevronRight, AlertTriangle, Settings, List, CircleX } from 'lucide-react';
 import { useErrorStore } from '@/stores/pannel/ErrorStore';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import type { CompileError } from '@/stores/pannel/ErrorStore';
@@ -92,11 +92,11 @@ export default function WarningPanel() {
       {/* Panel Header */}
       <div className="flex items-center p-2 border-b border-gray-300 dark:border-gray-700">
         <div className="flex items-center">
-          <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
-          <span className="font-semibold text-sm">Warnings</span>
+          <CircleX className="text-red-500 mr-1 w-4 h-4" />
+          <span className="font-semibold text-sm">Errors</span>
         </div>
         <div className="ml-auto flex items-center">
-          <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
+          <CircleX className="text-red-500 mr-1 w-4 h-4" />
           <span className="text-sm font-bold">{totalWarningCount}</span>
         </div>
       </div>
@@ -104,7 +104,7 @@ export default function WarningPanel() {
       {/* Warning List */}
       <div className="flex-1 overflow-auto p-1">
         {fileNames.length === 0 ? (
-          <p className="text-gray-400 text-sm mt-2 ml-2">No warnings found.</p>
+          <p className="text-gray-400 text-sm mt-2 ml-2">No Error found.</p>
         ) : (
           fileNames.map(fileName => {
             const warningsForFile = groupedWarnings[fileName] ?? [];
@@ -129,7 +129,7 @@ export default function WarningPanel() {
                     </span>
                   </p>
                   <div className="ml-auto flex items-center">
-                    <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
+                    <CircleX className="text-red-500 mr-1 w-4 h-4" />
                     <span className="text-sm">{warningsForFile.length}</span>
                   </div>
                 </div>
@@ -142,7 +142,7 @@ export default function WarningPanel() {
                         className="p-1 flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
                         onClick={() => handleErrorClick(warning)}
                       >
-                        <AlertTriangle className="text-yellow-500 mr-2 flex-shrink-0 w-4 h-4" />
+                        <CircleX className="text-red-500 mr-2 flex-shrink-0 w-4 h-4" />
                         <span>
                           {warning.message}
                           {warning.line && (

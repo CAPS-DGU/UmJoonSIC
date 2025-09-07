@@ -5,7 +5,7 @@ import { menuList } from './menu';
 import './ipc/file';
 import './ipc/server';
 import { ChildProcess, spawn } from 'child_process';
-import { checkJreExists, checkServerExists, downloadJre, downloadServer, runServer } from './setup';
+import { checkJreExists, checkServerExists, checkUpdate, downloadJre, downloadServer, runServer } from './setup';
 
 let server: ChildProcess | null = null;
 app.setName('UmJoonSIC');
@@ -41,6 +41,8 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', async () => {
     splash.loadFile(path.join(__dirname, '../renderer/splash.html'));
     splash.center();
+
+    await checkUpdate();
 
     if (!checkJreExists()) {
       await downloadJre().catch(error => {
