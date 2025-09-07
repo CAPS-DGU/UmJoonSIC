@@ -1,8 +1,8 @@
 // src/components/editor/List.tsx
 import React, { useEffect, useRef } from 'react';
 import type { ListViewItem } from './ListContainer';
-import { List as ListIcon } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
+import { useRunningStore } from '@/stores/RunningStore';
 
 interface ListProps {
   data: ListViewItem[];
@@ -15,6 +15,7 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
   const { PC } = useRegisterStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
+  const { stopRunning } = useRunningStore();
 
   // PC가 변경될 때마다 하이라이팅된 행으로 스크롤
   useEffect(() => {
@@ -25,6 +26,17 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
       });
     }
   }, [PC, data]);
+
+  // PC가 변경될 때마다, 해당 PC 주소에 브레이크포인트가 있으면 stopRunning 호출
+  useEffect(() => {
+    // 현재 PC가 data에 존재하는지 확인
+    const pcIndex = data.findIndex(row => parseInt(row.addressHex, 16) === PC);
+    if (pcIndex !== -1 && breakpoints.includes(pcIndex)) {
+      // 브레이크포인트가 걸려있으면 stopRunning 호출
+      stopRunning();
+    }
+  }, [PC, data, breakpoints, stopRunning]);
+
 
   // if (data.some(row => parseInt(row.addressHex, 16) === PC)) {
   //   console.log('PC is in data');

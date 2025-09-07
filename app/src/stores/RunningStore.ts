@@ -13,6 +13,7 @@ import { toProjectRelativePath } from '@/lib/file-name';
 
 interface RunningState {
   isRunning: boolean;
+  isPaused: boolean;
   isReady: boolean;
   loadedFiles: LoadedFile[];
   setIsRunning: (isRunning: boolean) => void;
@@ -22,6 +23,7 @@ interface RunningState {
   setLoadedFiles: (files: LoadedFile[]) => void;
   loadToListfileAndWatch: () => void;
   stopRunning: () => void;
+  setIsPaused: (isPaused: boolean) => void;
 }
 
 // Watch 변수 정보
@@ -69,8 +71,10 @@ interface LoadedFile {
 
 export const useRunningStore = create<RunningState>((set, get) => ({
   isRunning: false,
+  isPaused: true,
   isReady: false,
   loadedFiles: [],
+  setIsPaused: isPaused => set({ isPaused }),
   setIsRunning: isRunning => set({ isRunning }),
   toggleIsRunning: () => set(state => ({ isRunning: !state.isRunning })),
   setLoadedFiles: (files: LoadedFile[]) => set({ loadedFiles: files }),
@@ -215,6 +219,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       clearListFile();
       closeAllListFileTabs();
       clearWatch();
+      set({ isPaused: false });
       set({ isRunning: false, isReady: false, loadedFiles: [] });
     } else {
       console.error('Failed to stop');

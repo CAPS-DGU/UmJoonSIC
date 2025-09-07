@@ -22,7 +22,7 @@ export default function ListContainer() {
   } = useEditorTabStore();
   const { projectPath } = useProjectStore();
   const { listFile } = useListFileStore();
-  const [breakpoints, setBreakpoints] = useState<number[]>([]);
+  // const [breakpoints, setBreakpoints] = useState<number[]>([]);
   const activeTab = getActiveTab();
   const PC = useRegisterStore(state => state.PC);
 
@@ -94,7 +94,7 @@ export default function ListContainer() {
           )?.rows ?? []
         } // 스토어에서 가져온 listFile을 사용합니다.
         activeTabTitle={activeTab?.title}
-        breakpoints={breakpoints}
+        breakpoints={getActiveTab()?.breakpoints ?? []}
         onBreakpointToggle={index => toggleBreakpoint(activeTab?.idx || 0, index)}
       />
     </div>

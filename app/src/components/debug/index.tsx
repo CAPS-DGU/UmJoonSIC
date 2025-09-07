@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Cpu, AlarmClock, Play } from 'lucide-react';
+import { Cpu, AlarmClock, Play, Pause } from 'lucide-react';
 import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 import { useRunningStore } from '@/stores/RunningStore';
@@ -22,22 +22,30 @@ export default function Debug() {
   };
 
   const handleRun = async () => {
+    useRunningStore.getState().setIsPaused(true);
     await fetchLoad();
     toggleIsRunning();
     await fetchMemory();
     fetchVarMemoryValue();
   };
 
-  const handleRunWithDelay = async (time: number) => {
-    await fetchLoad();
+  const handleRunWithDelay = async (time: number, start: boolean = true) => {
+    if(start) {
+      await fetchLoad();
+    }
     console.log('run with delay toggleIsRunning', isRunning);
-    toggleIsRunning();
+    if(!isRunning) {
+      toggleIsRunning();
+    }
     setIsExecuting(true);
     await fetchMemory();
     fetchVarMemoryValue();
     console.log('run with delay start', useRunningStore.getState().isRunning);
 
     while(useRunningStore.getState().isRunning) {
+      if(useRunningStore.getState().isPaused) {
+        break;
+      }
       console.log('run with delay loop');
       await delay(time);
       fetchRegisters();
@@ -72,13 +80,13 @@ export default function Debug() {
   return (
     <div className="flex flex-col w-max border border-gray-200">
       <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
-        <h2 className="text-lg font-bold">실행 및 디버그</h2>
+        <h2 className="text-lg font-bold">실행</h2>
 
         <div className="flex space-x-2 relative" ref={menuRef}>
           {' '}
           {/* ref 할당 */}
           {isRunning ? (
-            <RunningButton />
+            <RunningButton handleRunWithDelay={handleRunWithDelay} />
           ) : (
             <DefaultButton
               handleRun={handleRun}
@@ -159,7 +167,7 @@ function DefaultButton({ handleRun, handleRunWithDelay, onToggleModeMenu }: Defa
   );
 }
 
-function RunningButton() {
+function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: number, start: boolean) => Promise<void> }) {
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const stopRunning = useRunningStore(s => s.stopRunning);
@@ -168,13 +176,28 @@ function RunningButton() {
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   return (
     <>
+    {!useRunningStore.getState().isPaused ? (
       <button
-        onClick={() => {}}
+        onClick={() => {
+          useRunningStore.getState().setIsPaused(true);
+          console.log('Pause');
+        }}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="Pause"
+      >
+        <Pause className="w-4 h-4" />
+      </button>) : (
+      <button
+        onClick={() => {
+          console.log('Continue');
+          useRunningStore.getState().setIsPaused(false);
+          handleRunWithDelay(1000, false);
+        }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Continue"
       >
         <StepForward className="w-4 h-4" />
-      </button>
+      </button> )}
       <button
         onClick={() => {
           fetchRegisters();
