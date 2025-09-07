@@ -45,7 +45,7 @@ interface MemoryViewState {
   setMemoryValues: (memoryValues: MemoryNodeData[]) => void;
   setLabels: (labels: MemoryLabel[]) => void;
   updateMemoryNode: (index: number, patch: MemoryNodeData) => void;
-  clearChangedNodes: () => void; // 변경된 노드 목록 초기화
+  clearChangedNodes: () => void;
   fetchMemoryValues: () => Promise<void>;
   setVisibleRange: (range: { start: number; end: number }) => void;
   setTotalMemorySize: (size: number) => void;
@@ -206,25 +206,29 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       start: memoryRange.start,
       end: memoryRange.end,
     });
-    console.log(res);
     const data = res.data;
 
-    const newValues = data.values.map((value: number) => ({
+    const newValues = data.values.map((value: number, i: number) => ({
       value: value.toString(16).toUpperCase().padStart(2, '0'),
       status: 'normal',
     }));
 
-    const changedNodes = new Set<number>();
-    newValues.forEach((newNode: MemoryNodeData, index: number) => {
-      const oldNode = memoryValues[index];
-      if (oldNode && oldNode.value !== newNode.value) {
-        changedNodes.add(index);
+    set(state => {
+      const mergedValues = [...state.memoryValues];
+      for (let i = 0; i < newValues.length; i++) {
+        const globalIndex = memoryRange.start + i;
+        mergedValues[globalIndex] = newValues[i];
       }
-    });
 
-    set({
-      memoryValues: newValues,
-      changedNodes,
+      const changedNodes = new Set<number>();
+      newValues.forEach((newNode: MemoryNodeData, idx: number) => {
+        const oldNode = state.memoryValues[memoryRange.start + idx];
+        if (oldNode && oldNode.value !== newNode.value) {
+          changedNodes.add(memoryRange.start + idx);
+        }
+      });
+
+      return { memoryValues: mergedValues, changedNodes };
     });
   },
   getMemoryLabelFromWatch: () => {

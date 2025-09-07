@@ -1,6 +1,5 @@
 import {
   useMemoryViewStore,
-  type MachineMode,
   type MemoryNodeData,
   type MemoryNodeStatus,
   type MemoryLabel,
@@ -21,8 +20,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
   const loadMemoryRange = useMemoryViewStore(state => state.loadMemoryRange);
   const getMemoryValue = useMemoryViewStore(state => state.getMemoryValue);
   const memoryRange = useMemoryViewStore(state => state.memoryRange);
-  const pc = useRegisterStore(state => state.PC); // ✅ PC 값 가져오기
-
+  const pc = useRegisterStore(state => state.PC);
   const containerRef = useRef<HTMLDivElement>(null);
   const ROW_SIZE = 8;
   const BUFFER_SIZE = 512; // 미리 로드할 범위 (위아래 256바이트씩)
@@ -34,29 +32,27 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
 
   const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
 
-  // 애니메이션 완료 후 변경된 노드 목록 초기화
+  // 변경 애니메이션 완료 후 초기화
   useEffect(() => {
     if (changedNodes.size > 0) {
       const timer = setTimeout(() => {
         clearChangedNodes();
       }, 600);
-
       return () => clearTimeout(timer);
     }
   }, [changedNodes, clearChangedNodes]);
 
-  // 검색된 노드 애니메이션 초기화
+  // 검색 애니메이션 초기화
   useEffect(() => {
     if (searchedNodes.size > 0) {
       const timer = setTimeout(() => {
         setSearchedNodes(new Set());
       }, 600);
-
       return () => clearTimeout(timer);
     }
   }, [searchedNodes]);
 
-  // 메모리 범위 변경 확인
+  // 메모리 범위 변경 시 로드
   useEffect(() => {
     loadMemoryRange(memoryRange.start, memoryRange.end);
   }, [memoryRange, loadMemoryRange]);
@@ -94,7 +90,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
     loadMemoryRange(0, BUFFER_SIZE);
   }, [loadMemoryRange]);
 
-  // 스크롤 이벤트 리스너 등록
+  // 스크롤 이벤트 등록
   useEffect(() => {
     const container = containerRef.current;
     if (container) {
@@ -103,14 +99,13 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
     }
   }, [handleScroll]);
 
-  // 디버깅: 메모리 값 확인
-  const handleDebugMemory = () => {
-    console.log('현재 로드된 메모리 값들:', memoryValues.slice(0, 20));
-    console.log('주소 0x0000의 값:', getMemoryValue(0));
-    console.log('주소 0x0008의 값:', getMemoryValue(8));
-    console.log('주소 0x0010의 값:', getMemoryValue(16));
-  };
+  useEffect(() => {
+    if (isExecuting && pc >= 0 && pc < totalMemorySize) {
+      loadMemoryRange(pc - BUFFER_SIZE / 2, pc + BUFFER_SIZE / 2);
+    }
+  }, [isExecuting, pc, totalMemorySize, loadMemoryRange]);
 
+  // 검색
   const handleSearch = () => {
     if (!containerRef.current || !searchAddress) return;
 
@@ -129,6 +124,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
     loadMemoryRange(address, address + BUFFER_SIZE);
   };
 
+  // PC auto-scroll
   useEffect(() => {
     if (!isExecuting) {
       setHasAutoScrolled(false);
@@ -137,13 +133,10 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
       setSearchedNodes(new Set([pc]));
       const rowIndex = Math.floor(pc / ROW_SIZE);
       const scrollTo = rowIndex * ROW_HEIGHT;
-      if (containerRef.current) {
-        containerRef.current.scrollTop = scrollTo;
-      }
+      if (containerRef.current) containerRef.current.scrollTop = scrollTo;
       loadMemoryRange(pc, pc + BUFFER_SIZE);
       setHasAutoScrolled(true);
     }
-    console.log('current pc : ', pc);
   }, [isExecuting, pc, totalMemorySize, loadMemoryRange, hasAutoScrolled]);
 
   const totalRows = Math.ceil(totalMemorySize / ROW_SIZE);
@@ -159,11 +152,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
           type="text"
           value={searchAddress}
           onChange={e => setSearchAddress(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              handleSearch();
-            }
-          }}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
           placeholder="memory address"
           className="border border-gray-300 p-1 rounded text-sm w-48 font-mono"
         />
@@ -196,6 +185,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
               labels={labels}
               changedNodes={changedNodes}
               getMemoryValue={getMemoryValue}
+              memoryValues={memoryValues}
               ROW_SIZE={ROW_SIZE}
               ROW_HEIGHT={ROW_HEIGHT}
               searchedNodes={searchedNodes}
@@ -207,6 +197,7 @@ export default function MemoryViewer({ isExecuting }: { isExecuting: boolean }) 
   );
 }
 
+// Key Column
 function KeyColumn({
   totalRows,
   visibleRowRange,
@@ -220,9 +211,7 @@ function KeyColumn({
 }) {
   const visibleRows = [];
   for (let i = visibleRowRange.start; i < visibleRowRange.end; i++) {
-    if (i < totalRows) {
-      visibleRows.push(i);
-    }
+    if (i < totalRows) visibleRows.push(i);
   }
 
   return (
@@ -248,12 +237,14 @@ function KeyColumn({
   );
 }
 
+// Value Column
 function ValueColumn({
   totalRows,
   visibleRowRange,
   labels,
   changedNodes,
   getMemoryValue,
+  memoryValues,
   ROW_SIZE,
   ROW_HEIGHT,
   searchedNodes,
@@ -263,15 +254,14 @@ function ValueColumn({
   labels: MemoryLabel[];
   changedNodes: Set<number>;
   getMemoryValue: (address: number) => MemoryNodeData | null;
+  memoryValues: (MemoryNodeData | null)[];
   ROW_SIZE: number;
   ROW_HEIGHT: number;
   searchedNodes: Set<number>;
 }) {
   const visibleRows = [];
   for (let i = visibleRowRange.start; i < visibleRowRange.end; i++) {
-    if (i < totalRows) {
-      visibleRows.push(i);
-    }
+    if (i < totalRows) visibleRows.push(i);
   }
 
   return (
@@ -301,7 +291,7 @@ function ValueColumn({
             <div className="flex relative mb-2">
               {Array.from({ length: ROW_SIZE }, (_, idx) => {
                 const byteAddr = rowStartAddr + idx;
-                const node = getMemoryValue(byteAddr);
+                const node = memoryValues[byteAddr] || getMemoryValue(byteAddr);
                 const label = rowLabels.find(l => idx >= l.start && idx <= l.end);
                 const isChanged = changedNodes.has(byteAddr);
                 const isSearched = searchedNodes.has(byteAddr);
@@ -318,25 +308,27 @@ function ValueColumn({
                 );
               })}
 
+              {/* Label Line */}
               {rowLabels.map((label, idx) => {
                 const originalLabel = labels.find(l => l.name === label.name);
                 if (!originalLabel) return null;
 
                 const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
-                const relativeEnd = Math.min(originalLabel.end, rowEndAddr) - rowStartAddr;
-
-                const left = relativeStart * 24 + 4;
-                const width = (relativeEnd - relativeStart + 1) * 24 - 8;
+                const width =
+                  (Math.min(originalLabel.end, rowEndAddr) - rowStartAddr - relativeStart + 1) *
+                    24 -
+                  8;
 
                 return (
                   <div
                     key={`line-${idx}`}
                     className="absolute -bottom-0.5 border-t-2 border-orange-500"
-                    style={{ left, width }}
+                    style={{ left: relativeStart * 24 + 4, width }}
                   />
                 );
               })}
 
+              {/* Label Name */}
               {rowLabels
                 .filter(label => {
                   const originalLabel = labels.find(l => l.name === label.name);
@@ -365,6 +357,7 @@ function ValueColumn({
   );
 }
 
+// Memory Node
 function MemoryNode({
   val,
   status,

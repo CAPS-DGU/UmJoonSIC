@@ -50,7 +50,6 @@ export default function Debug() {
   const [showModeMenu, setShowModeMenu] = useState<boolean>(false);
   const { mode: currentMode, setMode } = useMemoryViewStore();
 
-  // 모달 외부 클릭 감지를 위한 ref
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -168,17 +167,21 @@ function RunningButton({ setIsExecuting }: { setIsExecuting: (e: boolean) => voi
   return (
     <>
       <button
-        onClick={() => {}}
+        onClick={async () => {
+          await fetchRegisters();
+          await fetchMemory();
+          await fetchVarMemoryValue();
+        }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Continue"
       >
         <StepForward className="w-4 h-4" />
       </button>
       <button
-        onClick={() => {
-          fetchRegisters();
-          fetchMemory();
-          fetchVarMemoryValue();
+        onClick={async () => {
+          await fetchRegisters();
+          await fetchMemory();
+          await fetchVarMemoryValue();
         }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="Step Over"
