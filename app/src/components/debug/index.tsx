@@ -198,7 +198,7 @@ function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: numb
       >
         <StepForward className="w-4 h-4" />
       </button> )}
-      <button
+      {useRunningStore.getState().isPaused && <button
         onClick={() => {
           fetchRegisters();
           fetchMemory();
@@ -208,7 +208,7 @@ function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: numb
         title="Step Over"
       >
         <Redo className="w-4 h-4" />
-      </button>
+      </button>}
       <button
         onClick={async () => {
           await stopRunning();
