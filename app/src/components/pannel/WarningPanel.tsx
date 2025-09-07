@@ -1,15 +1,23 @@
 import { useState, useMemo } from 'react';
 import { File, ChevronRight, AlertTriangle, Settings, List } from 'lucide-react';
 import { useErrorStore } from '@/stores/pannel/ErrorStore';
+import { useEditorTabStore } from '@/stores/EditorTabStore';
 import type { CompileError } from '@/stores/pannel/ErrorStore';
 
 // 경고 메시지 타입 정의
 interface WarningMessage {
   file: string;
+  filePath: string;
   message: string;
   line?: number;
   col?: number;
 }
+
+const getFileName = (filePath: string) => {
+  const parts = filePath.split(/[/\\]/);
+  return parts[parts.length - 1];
+};
+
 const getFileIcon = (fileName: string) => {
   if (fileName === 'project.sic') return <Settings className="text-gray-500 mr-2 w-4 h-4" />;
   if (fileName.toLowerCase().endsWith('.lst'))
@@ -22,7 +30,8 @@ const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => 
   const grouped: Record<string, WarningMessage[]> = {};
   Object.entries(errors).forEach(([file, errs]) => {
     grouped[file] = errs.map(err => ({
-      file,
+      file: getFileName(file),
+      filePath: file,
       message: err.message,
       line: err.row,
       col: err.col,
@@ -31,9 +40,10 @@ const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => 
   return grouped;
 };
 
-const WarningPanel = () => {
+export default function WarningPanel() {
   const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const errors = useErrorStore(state => state.errors);
+  const { tabs, addTab, setActiveTab, setCursor } = useEditorTabStore();
 
   // useMemo로 계산 최적화
   const groupedWarnings = useMemo(() => groupWarningsByFile(errors), [errors]);
@@ -50,6 +60,31 @@ const WarningPanel = () => {
       else newSet.add(fileName);
       return newSet;
     });
+  };
+
+  const handleErrorClick = (warning: WarningMessage) => {
+    const tabExists = tabs.find(t => t.filePath === warning.filePath);
+    if (!tabExists) {
+      addTab({
+        idx: tabs.length,
+        title: warning.file,
+        filePath: warning.filePath,
+        fileContent: '',
+        isModified: false,
+        isActive: true,
+        breakpoints: [],
+        cursor: { line: warning.line ?? 1, column: warning.col ?? 1 },
+      });
+    }
+
+    const tabIdx = tabs.findIndex(t => t.filePath === warning.filePath);
+    if (tabIdx !== -1) {
+      setActiveTab(tabIdx);
+      // 커서 이동은 탭 활성화 후 실행 (비동기 안전하게)
+      setTimeout(() => {
+        setCursor(tabIdx, { line: warning.line ?? 1, column: warning.col ?? 1 });
+      }, 0);
+    }
   };
 
   return (
@@ -71,46 +106,58 @@ const WarningPanel = () => {
         {fileNames.length === 0 ? (
           <p className="text-gray-400 text-sm mt-2 ml-2">No warnings found.</p>
         ) : (
-          fileNames.map(fileName => (
-            <div key={fileName} className="mb-1">
-              <div
-                className="flex items-center p-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors duration-150 ease-in-out"
-                onClick={() => toggleFile(fileName)}
-              >
-                <ChevronRight
-                  className={`text-gray-500 mr-2 transition-transform duration-200 w-4 h-4 ${
-                    openFiles.has(fileName) ? 'transform rotate-90' : ''
-                  }`}
-                />
-                {getFileIcon(fileName)}
-                <span className="text-sm">{fileName}</span>
-                <div className="ml-auto flex items-center">
-                  <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
-                  <span className="text-sm">{groupedWarnings[fileName].length}</span>
-                </div>
-              </div>
+          fileNames.map(fileName => {
+            const warningsForFile = groupedWarnings[fileName] ?? [];
+            if (warningsForFile.length === 0) return null;
 
-              {openFiles.has(fileName) && (
-                <div className="pl-8 text-sm">
-                  {groupedWarnings[fileName].map((warning, index) => (
-                    <div key={index} className="p-1 flex items-center">
-                      <AlertTriangle className="text-yellow-500 mr-2 flex-shrink-0 w-4 h-4" />
-                      <span>
-                        {warning.message}
-                        {warning.line && (
-                          <span className="text-gray-500 ml-2">{`[Ln ${warning.line}] [Col ${warning.col}]`}</span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
+            return (
+              <div key={fileName} className="mb-1">
+                <div
+                  className="flex items-center p-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors duration-150 ease-in-out"
+                  onClick={() => toggleFile(fileName)}
+                >
+                  <ChevronRight
+                    className={`text-gray-500 mr-2 transition-transform duration-200 w-4 h-4 ${
+                      openFiles.has(fileName) ? 'transform rotate-90' : ''
+                    }`}
+                  />
+                  {getFileIcon(warningsForFile[0]?.file ?? 'Unknown')}
+                  <p className="text-sm">
+                    <span className="font-semibold">{warningsForFile[0]?.file ?? 'Unknown'}</span>
+                    <span className="text-gray-400 text-xs ml-1 italic">
+                      ({warningsForFile[0]?.filePath ?? 'Unknown'})
+                    </span>
+                  </p>
+                  <div className="ml-auto flex items-center">
+                    <AlertTriangle className="text-yellow-500 mr-1 w-4 h-4" />
+                    <span className="text-sm">{warningsForFile.length}</span>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))
+
+                {openFiles.has(fileName) && (
+                  <div className="pl-8 text-sm">
+                    {warningsForFile.map((warning, index) => (
+                      <div
+                        key={index}
+                        className="p-1 flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        onClick={() => handleErrorClick(warning)}
+                      >
+                        <AlertTriangle className="text-yellow-500 mr-2 flex-shrink-0 w-4 h-4" />
+                        <span>
+                          {warning.message}
+                          {warning.line && (
+                            <span className="text-gray-500 ml-2">{`[Ln ${warning.line}] [Col ${warning.col}]`}</span>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>
   );
-};
-
-export default WarningPanel;
+}
