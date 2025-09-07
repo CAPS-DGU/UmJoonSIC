@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import SideBar from '@/components/common/SideBar';
-import ToolBar from '@/components/common/ToolBar';
 import UnderStatusBar from '@/components/common/UnderStatusBar';
 import Debug from '@/components/debug';
 import EditorContainer from './components/editor/EditorContainer';

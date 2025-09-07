@@ -5,7 +5,7 @@ import { useEditorTabStore } from '@/stores/EditorTabStore';
 
 export default function SicSettingContainer() {
   const { settings, setSettings, saveSettings } = useProjectStore();
-  const { tabs, activeTabIdx, setIsModified } = useEditorTabStore();
+  const { activeTabIdx, setIsModified } = useEditorTabStore();
   const [newAsm, setNewAsm] = useState('');
   return (
     <div className="flex flex-col flex-1 w-full h-full">

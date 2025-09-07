@@ -28,7 +28,6 @@ function registerAssemblyLanguage(monaco: typeof monaco_editor | null) {
 
 // 에디터 컴포넌트
 export default function CodeEditor() {
-  console.error('CodeEditor rendered');
   const monaco = useMonaco();
   const tabs = useEditorTabStore(state => state.tabs);
   const getActiveTab = useEditorTabStore(state => state.getActiveTab);
