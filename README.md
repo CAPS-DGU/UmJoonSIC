@@ -119,5 +119,5 @@ IntelliJ에서 열 경우 해당 커맨드가 우측 상단의 Run Configuration
 **3. 최종 빌드**
 - 같은 디렉터리에서 다음을 실행하면 하나의 jar 파일로 빌드합니다 (Release 시)
 ```bash
-gradle clean shadowJar
+./gradlew clean shadowJar
 ```
