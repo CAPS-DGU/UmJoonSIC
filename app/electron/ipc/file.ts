@@ -3,11 +3,16 @@ import { ipcMain, dialog } from 'electron';
 import * as fs from 'fs';
 import * as pathModule from 'path';
 
+interface FileDevice {
+  index: number;
+  filename: string;
+}
+
 function ensureDir(p: string) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
-function readProjectSic(projectRoot: string): { asm: string[]; main: string } | null {
+function readProjectSic(projectRoot: string): { asm: string[]; main: string; filedevices: FileDevice[] } | null {
   const sicPath = pathModule.join(projectRoot, 'project.sic');
   if (!fs.existsSync(sicPath)) return null;
   try {
@@ -15,7 +20,8 @@ function readProjectSic(projectRoot: string): { asm: string[]; main: string } | 
     const json = JSON.parse(raw);
     const asm: string[] = Array.isArray(json.asm) ? json.asm : [];
     const main: string = typeof json.main === 'string' ? json.main : '';
-    return { asm, main };
+    const filedevices: FileDevice[] = Array.isArray(json.filedevices) ? json.filedevices : [];
+    return { asm, main, filedevices };
   } catch {
     return null;
   }
@@ -182,6 +188,7 @@ async function createNewProjectInteractive() {
     const sic = {
       asm: ['main.asm'],
       main: 'main',
+      filedevices: [],
     };
     fs.writeFileSync(
       pathModule.join(projectPath, 'project.sic'),
@@ -267,13 +274,14 @@ ipcMain.handle('openProject', async () => {
     // Normalize fields
     const asm: string[] = Array.isArray(sic.asm) ? sic.asm : [];
     const main: string = typeof sic.main === 'string' ? sic.main : '';
+    const filedevices: FileDevice[] = Array.isArray(sic.filedevices) ? sic.filedevices : [];
 
     return {
       success: true,
       data: {
         name: projectName,
         path: projectRoot,
-        settings: { asm, main },
+        settings: { asm, main, filedevices },
       },
     };
   } catch (error) {
@@ -297,6 +305,22 @@ ipcMain.handle('saveFile', async (_event, filePath: string, content: string) => 
   try {
     fs.writeFileSync(filePath, content);
     return { success: true };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+  }
+});
+
+// File picker (returns absolute path)
+ipcMain.handle('pickFile', async () => {
+  try {
+    const pick = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      title: 'Choose a file',
+    });
+    if (pick.canceled || pick.filePaths.length === 0) {
+      return { success: false, message: 'canceled' };
+    }
+    return { success: true, data: pick.filePaths[0] };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
   }

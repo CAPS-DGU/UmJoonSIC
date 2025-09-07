@@ -1,10 +1,18 @@
 // src/stores/ProjectStore.ts
 import { create } from 'zustand';
+import axios from 'axios';
+import { useRunningStore } from './RunningStore';
+import { useMemoryViewStore } from './MemoryViewStore';
+
+interface FileDevice {
+  index: number;
+  filename: string;
+}
 
 interface ProjectState {
   projectName: string;
   projectPath: string;
-  settings: { asm: string[]; main: string };
+  settings: { asm: string[]; main: string; filedevices: FileDevice[] };
   fileTree: string[];
   selectedFileOrFolder: string;
   setSelectedFileOrFolder: (path: string) => void;
@@ -18,13 +26,13 @@ interface ProjectState {
   getAsmAbsolutePaths: () => string[];
   addAsmFile: (filePath: string) => void;
   saveSettings: () => Promise<{ success: boolean; message?: string }>;
-  setSettings: (settings: { asm: string[]; main: string }) => void;
+  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   projectName: '',
   projectPath: '',
-  settings: { asm: [], main: '' },
+  settings: { asm: [], main: '', filedevices: [] },
   fileTree: [],
   selectedFileOrFolder: '',
   setSelectedFileOrFolder: (path: string) => set({ selectedFileOrFolder: path }),
@@ -60,9 +68,28 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     });
     saveSettings();
   },
-  saveSettings: () => {
+  saveSettings: async () => {
     const { settings, projectPath } = get();
-    return window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
+    const res = await window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
+    if (res.success) {
+      try {
+        // 실행 중이면 먼저 중지
+        const { isRunning, stopRunning } = useRunningStore.getState();
+        if (isRunning) {
+          await stopRunning();
+        }
+        // 머신 모드에 맞춰 /begin 호출 (파일 디바이스 매핑 포함)
+        const { mode } = useMemoryViewStore.getState();
+        const payload: any = { type: mode.toLowerCase() };
+        if (settings.filedevices && settings.filedevices.length > 0) {
+          payload.filedevices = settings.filedevices.map(fd => ({ index: fd.index, filename: fd.filename }));
+        }
+        await axios.post('http://localhost:9090/begin', payload);
+      } catch (e) {
+        console.warn('Failed to call /begin after saving settings:', e);
+      }
+    }
+    return res;
   },
   refreshFileTree: () => {
     const currentPath = get().projectPath;
@@ -86,7 +113,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       });
   },
 
-  refreshSettings: () => set({ settings: { asm: [], main: '' } }),
+  refreshSettings: () => set({ settings: { asm: [], main: '', filedevices: [] } }),
 
   setProject: (project: ProjectState) =>
     set({
@@ -103,7 +130,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           set({
             projectName: res.data.name,
             projectPath: res.data.path,
-            settings: res.data.settings,
+            settings: { ...res.data.settings },
             fileTree: [],
           });
           get().refreshFileTree();
@@ -125,7 +152,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           set({
             projectName: res.data.name,
             projectPath: res.data.path,
-            settings: res.data.settings,
+            settings: { ...res.data.settings },
             fileTree: [],
           });
           get().refreshFileTree();
@@ -143,7 +170,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({
       projectName: '',
       projectPath: '',
-      settings: { asm: [], main: '' },
+      settings: { asm: [], main: '', filedevices: [] },
       fileTree: [],
       selectedFileOrFolder: '',
     });
@@ -158,5 +185,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     });
   },
 
-  setSettings: (settings: { asm: string[]; main: string }) => set({ settings }),
+  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) => set({ settings }),
 }));
