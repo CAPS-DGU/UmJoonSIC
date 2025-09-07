@@ -1,15 +1,13 @@
 package iodevices;
 
-import sic.common.Logger;
-
 import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.io.RandomAccessFile;
+import java.util.logging.Logger;
 
-/**
- * @author: jure
- */
 public class FileDevice extends Device {
+
+    private static final Logger LOG = Logger.getLogger(FileDevice.class.getName());
 
     private String filename;
     private RandomAccessFile file;
@@ -18,7 +16,7 @@ public class FileDevice extends Device {
         try {
             file = new RandomAccessFile(filename, "rw");
         } catch (FileNotFoundException e) {
-            Logger.fmterr("Cannot open file '%s'", filename);
+            LOG.severe(String.format("Cannot open file '%s'", filename));
         }
     }
 
@@ -29,7 +27,7 @@ public class FileDevice extends Device {
         try {
             return file.read();
         } catch (IOException e) {
-            Logger.fmterr("Cannot read from file '%s'", filename);
+            LOG.severe(String.format("Cannot read from file '%s'", filename));
             return super.read();
         }
     }
@@ -41,7 +39,7 @@ public class FileDevice extends Device {
         try {
             file.write(value);
         } catch (IOException e) {
-            Logger.fmterr("Cannot write to file '%s'", filename);
+            LOG.severe(String.format("Cannot write to file '%s'", filename));
         }
     }
 
@@ -52,13 +50,11 @@ public class FileDevice extends Device {
             file.close();
             file = null;
         } catch (IOException e) {
-            Logger.fmterr("Cannot reset file '%s'", filename);
+            LOG.severe(String.format("Cannot reset file '%s'", filename));
         }
     }
 
     public FileDevice(String filename) {
         this.filename = filename;
-        // do not open/create file - lazy open
     }
-
 }

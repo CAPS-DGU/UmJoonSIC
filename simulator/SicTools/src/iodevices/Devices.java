@@ -1,13 +1,10 @@
 package iodevices;
 
-import sic.common.Conversion;
-import sic.common.Logger;
-import sic.common.SICXE;
+import java.util.logging.Logger;
 
-/**
- * @author jure
- */
 public class Devices {
+
+    private static final Logger LOG = Logger.getLogger(Devices.class.getName());
 
     private Device[] devices;
 
@@ -19,16 +16,19 @@ public class Devices {
         devices[idx] = device;
     }
 
-    // returns true if invalid
+    private String byteToHex(int value) {
+        return String.format("%02X", value & 0xFF);
+    }
+
     private boolean checkDeviceIndex(int idx) {
         boolean invalid = idx < 0 || idx >= devices.length;
-        if (invalid) Logger.fmterr("Invalid device number '%d'.", idx);
+        if (invalid) LOG.severe(String.format("Invalid device number '%d'.", idx));
         return invalid;
     }
 
     public int read(int idx) {
         if (checkDeviceIndex(idx)) {
-            Logger.fmterr("Invalid device number '%d'.", idx);
+            LOG.severe(String.format("Invalid device number '%d'.", idx));
             return 0;
         }
         int val = devices[idx].read();
@@ -38,30 +38,23 @@ public class Devices {
 
     public void write(int idx, int val) {
         if (checkDeviceIndex(idx))
-            Logger.fmterr("Invalid device number '%d'.", idx);
+            LOG.severe(String.format("Invalid device number '%d'.", idx));
         else
             devices[idx].write(val & 0xFF);
     }
 
     public boolean test(int idx) {
         if (checkDeviceIndex(idx)) {
-            Logger.fmterr("Invalid device number '%d'.", idx);
+            LOG.severe(String.format("Invalid device number '%d'.", idx));
             return false;
         }
         return devices[idx].test();
-    }
-
-    public void reset() {
-        for (int i = SICXE.DEVICE_FREE; i < devices.length; i++) {
-            devices[i].reset();
-        }
     }
 
     public Devices(int count) {
         assert count > 2;
         devices = new Device[count];
         for (int i = 0; i < count; i++)
-            setDevice(i, new FileDevice(Conversion.byteToHex(i) + ".dev"));
+            setDevice(i, new FileDevice(byteToHex(i) + ".dev"));
     }
-
 }
