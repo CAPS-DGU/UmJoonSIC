@@ -1,4 +1,4 @@
-package sic.sim.vm;
+package iodevices;
 
 /**
  * Base class for SIC/XE device.
@@ -7,8 +7,8 @@ package sic.sim.vm;
 public class Device {
 
     public boolean test() {
-        // always true: EOF is returned by read
-        return true;
+        // false by default
+        return false;
     }
 
     public int read() {

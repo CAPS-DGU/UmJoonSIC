@@ -41,6 +41,41 @@ public class SicSimulation extends SicxeSimulation {
         this.executorSic = new Executor(machineSic, processedArgs);
     }
 
+    public SicSimulation(int[] indices, String[] filenames) {
+        this(); // must be first
+
+        if (indices == null || filenames == null || indices.length != filenames.length) {
+            throw new IllegalArgumentException("indices and filenames must be non-null and of equal length");
+        }
+
+        boolean[] seen = new boolean[256]; // track overlaps
+
+        for (int i = 0; i < indices.length; i++) {
+            int idx = indices[i];
+            String filename = filenames[i];
+
+            if (idx < 0 || idx > 255) {
+                throw new IllegalArgumentException("Device index out of range (0–255): " + idx);
+            }
+            if (seen[idx]) {
+                throw new IllegalArgumentException("Overlapping device index: " + idx);
+            }
+            if (filename == null || filename.isEmpty()) {
+                throw new IllegalArgumentException("Filename at position " + i + " is null/empty");
+            }
+
+            seen[idx] = true;
+
+            try {
+                this.machineSic.devices.addFileDevice(idx, filename);
+            } catch (RuntimeException e) {
+                throw e; // rethrow unchecked from addFileDevice
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to add file device at idx=" + idx + " for '" + filename + "'", e);
+            }
+        }
+    }
+
     /* --- small helpers specific to SIC types --- */
     private SicListingDTO listingToDTO(Listing listing) {
         SicListingDTO dto = new SicListingDTO();

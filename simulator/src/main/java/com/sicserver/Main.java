@@ -8,6 +8,9 @@ import com.sicserver.api.SicSimulation;
 import com.sicserver.api.SicxeSimulation;
 import com.sicserver.api.Simulation;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * # SIC Server — POST-only HTTP API
  *
@@ -37,8 +40,16 @@ import com.sicserver.api.Simulation;
  *
  * **Request JSON:**
  * ```json
- * { "type": "sic" }     // or "sicxe"
+ * { "type": "sic" }                        // or "sicxe"
+ * { "type": "sic", "filedevices":[
+ *     {"index":0, "filename":"/tmp/in.bin"},
+ *     {"index":1, "filename":"/tmp/out.bin"}
+ * ]}                                       // optional: map file devices before start
  * ```
+ * When `filedevices` is present, the server uses the overloaded simulation
+ * constructors with `int[] indices` and `String[] filenames`. If an invalid
+ * mapping is supplied, the constructor may throw `IllegalArgumentException`
+ * which is returned as `{ ok:false, message:"..." }`.
  *
  * **Response:** `{ ok:true, message:"Simulation initialized (sic)" }`
  *
@@ -153,7 +164,14 @@ public class Main {
     }
 
     // ---------- Request DTOs ----------
-    static final class BeginReq { String type; }  // <-- NEW: engine type for /begin
+    static final class BeginReq {
+        String type;
+        List<FileDev> filedevices; // optional; list of {index, filename}
+    }
+    static final class FileDev {
+        Integer index;
+        String filename;
+    }
     static final class LoadReq {
         String[] filePaths; String outputDir; String outputName; String main;
         Boolean keep; Boolean graphical; Boolean editing; Boolean force; Boolean verbose;
@@ -163,7 +181,7 @@ public class Main {
 
     public static void main(String[] args) {
         SIM = new SicSimulation(); // default engine before first /begin
-        int portNum = 9090; // default
+        int portNum = 9090;
         if (args != null && args.length > 0) {
             try {
                 portNum = Integer.parseInt(args[0]);
@@ -186,15 +204,47 @@ public class Main {
         post("/begin", (req, res) -> {
             BeginReq body = safeFromJson(req.body(), BeginReq.class);
             if (body == null || body.type == null) {
-                return gson.toJson(new Msg(false, "Expected JSON body: { \"type\": \"sic\" | \"sicxe\" }"));
+                return gson.toJson(new Msg(false, "Expected JSON body: { \"type\": \"sic\" | \"sicxe\", \"filedevices\":[{index,filename}]? }"));
             }
             String t = body.type.trim().toLowerCase();
-            switch (t) {
-                case "sic" -> SIM = new SicSimulation();
-                case "sicxe" -> SIM = new SicxeSimulation();
-                default -> {
-                    return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
+
+            // Optional: build arrays for overloaded constructors
+            int[] indices = null;
+            String[] filenames = null;
+            if (body.filedevices != null && !body.filedevices.isEmpty()) {
+                List<Integer> idxTmp = new ArrayList<>();
+                List<String> fileTmp = new ArrayList<>();
+                int pos = 0;
+                for (FileDev fd : body.filedevices) {
+                    if (fd == null || fd.index == null || fd.filename == null || fd.filename.isBlank()) {
+                        return gson.toJson(new Msg(false, "Invalid filedevices entry at position " + pos + " (require {index, filename})."));
+                    }
+                    idxTmp.add(fd.index);
+                    fileTmp.add(fd.filename);
+                    pos++;
                 }
+                indices = idxTmp.stream().mapToInt(Integer::intValue).toArray();
+                filenames = fileTmp.toArray(new String[0]);
+            }
+
+            try {
+                switch (t) {
+                    case "sic" -> {
+                        SIM = (indices == null)
+                                ? new SicSimulation()
+                                : new SicSimulation(indices, filenames);
+                    }
+                    case "sicxe" -> {
+                        SIM = (indices == null)
+                                ? new SicxeSimulation()
+                                : new SicxeSimulation(indices, filenames);
+                    }
+                    default -> {
+                        return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
+                    }
+                }
+            } catch (IllegalArgumentException iae) {
+                return gson.toJson(new Msg(false, iae.getMessage()));
             }
             return gson.toJson(new Msg(true, "Simulation initialized (" + t + ")"));
         });
@@ -217,7 +267,7 @@ public class Main {
                     body.editing,
                     body.force,
                     body.verbose
-            ); // already JSON
+            );
         });
 
         // Syntax check (no link)
@@ -227,7 +277,7 @@ public class Main {
             if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with texts and fileNames arrays."));
             if (body.texts == null || body.fileNames == null || body.texts.length != body.fileNames.length)
                 return gson.toJson(new Msg(false, "texts and fileNames must be non-null and the same length."));
-            return SIM.syntaxCheck(body.texts, body.fileNames); // already JSON
+            return SIM.syntaxCheck(body.texts, body.fileNames);
         });
 
         // Memory read
@@ -242,10 +292,10 @@ public class Main {
             Integer end   = parseIntFlexible(body.end);
 
             if (addr != null && start == null && end == null) {
-                return SIM.memory(addr); // already JSON
+                return SIM.memory(addr);
             }
             if (addr == null && start != null && end != null) {
-                return SIM.memory(start, end); // already JSON
+                return SIM.memory(start, end);
             }
             return gson.toJson(new Msg(false,
                     "Provide either {addr} OR {start,end}. Values may be decimal or hex strings like '0x1000'."));
@@ -254,7 +304,7 @@ public class Main {
         // One step
         post("/step", (req, res) -> {
             if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
-            return SIM.step(); // already JSON
+            return SIM.step();
         });
     }
 
