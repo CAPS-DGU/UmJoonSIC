@@ -7,6 +7,12 @@ type IpcApiResponse<T = void> = Promise<{
   data?: T;
   message?: string;
 }>;
+
+interface FileDevice {
+  index: number;
+  filename: string;
+}
+
 // Custom APIs for renderer
 const api = {
   getFileList: (path: string): IpcApiResponse<string[]> => {
@@ -18,6 +24,7 @@ const api = {
     settings: {
       asm: string[];
       main: string;
+      filedevices: FileDevice[];
     };
   }> => {
     return ipcRenderer.invoke('createNewProject');
@@ -31,7 +38,7 @@ const api = {
   openProject: (): IpcApiResponse<{
     name: string;
     path: string;
-    settings: { asm: string[]; main: string };
+    settings: { asm: string[]; main: string; filedevices: FileDevice[] };
   }> => {
     return ipcRenderer.invoke('openProject');
   },
@@ -55,6 +62,9 @@ const api = {
   },
   deleteFolder: (projectPath: string, relativePath: string): IpcApiResponse<void> => {
     return ipcRenderer.invoke('deleteFolder', { projectPath, relativePath });
+  },
+  pickFile: (): IpcApiResponse<string> => {
+    return ipcRenderer.invoke('pickFile');
   },
 };
 

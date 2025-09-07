@@ -3,14 +3,14 @@ interface Window {
     getFileList: (path: string) => Promise<{ success: boolean; data?: string[]; message?: string }>;
     createNewProject: () => Promise<{
       success: boolean;
-      data?: { name: string; path: string; settings: { asm: string[]; main: string } };
+      data?: { name: string; path: string; settings: { asm: string[]; main: string; filedevices: FileDevice[] } };
       message?: string;
     }>;
     readFile: (path: string) => Promise<{ success: boolean; data?: string; message?: string }>;
     saveFile: (path: string, content: string) => Promise<{ success: boolean; message?: string }>;
     openProject: () => Promise<{
       success: boolean;
-      data?: { name: string; path: string; settings: { asm: string[]; main: string } };
+      data?: { name: string; path: string; settings: { asm: string[]; main: string; filedevices: FileDevice[] } };
       message?: string;
     }>;
     createNewFile: (
@@ -29,6 +29,7 @@ interface Window {
       projectPath: string,
       relativePath: string,
     ) => Promise<{ success: boolean; message?: string }>;
+    pickFile: () => Promise<{ success: boolean; data?: string; message?: string }>;
   };
 }
 

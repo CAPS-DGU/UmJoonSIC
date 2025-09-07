@@ -85,8 +85,10 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   setLoadedFiles: (files: LoadedFile[]) => set({ loadedFiles: files }),
   fetchBegin: async () => {
     const { mode } = useMemoryViewStore.getState();
+    const { settings } = useProjectStore.getState();
     console.log('mode: ', mode);
-    const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
+    console.log('filedevices: ', settings.filedevices);
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase(), filedevices: settings.filedevices});
     const data = res.data;
     if (data.ok) {
       set({ isReady: true });
@@ -226,6 +228,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { closeAllListFileTabs } = useEditorTabStore.getState();
     const { clearWatch } = useWatchStore.getState();
     const { mode } = useMemoryViewStore.getState();
+    const { settings } = useProjectStore.getState();
+    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase(), filedevices: settings.filedevices});
     const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
     const data = res.data;
     if (data.ok) {
