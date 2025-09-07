@@ -11,6 +11,8 @@ import Pannel from './components/pannel/Pannel';
 import Resizer from './components/common/Resizer';
 import SicSettingContainer from './components/setting/SicSettingContainer';
 
+import { InfoModal } from '@/components/common/InfoModal';
+
 const STATUS_BAR_HEIGHT = 40;
 
 function App() {
@@ -127,6 +129,7 @@ function App() {
         </div>
       </div>
       <UnderStatusBar />
+      <InfoModal />
     </div>
   );
 }

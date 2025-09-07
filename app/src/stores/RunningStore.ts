@@ -8,6 +8,7 @@ import { useRegisterStore } from './RegisterStore';
 import { useEditorTabStore, type EditorTab } from './EditorTabStore';
 import { useMemoryViewStore } from './MemoryViewStore';
 import { useErrorStore } from './pannel/ErrorStore';
+import { useModalStore } from '@/stores/ModalStore';
 import type { AssemblerError, LinkerError } from '@/types/DTO';
 import { toProjectRelativePath } from '@/lib/file-name';
 
@@ -66,7 +67,7 @@ interface LoadedFile {
   fileName: string;
   listing: Listing;
   assemblerErrors?: AssemblerError[];
-  linkerErrors?: LinkerError[];
+  linkerError?: LinkerError;
 }
 
 export const useRunningStore = create<RunningState>((set, get) => ({
@@ -81,7 +82,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   fetchBegin: async () => {
     const { mode } = useMemoryViewStore.getState();
     console.log('mode: ', mode);
-    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
+    const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
     const data = res.data;
     if (data.ok) {
       set({ isReady: true });
@@ -133,6 +134,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
                 type: 'load',
               })),
             );
+          }
+          if (file.linkerError) {
+            useModalStore
+              .getState()
+              .show(
+                '링커 에러',
+                `[에러 발생 단계: ${file.linkerError.phase}]\n${file.linkerError.msg}`,
+              );
           }
         });
 
@@ -213,7 +222,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { closeAllListFileTabs } = useEditorTabStore.getState();
     const { clearWatch } = useWatchStore.getState();
     const { mode } = useMemoryViewStore.getState();
-    const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase()});
+    const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
     const data = res.data;
     if (data.ok) {
       clearListFile();
