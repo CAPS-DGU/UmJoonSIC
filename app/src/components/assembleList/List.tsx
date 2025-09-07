@@ -1,11 +1,13 @@
 // src/components/editor/List.tsx
 import React, { useEffect, useRef } from 'react';
+import type { ListFileRow } from '@/stores/ListFileStore';
 import type { ListViewItem } from './ListContainer';
+import { List as ListIcon } from 'lucide-react';
 import { useRegisterStore } from '@/stores/RegisterStore';
 import { useRunningStore } from '@/stores/RunningStore';
 
 interface ListProps {
-  data: ListViewItem[];
+  data: ListFileRow[];
   activeTabTitle: string | undefined;
   breakpoints: number[];
   onBreakpointToggle: (index: number) => void;
@@ -109,11 +111,26 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
                         <div className="w-2 h-2 rounded-full border border-gray-400 mx-auto"></div>
                       )}
                     </td>
-                    <td className="px-2 py-1 w-24">{'0x' + parseInt(row.addressHex, 16).toString(16).toUpperCase().padStart(6, '0')}</td>
+                    <td className="px-2 py-1 w-24">
+                      {'0x' +
+                        parseInt(row.addressHex, 16).toString(16).toUpperCase().padStart(6, '0')}
+                    </td>
                     <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
                     <td className="px-2 py-1 w-24">{row.label}</td>
                     <td className="px-2 py-1 w-24">{row.instr}</td>
-                    <td className="px-2 py-1 w-24">{row.operand}</td>
+                    <td className="px-2 py-1 w-24">
+                      {(() => {
+                        // if operand is number → Hexnum
+                        if (/^\d+$/.test(row.operand)) {
+                          return (
+                            '0x' +
+                            parseInt(row.operand, 10).toString(16).toUpperCase().padStart(4, '0')
+                          );
+                        }
+                        // else (label etc) → print
+                        return row.operand;
+                      })()}
+                    </td>
                     <td className="px-2 py-1 flex-1 min-w-64">{row.comment}</td>
                     <td className="px-2 py-1 w-64">{row.rawCodeBinary}</td>
                     <td className="px-2 py-1 w-24">{row.instrBin}</td>

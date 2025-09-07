@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Cpu, AlarmClock, Play, Pause } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Cpu, AlarmClock, Play, Pause, Settings } from 'lucide-react';
 import RegisterValue from './RegisterValue';
 import MemoryViewer from './MemoryViewer';
 import { useRunningStore } from '@/stores/RunningStore';
@@ -16,6 +16,11 @@ export default function Debug() {
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
   const [isExecuting, setIsExecuting] = useState(false);
+
+  const delayTime = useRunningStore(s => s.delayTime);
+  const setDelayTime = useRunningStore(s => s.setDelayTime);
+  const [showDelayModal, setShowDelayModal] = useState(false);
+  const [delayInput, setDelayInput] = useState<string>('1000');
   
   const delay = async (time: number) => {
     await new Promise(resolve => setTimeout(resolve, time));
@@ -27,38 +32,60 @@ export default function Debug() {
     toggleIsRunning();
     await fetchMemory();
     fetchVarMemoryValue();
+    setIsExecuting(true);
   };
 
   const handleRunWithDelay = async (time: number, start: boolean = true) => {
-    if(start) {
-      await fetchLoad();
-    }
-    console.log('run with delay toggleIsRunning', isRunning);
-    if(!isRunning) {
-      toggleIsRunning();
-    }
-    setIsExecuting(true);
-    await fetchMemory();
-    fetchVarMemoryValue();
-    console.log('run with delay start', useRunningStore.getState().isRunning);
+  if (start) {
+    await fetchLoad();
+  }
+  console.log('run with delay toggleIsRunning', isRunning);
+  
+  if (!isRunning) {
+    toggleIsRunning();
+  }
+  setIsExecuting(true);
+  
+  await fetchMemory();
+  fetchVarMemoryValue();
+  console.log('run with delay start', useRunningStore.getState().isRunning);
 
-    while(useRunningStore.getState().isRunning) {
-      if(useRunningStore.getState().isPaused) {
-        break;
-      }
-      console.log('run with delay loop');
-      await delay(time);
-      fetchRegisters();
-      fetchMemory();
-      fetchVarMemoryValue();
+  while (useRunningStore.getState().isRunning) {
+    if (useRunningStore.getState().isPaused) {
+      break;
     }
-    console.log('run with delay end');
+    console.log('run with delay loop');
+    await delay(time);
+    fetchRegisters();
+    fetchMemory();
+    fetchVarMemoryValue();
+  }
+  console.log('run with delay end');
+};
+
+  const openDelayModal = () => {
+    setDelayInput(String(delayTime || 1000));
+    setShowDelayModal(true);
+  };
+
+  const confirmDelayAndRun = () => {
+    const parsed = Number(delayInput);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    setDelayTime(parsed);
+    setShowDelayModal(false);
+    handleRunWithDelay(parsed);
+  };
+
+  const confirmDelaySave = () => {
+    const parsed = Number(delayInput);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    setDelayTime(parsed);
+    setShowDelayModal(false);
   };
 
   const [showModeMenu, setShowModeMenu] = useState<boolean>(false);
   const { mode: currentMode, setMode } = useMemoryViewStore();
 
-  // 모달 외부 클릭 감지를 위한 ref
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,6 +119,8 @@ export default function Debug() {
               handleRun={handleRun}
               handleRunWithDelay={handleRunWithDelay}
               onToggleModeMenu={() => setShowModeMenu(!showModeMenu)}
+              onOpenDelayModal={openDelayModal}
+              delayTime={delayTime}
             />
           )}
           {showModeMenu && (
@@ -122,6 +151,43 @@ export default function Debug() {
           )}
         </div>
       </section>
+      {showDelayModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-4 w-80">
+            <h3 className="text-base font-semibold mb-2">지연 시간(ms)을 입력하세요</h3>
+            <input
+              type="number"
+              min={0}
+              value={delayInput}
+              onChange={e => setDelayInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') confirmDelaySave();
+              }}
+              className="w-full border border-gray-300 rounded-md px-2 py-1 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-3 py-1 rounded-md bg-gray-200 hover:bg-gray-300"
+                onClick={() => setShowDelayModal(false)}
+              >
+                취소
+              </button>
+              <button
+                className="px-3 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600"
+                onClick={confirmDelaySave}
+              >
+                저장
+              </button>
+              <button
+                className="px-3 py-1 rounded-md bg-green-600 text-white hover:bg-green-700"
+                onClick={confirmDelayAndRun}
+              >
+                저장 후 실행
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="border-b border-gray-200 py-3">
         <RegisterValue />
       </section>
@@ -136,18 +202,27 @@ interface DefaultButtonProps {
   handleRun: () => Promise<void>;
   handleRunWithDelay: (time: number) => Promise<void>;
   onToggleModeMenu: () => void;
+  onOpenDelayModal: () => void;
+  delayTime: number;
 }
 
-function DefaultButton({ handleRun, handleRunWithDelay, onToggleModeMenu }: DefaultButtonProps) {
+function DefaultButton({ handleRun, handleRunWithDelay, onToggleModeMenu, onOpenDelayModal, delayTime }: DefaultButtonProps) {
 
   return (
     <>
       <button
-        onClick={() => handleRunWithDelay(1000)}
+        onClick={() => handleRunWithDelay(delayTime || 1000)}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
-        title="1초 타임아웃으로 실행"
+        title={`지연(${delayTime || 1000}ms)으로 실행`}
       >
         <AlarmClock className="w-4 h-4" />
+      </button>
+      <button
+        onClick={onOpenDelayModal}
+        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+        title="지연 시간 설정"
+      >
+        <Settings className="w-4 h-4" />
       </button>
       <button
         onClick={() => handleRun()}
@@ -166,17 +241,46 @@ function DefaultButton({ handleRun, handleRunWithDelay, onToggleModeMenu }: Defa
     </>
   );
 }
-
-function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: number, start: boolean) => Promise<void> }) {
+function RunningButton({
+  handleRunWithDelay,
+  setIsExecuting,
+}: {
+  handleRunWithDelay: (time: number, start: boolean) => Promise<void>;
+  setIsExecuting: (e: boolean) => void;
+}) {
   const fetchRegisters = useRegisterStore(s => s.fetchRegisters);
   const fetchMemory = useMemoryViewStore(s => s.fetchMemoryValues);
   const stopRunning = useRunningStore(s => s.stopRunning);
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
+  
   return (
     <>
-    {!useRunningStore.getState().isPaused ? (
+      {!useRunningStore.getState().isPaused ? (
+        <button
+          onClick={() => {
+            useRunningStore.getState().setIsPaused(true);
+            console.log('Pause');
+          }}
+          className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+          title="Pause"
+        >
+          <Pause className="w-4 h-4" />
+        </button>
+      ) : (
+        <button
+          onClick={() => {
+            console.log('Continue');
+            useRunningStore.getState().setIsPaused(false);
+            handleRunWithDelay(1000, false);
+          }}
+          className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+          title="Continue"
+        >
+          <StepForward className="w-4 h-4" />
+        </button>
+      )}
       <button
         onClick={() => {
           useRunningStore.getState().setIsPaused(true);
@@ -198,7 +302,7 @@ function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: numb
       >
         <StepForward className="w-4 h-4" />
       </button> )}
-      <button
+      {useRunningStore.getState().isPaused && <button
         onClick={() => {
           fetchRegisters();
           fetchMemory();
@@ -208,7 +312,7 @@ function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: numb
         title="Step Over"
       >
         <Redo className="w-4 h-4" />
-      </button>
+      </button>}
       <button
         onClick={async () => {
           await stopRunning();
@@ -221,7 +325,10 @@ function RunningButton({ handleRunWithDelay }: { handleRunWithDelay: (time: numb
         <RotateCcw className="w-4 h-4" />
       </button>
       <button
-        onClick={stopRunning}
+        onClick={() => {
+          stopRunning();
+          setIsExecuting(false);
+        }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="실행 중지"
       >

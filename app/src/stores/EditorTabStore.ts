@@ -113,16 +113,27 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
       };
     }),
   closeAllListFileTabs: () => {
-    const { closeTab } = get();
-    get().tabs.forEach(tab => {
-      if (tab.filePath.endsWith('.lst')) {
-        closeTab(tab.idx);
+    set(state => {
+      const wasActive = state.tabs[state.activeTabIdx];
+      const filtered = state.tabs.filter(tab => !tab.filePath.endsWith('.lst'));
+      const reindexed = filtered.map((tab, i) => ({ ...tab, idx: i }));
+
+      let newActiveIdx = -1;
+      if (reindexed.length > 0) {
+        if (wasActive && !wasActive.filePath.endsWith('.lst')) {
+          const idx = reindexed.findIndex(t => t.filePath === wasActive.filePath);
+          newActiveIdx = idx !== -1 ? idx : reindexed.length - 1;
+        } else {
+          newActiveIdx = reindexed.length - 1;
+        }
       }
+
+      const syncedTabs = syncActiveState(reindexed, newActiveIdx);
+      return {
+        tabs: syncedTabs,
+        activeTabIdx: newActiveIdx,
+      };
     });
-    set(state => ({
-      tabs: state.tabs.filter(tab => !tab.filePath.endsWith('.lst')),
-      activeTabIdx: state.activeTabIdx,
-    }));
   },
   setActiveTab: idx =>
     set(state => {

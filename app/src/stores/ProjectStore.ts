@@ -8,14 +8,15 @@ interface FileDevice {
   index: number;
   filename: string;
 }
+import type { FileStructure } from '@/types/fileTree';
 
 interface ProjectState {
   projectName: string;
   projectPath: string;
   settings: { asm: string[]; main: string; filedevices: FileDevice[] };
-  fileTree: string[];
-  selectedFileOrFolder: string;
-  setSelectedFileOrFolder: (path: string) => void;
+  fileTree: FileStructure[];
+  selectedFileOrFolder: FileStructure | null;
+  setSelectedFileOrFolder: (item: FileStructure | null) => void;
   getFolderFromSelectedFileOrFolder: () => string;
   refreshFileTree: () => void;
   refreshSettings: () => void;
@@ -24,7 +25,8 @@ interface ProjectState {
   openProject: () => void;
   closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
-  addAsmFile: (filePath: string) => void;
+  addAsmFile: (file: FileStructure) => void;
+  removeAsmFile: (relativePath: string) => void;
   saveSettings: () => Promise<{ success: boolean; message?: string }>;
   setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) => void;
 }
@@ -34,37 +36,35 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projectPath: '',
   settings: { asm: [], main: '', filedevices: [] },
   fileTree: [],
-  selectedFileOrFolder: '',
-  setSelectedFileOrFolder: (path: string) => set({ selectedFileOrFolder: path }),
+  selectedFileOrFolder: null as FileStructure | null,
+  setSelectedFileOrFolder: (item: FileStructure | null) => set({ selectedFileOrFolder: item }),
   getFolderFromSelectedFileOrFolder: () => {
     const { selectedFileOrFolder } = get();
+    if (!selectedFileOrFolder) return '/';
 
-    // 빈 문자열이거나 루트 경로인 경우
-    if (!selectedFileOrFolder || selectedFileOrFolder === '/') {
-      return selectedFileOrFolder;
+    if (selectedFileOrFolder.type === 'folder') {
+      return selectedFileOrFolder.relativePath;
+    } else {
+      const parts = selectedFileOrFolder.relativePath.split('/');
+      parts.pop();
+      return parts.length === 0 ? '/' : parts.join('/');
     }
-
-    // /로 끝나는 경우 (디렉터리) - 그대로 반환
-    if (selectedFileOrFolder.endsWith('/')) {
-      return selectedFileOrFolder;
-    }
-
-    // 파일인 경우 - 파일명을 제거하고 디렉터리만 반환
-    const pathParts = selectedFileOrFolder.split('/');
-    pathParts.pop(); // 마지막 부분(파일명) 제거
-
-    // 루트 디렉터리인 경우
-    if (pathParts.length === 0 || (pathParts.length === 1 && pathParts[0] === '')) {
-      return '/';
-    }
-
-    return pathParts.join('/');
   },
-  addAsmFile: (filePath: string) => {
+  addAsmFile: (file: FileStructure) => {
+    const { settings, fileTree, saveSettings } = get();
+    if (file.type === 'file') {
+      set({
+        settings: { ...settings, asm: [...settings.asm, file.relativePath] },
+        fileTree: [...fileTree, file],
+      });
+      saveSettings();
+    }
+  },
+  removeAsmFile: (relativePath: string) => {
     const { settings, fileTree, saveSettings } = get();
     set({
-      settings: { ...settings, asm: [...settings.asm, filePath] },
-      fileTree: [...fileTree, filePath],
+      settings: { ...settings, asm: settings.asm.filter(p => p !== relativePath) },
+      fileTree: fileTree.filter(f => f.relativePath !== relativePath),
     });
     saveSettings();
   },
@@ -101,7 +101,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       .getFileList(currentPath)
       .then(res => {
         if (res.success && res.data) {
-          set({ fileTree: res.data });
+          const fileTree: FileStructure[] = res.data.map(pathStr => ({
+            type: 'file', // 또는 folder인지 판단해서 동적으로
+            name: pathStr.split('/').pop() || pathStr,
+            relativePath: pathStr,
+          }));
+          set({ fileTree });
         } else {
           console.error('Failed to get file list:', res.message);
           set({ fileTree: [] });
@@ -172,7 +177,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectPath: '',
       settings: { asm: [], main: '', filedevices: [] },
       fileTree: [],
-      selectedFileOrFolder: '',
+      selectedFileOrFolder: null,
     });
   },
 

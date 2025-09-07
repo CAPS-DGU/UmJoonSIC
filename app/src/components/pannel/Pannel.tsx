@@ -5,7 +5,7 @@ import Console from '@/components/pannel/Console';
 
 const TABS = [
   { key: 'watch', label: '관찰' },
-  { key: 'warnings', label: '경고' },
+  { key: 'warnings', label: '오류' },
   { key: 'console', label: '서버' },
 ] as const;
 

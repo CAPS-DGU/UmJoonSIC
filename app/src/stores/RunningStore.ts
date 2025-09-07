@@ -8,6 +8,7 @@ import { useRegisterStore } from './RegisterStore';
 import { useEditorTabStore, type EditorTab } from './EditorTabStore';
 import { useMemoryViewStore } from './MemoryViewStore';
 import { useErrorStore } from './pannel/ErrorStore';
+import { useModalStore } from '@/stores/ModalStore';
 import type { AssemblerError, LinkerError } from '@/types/DTO';
 import { toProjectRelativePath } from '@/lib/file-name';
 
@@ -16,6 +17,8 @@ interface RunningState {
   isPaused: boolean;
   isReady: boolean;
   loadedFiles: LoadedFile[];
+  delayTime: number;
+  setDelayTime: (delayTime: number) => void;
   setIsRunning: (isRunning: boolean) => void;
   toggleIsRunning: () => void;
   fetchBegin: () => void;
@@ -66,7 +69,7 @@ interface LoadedFile {
   fileName: string;
   listing: Listing;
   assemblerErrors?: AssemblerError[];
-  linkerErrors?: LinkerError[];
+  linkerError?: LinkerError;
 }
 
 export const useRunningStore = create<RunningState>((set, get) => ({
@@ -74,6 +77,8 @@ export const useRunningStore = create<RunningState>((set, get) => ({
   isPaused: true,
   isReady: false,
   loadedFiles: [],
+  delayTime: 1000,
+  setDelayTime: delayTime => set({ delayTime }),
   setIsPaused: isPaused => set({ isPaused }),
   setIsRunning: isRunning => set({ isRunning }),
   toggleIsRunning: () => set(state => ({ isRunning: !state.isRunning })),
@@ -135,6 +140,14 @@ export const useRunningStore = create<RunningState>((set, get) => ({
                 type: 'load',
               })),
             );
+          }
+          if (file.linkerError) {
+            useModalStore
+              .getState()
+              .show(
+                '링커 에러',
+                `[에러 발생 단계: ${file.linkerError.phase}]\n${file.linkerError.msg}`,
+              );
           }
         });
 
@@ -217,6 +230,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { mode } = useMemoryViewStore.getState();
     const { settings } = useProjectStore.getState();
     const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase(), filedevices: settings.filedevices});
+    const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
     const data = res.data;
     if (data.ok) {
       clearListFile();

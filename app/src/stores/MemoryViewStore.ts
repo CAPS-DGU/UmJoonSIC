@@ -6,8 +6,9 @@ import type { WatchRow } from './pannel/WatchStore';
 export type MemoryNodeStatus = 'normal' | 'highlighted' | 'red bold';
 
 export interface MemoryNodeData {
-  value: string; // 실제 값 (0~255)
-  status?: MemoryNodeStatus; // 표시 상태
+  value: string;
+  status?: MemoryNodeStatus;
+  isLoading?: boolean;
 }
 
 export interface MemoryLabel {
@@ -16,13 +17,10 @@ export interface MemoryLabel {
   name: string;
 }
 
-// SIC, SIC/XE 모드를 위한 타입 정의
 export type MachineMode = 'SIC' | 'SICXE';
 
 interface MemoryViewState {
-  // --- 새로 추가된 상태 ---
-  mode: MachineMode; // 현재 머신 모드
-
+  mode: MachineMode;
   memoryRange: {
     start: number;
     end: number;
@@ -30,22 +28,20 @@ interface MemoryViewState {
   memoryValues: MemoryNodeData[];
   labels: MemoryLabel[];
   changedNodes: Set<number>;
-
   visibleRange: {
     start: number;
     end: number;
   };
   totalMemorySize: number;
   loadedRanges: Set<string>;
+  loadingRanges: Set<string>;
 
-  // --- 새로 추가된 액션 ---
   setMode: (newMode: MachineMode) => void;
-
   setMemoryRange: (memoryRange: { start: number; end: number }) => void;
   setMemoryValues: (memoryValues: MemoryNodeData[]) => void;
   setLabels: (labels: MemoryLabel[]) => void;
-  updateMemoryNode: (index: number, patch: MemoryNodeData) => void;
-  clearChangedNodes: () => void; // 변경된 노드 목록 초기화
+  updateMemoryNode: (index: number, patch: Partial<MemoryNodeData>) => void;
+  clearChangedNodes: () => void;
   fetchMemoryValues: () => Promise<void>;
   setVisibleRange: (range: { start: number; end: number }) => void;
   setTotalMemorySize: (size: number) => void;
@@ -55,25 +51,16 @@ interface MemoryViewState {
 }
 
 export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
-  // --- 기본값을 SIC 모드 기준으로 변경 ---
   mode: 'SIC',
-  totalMemorySize: 0x8000, // 32KB (SIC 메모리 크기)
-
-  memoryRange: {
-    start: 0,
-    end: 256,
-  },
+  totalMemorySize: 0x8000,
+  memoryRange: { start: 0, end: 256 },
   memoryValues: [],
   labels: [],
   changedNodes: new Set(),
-
-  visibleRange: {
-    start: 0,
-    end: 256,
-  },
+  visibleRange: { start: 0, end: 256 },
   loadedRanges: new Set(),
+  loadingRanges: new Set(),
 
-  // --- 모드 변경 액션 구현 ---
   setMode: newMode => {
     const totalSize = newMode === 'SIC' ? 0x8000 : 0x100000;
     set({
@@ -82,6 +69,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       memoryRange: { start: 0, end: totalSize - 1 },
       memoryValues: [],
       loadedRanges: new Set(),
+      loadingRanges: new Set(),
       changedNodes: new Set(),
       labels: [],
       visibleRange: { start: 0, end: 256 },
@@ -95,9 +83,9 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
     set(state => {
       const newValues = [...state.memoryValues];
       const oldValue = newValues[index]?.value;
-      newValues[index] = { ...newValues[index], ...patch };
+      newValues[index] = { ...newValues[index], ...patch } as MemoryNodeData;
 
-      if (oldValue !== patch.value) {
+      if (patch.value !== undefined && oldValue !== patch.value) {
         const newChangedNodes = new Set(state.changedNodes);
         newChangedNodes.add(index);
         return {
@@ -114,12 +102,47 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   setTotalMemorySize: totalMemorySize => set({ totalMemorySize }),
 
   loadMemoryRange: async (start, end) => {
-    const { loadedRanges } = get();
-    const rangeKey = `${start}-${end}`;
-
-    if (loadedRanges.has(rangeKey)) {
+    if (start < 0 || start >= end) {
       return;
     }
+
+    const rangeKey = `${start}-${end}`;
+    const currentState = get();
+
+    if (currentState.loadedRanges.has(rangeKey) || currentState.loadingRanges.has(rangeKey)) {
+      return;
+    }
+
+    set(state => {
+      const newLoadingRanges = new Set(state.loadingRanges).add(rangeKey);
+      const mergedValues = [...state.memoryValues];
+      const requiredSize = end;
+
+      if (mergedValues.length < requiredSize) {
+        const diff = requiredSize - mergedValues.length;
+        const newPlaceholders = Array.from({ length: diff }, () => ({
+          value: '00',
+          status: 'normal' as const,
+          isLoading: false,
+        }));
+        mergedValues.push(...newPlaceholders);
+      }
+
+      for (let i = start; i < end; i++) {
+        if (i < mergedValues.length && (!mergedValues[i] || !mergedValues[i].isLoading)) {
+          mergedValues[i] = {
+            value: '00',
+            status: 'normal',
+            isLoading: true,
+          };
+        }
+      }
+
+      return {
+        memoryValues: mergedValues,
+        loadingRanges: newLoadingRanges,
+      };
+    });
 
     try {
       const res = await axios.post('http://localhost:9090/memory', {
@@ -130,63 +153,44 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       const data = res.data;
       const newValues = data.values.map((value: number) => ({
         value: value.toString(16).toUpperCase().padStart(2, '0'),
-        status: 'normal',
+        status: 'normal' as const,
+        isLoading: false,
       }));
 
       set(state => {
-        const newLoadedRanges = new Set(state.loadedRanges);
-        newLoadedRanges.add(rangeKey);
         const mergedValues = [...state.memoryValues];
-        const requiredSize = end + 1;
-        while (mergedValues.length < requiredSize) {
-          mergedValues.push({
-            value: '00',
-            status: 'normal',
-          });
-        }
-
-        for (let i = 0; i < newValues.length; i++) {
+        newValues.forEach((val: any, i: any) => {
           const globalIndex = start + i;
           if (globalIndex < mergedValues.length) {
-            mergedValues[globalIndex] = newValues[i];
+            mergedValues[globalIndex] = val;
           }
-        }
+        });
 
-        console.log(`메모리 범위 로드: ${start}-${end}, 로드된 값들:`, newValues.slice(0, 5));
+        const newLoadingRanges = new Set(state.loadingRanges);
+        newLoadingRanges.delete(rangeKey);
+        const newLoadedRanges = new Set(state.loadedRanges).add(rangeKey);
 
         return {
           memoryValues: mergedValues,
+          loadingRanges: newLoadingRanges,
           loadedRanges: newLoadedRanges,
         };
       });
     } catch (error) {
-      console.error('메모리 범위 로드 실패:', error);
-
+      console.error(`메모리 범위 ${rangeKey} 로드 실패:`, error);
       set(state => {
-        const newLoadedRanges = new Set(state.loadedRanges);
-        newLoadedRanges.add(rangeKey);
         const mergedValues = [...state.memoryValues];
-        const requiredSize = end + 1;
-        while (mergedValues.length < requiredSize) {
-          mergedValues.push({
-            value: '00',
-            status: 'normal',
-          });
-        }
-
-        for (let i = 0; i < end - start + 1; i++) {
-          const globalIndex = start + i;
-          if (globalIndex < mergedValues.length) {
-            mergedValues[globalIndex] = {
-              value: (globalIndex % 256).toString(16).toUpperCase().padStart(2, '0'),
-              status: 'normal',
-            };
+        for (let i = start; i < end; i++) {
+          if (i < mergedValues.length && mergedValues[i]?.isLoading) {
+            mergedValues[i] = { ...mergedValues[i], isLoading: false, value: 'ER' };
           }
         }
 
+        const newLoadingRanges = new Set(state.loadingRanges);
+        newLoadingRanges.delete(rangeKey);
         return {
+          loadingRanges: newLoadingRanges,
           memoryValues: mergedValues,
-          loadedRanges: newLoadedRanges,
         };
       });
     }
@@ -201,41 +205,48 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   },
 
   fetchMemoryValues: async () => {
-    const { memoryRange, memoryValues } = get();
-    const res = await axios.post('http://localhost:9090/memory', {
-      start: memoryRange.start,
-      end: memoryRange.end,
-    });
-    console.log(res);
-    const data = res.data;
+    const { memoryRange } = get();
+    try {
+      const res = await axios.post('http://localhost:9090/memory', {
+        start: memoryRange.start,
+        end: memoryRange.end,
+      });
+      const data = res.data;
+      const newValues = data.values.map((value: number) => ({
+        value: value.toString(16).toUpperCase().padStart(2, '0'),
+        status: 'normal' as const,
+      }));
 
-    const newValues = data.values.map((value: number) => ({
-      value: value.toString(16).toUpperCase().padStart(2, '0'),
-      status: 'normal',
-    }));
+      set(state => {
+        const mergedValues = [...state.memoryValues];
+        const changedNodes = new Set<number>();
+        newValues.forEach((newNode: any, i: any) => {
+          const globalIndex = memoryRange.start + i;
+          const oldNode = state.memoryValues[globalIndex];
+          if (oldNode && oldNode.value !== newNode.value) {
+            changedNodes.add(globalIndex);
+          }
+          if (globalIndex < mergedValues.length) {
+            mergedValues[globalIndex] = newNode;
+          }
+        });
+        return { memoryValues: mergedValues, changedNodes };
+      });
+    } catch (error) {
+      console.error('메모리 값 fetch 실패:', error);
+    }
+  },
 
-    const changedNodes = new Set<number>();
-    newValues.forEach((newNode: MemoryNodeData, index: number) => {
-      const oldNode = memoryValues[index];
-      if (oldNode && oldNode.value !== newNode.value) {
-        changedNodes.add(index);
+  getMemoryLabelFromWatch: () => {
+    const { watch } = useWatchStore.getState();
+    const labels: MemoryLabel[] = [];
+    watch.forEach((watchRow: WatchRow) => {
+      const { address, name, elementCount, elementSize } = watchRow;
+      if (typeof address === 'number' && elementCount > 0) {
+        const end = address + elementSize * elementCount - 1;
+        labels.push({ start: address, end, name: name });
       }
     });
-
-    set({
-      memoryValues: newValues,
-      changedNodes,
-    });
-  },
-  getMemoryLabelFromWatch: () => {
-    const { watch } = useWatchStore();
-    const labels: MemoryLabel[] = [];
-    watch.forEach((watch: WatchRow) => {
-      const { address, name, dataType, elementSize, elementCount } = watch;
-      const end = address + elementSize * elementCount - 1;
-      labels.push({ start: address, end, name: name });
-    });
-
     return labels;
   },
 }));
