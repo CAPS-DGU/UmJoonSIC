@@ -16,6 +16,10 @@ public class Devices {
         devices[idx] = device;
     }
 
+    public void addFileDevice(int idx, String filePath) {
+        devices[idx] = new FileDevice(filePath);
+    }
+
     private String byteToHex(int value) {
         return String.format("%02X", value & 0xFF);
     }
@@ -55,6 +59,6 @@ public class Devices {
         assert count > 2;
         devices = new Device[count];
         for (int i = 0; i < count; i++)
-            setDevice(i, new FileDevice(byteToHex(i) + ".dev"));
+            setDevice(i, new Device());
     }
 }

@@ -7,8 +7,8 @@ package iodevices;
 public class Device {
 
     public boolean test() {
-        // always true: EOF is returned by read
-        return true;
+        // false by default
+        return false;
     }
 
     public int read() {
