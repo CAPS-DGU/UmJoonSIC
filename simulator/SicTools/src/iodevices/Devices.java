@@ -17,6 +17,7 @@ public class Devices {
     }
 
     public void addFileDevice(int idx, String filePath) {
+
         devices[idx] = new FileDevice(filePath);
     }
 

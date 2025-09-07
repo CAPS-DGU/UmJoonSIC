@@ -21,6 +21,11 @@ public class FileDevice extends Device {
     }
 
     @Override
+    public boolean test(){
+        return true;
+    }
+
+    @Override
     public int read() {
         if (file == null) openFile();
         if (file == null) return super.read();
