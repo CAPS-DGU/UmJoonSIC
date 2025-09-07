@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { FileStructure } from '@/types/fileTree';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
 
 interface Props {
   x: number;
@@ -21,13 +30,14 @@ export function ContextMenu({ x, y, item, onDelete, onClose }: Props) {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, [onClose]);
 
   const handleDelete = () => {
+    console.log('Deleting item:', item);
     onDelete(item);
     setShowConfirm(false);
     onClose();
@@ -49,27 +59,20 @@ export function ContextMenu({ x, y, item, onDelete, onClose }: Props) {
         </button>
       </div>
 
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg w-80">
-            <h2 className="text-lg font-semibold mb-4">정말 삭제하시겠습니까?</h2>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-                onClick={() => setShowConfirm(false)}
-              >
-                취소
-              </button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                onClick={handleDelete}
-              >
-                삭제
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent className="!max-w-sm min-h-[150px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <p>{item.name}을 삭제합니다.</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
