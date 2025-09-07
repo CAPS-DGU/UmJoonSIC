@@ -8,9 +8,7 @@ import sic.common.Mnemonics;
 import java.io.Writer;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Pure SIC assembler pipeline.
  */
 public class Assembler {
 
@@ -31,17 +29,12 @@ public class Assembler {
         parser.begin(input);
         Program program = parser.parseProgram();
 
-        // phase one: absolute expressions
-        new DefineEQUs(program, errorCatcher).visitCommands();             // define EQUs
-        new EvalEQUs(program, errorCatcher, false).visitCommands();        // EQUs: resolve absolute expressions
-        new ResolveAbsolute(program, errorCatcher).visitCommands();        // resolve START and RESx
+        // phase one: resolve START and simple storage sizes (RESB/RESW)
+        new ResolveAbsolute(program, errorCatcher).visitCommands();
 
-        // phase two: relative expressions
-        new ResolveBlocks(program, errorCatcher).visitByStructure();       // define labels, resolve block sizes, resolve ORGs
-        new EvalEQUs(program, errorCatcher, true).visitCommands();         // resolve also relative EQUs
-        new ResolveRelative(program, errorCatcher).visitCommands();        // resolve BASE and import/export
-        new ResolveSymbols(program, errorCatcher).visitCommands();         // resolve instructions
-        // TODO: check for undefined symbols, unevaluated expressions
+        // phase two: define labels, block sizes; resolve instructions
+        new ResolveBlocks(program, errorCatcher).visitByStructure();
+        new ResolveSymbols(program, errorCatcher).visitCommands();
 
         return program;
     }
@@ -57,5 +50,4 @@ public class Assembler {
     public void generateObj(Program program, Writer writer, boolean addSpaceInObj) {
         new WriteText(program, errorCatcher, writer, addSpaceInObj).visitByStructure();
     }
-
 }

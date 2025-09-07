@@ -4,15 +4,21 @@ import sic.asm.Location;
 import sic.ast.data.Data;
 import sic.ast.data.DataHex;
 import sic.ast.storage.StorageData;
-import sic.common.*;
+import sic.common.Flags;
+import sic.common.Mnemonic;
+import sic.common.Mnemonics;
+import sic.common.Opcode;
+import sic.common.SICXE;
 import sic.ast.Command;
-import sic.ast.instructions.*;
+import sic.ast.instructions.Instruction;
+import sic.ast.instructions.InstructionF3;
+import sic.ast.instructions.InstructionF3m;
 import sic.sim.vm.Machine;
 
 /**
- * TODO: write a short description
- *
- * @author jure
+ * Pure SIC disassembler:
+ * - Always decodes 3-byte format (15-bit address + optional X)
+ * - Only F3 (no operand) and F3m (memory operand) mnemonics are produced
  */
 public class Disassembler {
 
@@ -71,69 +77,47 @@ public class Disassembler {
 
     public Instruction disassemble(int addr) {
         this.fetchAddr = addr;
-        int opcode = fetch();
-        String name = Opcode.getName(opcode & 0xFC);
+
+        // Always read 3 bytes (SIC format)
+        int b0 = fetch();          // opcode (ni bits are 00 in pure SIC)
+        int b1 = fetch();          // x bit in MSB, then high 7 bits of address
+        int b2 = fetch();          // low 8 bits of address
+
+        int op = b0 & 0xFC;
+        String name = Opcode.getName(op);
         if (name == null) return null;
+
         Mnemonic mnemonic = mnemonics.get(name);
-        int b1, b2;
-        Location loc = new Location(-1,-1,-1);
+        if (mnemonic == null) return null;
+
+        // Construct flags from first two bytes — only X is meaningful in pure SIC
+        Flags flags = new Flags(b0, b1);
+        int addr15 = ((b1 & 0x7F) << 8) | (b2 & 0xFF);
+
+        Location loc = new Location(-1, -1, -1);
+
         switch (mnemonic.format) {
-            case F1:
-                return new InstructionF1(loc, "", null,
-                        mnemonic, null);
-            case F2n:
-                return new InstructionF2n(loc, "", null,
-                        mnemonic, null,
-                        fetch() >> 4, null);
-            case F2r:
-                return new InstructionF2r(loc, "", null,
-                        mnemonic, null,
-                        fetch() >> 4, null);
-            case F2rn:
-                b1 = fetch();
-                return new InstructionF2rn(loc, "", null,
-                        mnemonic, null,
-                        (b1 & 0xF0) >> 4, null,
-                        (b1 & 0x0F) + 1, null);
-            case F2rr:
-                b1 = fetch();
-                return new InstructionF2rr(loc, "", null,
-                        mnemonic, null,
-                        (b1 & 0xF0) >> 4, null,
-                        b1 & 0x0F, null);
             case F3:
-                fetch(); fetch(); // should be zero?
-                return new InstructionF3(loc, "", null,
-                        mnemonic, null);
+                // No operand (e.g., RSUB). We already consumed the 2 extra bytes.
+                return new InstructionF3(loc, "", null, mnemonic, null);
+
             case F3m:
-            case F4m:
-                b1 = fetch(); b2 = fetch();
-                Flags flags = new Flags(opcode, b1);
-                if (flags.isExtended()) {
-                    int operand = flags.operandF4(b1, b2, fetch());
-                    mnemonic = mnemonics.get("+" + name);
-                    return new InstructionF4m(loc, "", null,
-                            mnemonic, null,
-                            flags, operand,
-                            null, null);
-                }
-                // F3 or Sic
-                int operand = flags.isSic() ? flags.operandSic(b1, b2) : flags.operandF3(b1, b2);
-                if (flags.isPCRelative()) operand = flags.operandPCRelative(operand);
-                return new InstructionF3m(loc, "", null,
-                        mnemonic, null,
-                        flags, operand,
-                        null, null);
+                // Memory operand (absolute 15-bit) with optional ,X
+                return new InstructionF3m(loc, "", null, mnemonic, null,
+                        flags, addr15, null, null);
+
+            default:
+                // Any other formats are not part of pure SIC disassembly
+                return null;
         }
-        return null;
     }
 
     public Command disassembleSafe(int loc) {
         Instruction instruction = disassemble(loc);
         if (instruction == null) {
             Data data = new DataHex(mnemonics.get("BYTE").opcode);
-            data.setData((byte)machine.memory.getByteRaw(loc));
-            return new StorageData(new Location(-1,-1,-1), "", null,
+            data.setData((byte) machine.memory.getByteRaw(loc));
+            return new StorageData(new Location(-1, -1, -1), "", null,
                     mnemonics.get("BYTE"), null,
                     data, null);
         }
@@ -157,5 +141,4 @@ public class Disassembler {
     public int getNextPCLocation() {
         return getLocationAfter(machine.registers.getPC());
     }
-
 }
