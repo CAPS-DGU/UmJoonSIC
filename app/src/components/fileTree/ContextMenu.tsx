@@ -10,7 +10,6 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 
 interface Props {
   x: number;
@@ -65,6 +64,7 @@ export function ContextMenu({ x, y, item, onDelete, onClose }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
           </AlertDialogHeader>
+          <p>{item.name}을 삭제합니다.</p>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
