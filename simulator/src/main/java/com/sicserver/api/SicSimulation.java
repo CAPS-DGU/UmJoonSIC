@@ -344,30 +344,8 @@ public class SicSimulation extends SicxeSimulation {
     @Override
     public String memory(int start) { return memory(start, null); }
 
-    // Dump 0x1000..0x1038 (inclusive) in 16-byte rows, hex
-    private void debugDumpWindow1000() {
-        final int start = 0x1000;
-        final int end   = 0x1038; // inclusive
-        int addr = start;
-
-        while (addr <= end) {
-            int lineStart = addr;
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format("[SIC][memory] DUMP 0x%06X:", lineStart));
-
-            for (int i = 0; i < 16 && addr <= end; i++, addr++) {
-                int v = machineSic.memory.getByteRaw(addr) & 0xFF;
-                sb.append(' ').append(String.format("%02X", v));
-            }
-            System.out.println(sb.toString());
-        }
-    }
     @Override
     public String memory(int start, Integer endInclusive) {
-        // --- Debug: log the request ---
-        System.out.printf("[SIC][memory] request start=%d (0x%06X), endInclusive=%s%n",
-                start, start, (endInclusive == null ? "null" : String.format("%d (0x%06X)", endInclusive, endInclusive)));
-
         try {
             if (endInclusive == null) {
                 int val = machineSic.memory.getByteRaw(start) & 0xFF;
@@ -377,13 +355,6 @@ public class SicSimulation extends SicxeSimulation {
                 r.put("value", val);
 
                 String json = gson.toJson(r);
-
-                // --- Debug: log the response (single byte) ---
-                System.out.printf("[SIC][memory] response SINGLE address=%d (0x%06X), value=%d (0x%02X)%n",
-                        start, start, val, val);
-
-                // --- Always dump window 0x1000..0x1038 ---
-                debugDumpWindow1000();
 
                 return json;
             } else {
@@ -412,12 +383,6 @@ public class SicSimulation extends SicxeSimulation {
                 }
                 if (len > preview) hexPreview.append(" ...");
 
-                System.out.printf("[SIC][memory] response RANGE %d..%d (0x%06X..0x%06X), len=%d, first %d bytes (hex)=%s%n",
-                        s, e, s, e, len, preview, hexPreview.toString());
-
-                // --- Always dump window 0x1000..0x1038 ---
-                debugDumpWindow1000();
-
                 return json;
             }
         } catch (Exception ex) {
@@ -426,10 +391,6 @@ public class SicSimulation extends SicxeSimulation {
             err.put("message", "Memory read failed: " + ex.getMessage());
 
             String json = gson.toJson(err);
-
-            // --- Debug: log the error and still dump the window for context ---
-            System.out.printf("[SIC][memory] ERROR: %s%n", ex.getMessage());
-            debugDumpWindow1000();
 
             return json;
         }

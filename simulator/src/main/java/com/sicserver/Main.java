@@ -179,6 +179,12 @@ public class Main {
     static final class SyntaxReq { String[] texts; String[] fileNames; }
     static final class MemoryReq { Object addr; Object start; Object end; }
 
+    static <T> T logIO(String endpoint, int inBytes, T out) {
+        int outBytes = String.valueOf(out).getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        System.out.println(endpoint + " incoming = " + inBytes + " bytes, outgoing = " + outBytes + " bytes");
+        return out;
+    }
+
     public static void main(String[] args) {
         SIM = new SicSimulation(); // default engine before first /begin
         int portNum = 9090;
@@ -202,9 +208,12 @@ public class Main {
         // ---------- Routes ----------
         // Health / init simulation
         post("/begin", (req, res) -> {
+            String __b = req.body();
+            int __in = __b == null ? 0 : __b.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
             BeginReq body = safeFromJson(req.body(), BeginReq.class);
             if (body == null || body.type == null) {
-                return gson.toJson(new Msg(false, "Expected JSON body: { \"type\": \"sic\" | \"sicxe\", \"filedevices\":[{index,filename}]? }"));
+                return logIO("POST /begin", __in, gson.toJson(new Msg(false, "Expected JSON body: { \"type\": \"sic\" | \"sicxe\", \"filedevices\":[{index,filename}]? }")));
             }
             String t = body.type.trim().toLowerCase();
 
@@ -217,7 +226,7 @@ public class Main {
                 int pos = 0;
                 for (FileDev fd : body.filedevices) {
                     if (fd == null || fd.index == null || fd.filename == null || fd.filename.isBlank()) {
-                        return gson.toJson(new Msg(false, "Invalid filedevices entry at position " + pos + " (require {index, filename})."));
+                        return logIO("POST /begin", __in, gson.toJson(new Msg(false, "Invalid filedevices entry at position " + pos + " (require {index, filename}).")));
                     }
                     idxTmp.add(fd.index);
                     fileTmp.add(fd.filename);
@@ -240,24 +249,26 @@ public class Main {
                                 : new SicxeSimulation(indices, filenames);
                     }
                     default -> {
-                        return gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")"));
+                        return logIO("POST /begin", __in, gson.toJson(new Msg(false, "Unknown type: \"" + body.type + "\" (use \"sic\" or \"sicxe\")")));
                     }
                 }
             } catch (IllegalArgumentException iae) {
-                return gson.toJson(new Msg(false, iae.getMessage()));
+                return logIO("POST /begin", __in, gson.toJson(new Msg(false, iae.getMessage())));
             }
-            return gson.toJson(new Msg(true, "Simulation initialized (" + t + ")"));
+            return logIO("POST /begin", __in, gson.toJson(new Msg(true, "Simulation initialized (" + t + ")")));
         });
 
         // Assemble / Link
         post("/load", (req, res) -> {
-            if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
+            String __b = req.body();
+            int __in = __b == null ? 0 : __b.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
+            if (SIM == null) return logIO("POST /load", __in, gson.toJson(new Msg(false, "Simulation not started. Call /begin first.")));
             LoadReq body = safeFromJson(req.body(), LoadReq.class);
-            if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with filePaths (array)."));
+            if (body == null) return logIO("POST /load", __in, gson.toJson(new Msg(false, "Expected JSON body with filePaths (array).")));
             if (body.filePaths == null || body.filePaths.length == 0)
-                return gson.toJson(new Msg(false, "filePaths must be a non-empty array."));
-            // main and other options are optional; Simulation.load handles defaults
-            return SIM.load(
+                return logIO("POST /load", __in, gson.toJson(new Msg(false, "filePaths must be a non-empty array.")));
+            Object r = SIM.load(
                     body.filePaths,
                     body.outputDir,
                     body.outputName,
@@ -268,43 +279,53 @@ public class Main {
                     body.force,
                     body.verbose
             );
+            return logIO("POST /load", __in, r);
         });
 
         // Syntax check (no link)
         post("/syntax-check", (req, res) -> {
-            if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
+            String __b = req.body();
+            int __in = __b == null ? 0 : __b.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
+            if (SIM == null) return logIO("POST /syntax-check", __in, gson.toJson(new Msg(false, "Simulation not started. Call /begin first.")));
             SyntaxReq body = safeFromJson(req.body(), SyntaxReq.class);
-            if (body == null) return gson.toJson(new Msg(false, "Expected JSON body with texts and fileNames arrays."));
+            if (body == null) return logIO("POST /syntax-check", __in, gson.toJson(new Msg(false, "Expected JSON body with texts and fileNames arrays.")));
             if (body.texts == null || body.fileNames == null || body.texts.length != body.fileNames.length)
-                return gson.toJson(new Msg(false, "texts and fileNames must be non-null and the same length."));
-            return SIM.syntaxCheck(body.texts, body.fileNames);
+                return logIO("POST /syntax-check", __in, gson.toJson(new Msg(false, "texts and fileNames must be non-null and the same length.")));
+            return logIO("POST /syntax-check", __in, SIM.syntaxCheck(body.texts, body.fileNames));
         });
 
         // Memory read
         post("/memory", (req, res) -> {
-            if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
+            String __b = req.body();
+            int __in = __b == null ? 0 : __b.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
+            if (SIM == null) return logIO("POST /memory", __in, gson.toJson(new Msg(false, "Simulation not started. Call /begin first.")));
             MemoryReq body = safeFromJson(req.body(), MemoryReq.class);
             if (body == null)
-                return gson.toJson(new Msg(false, "Expected JSON body with addr OR start+end."));
+                return logIO("POST /memory", __in, gson.toJson(new Msg(false, "Expected JSON body with addr OR start+end.")));
 
             Integer addr = parseIntFlexible(body.addr);
             Integer start = parseIntFlexible(body.start);
             Integer end   = parseIntFlexible(body.end);
 
             if (addr != null && start == null && end == null) {
-                return SIM.memory(addr);
+                return logIO("POST /memory", __in, SIM.memory(addr));
             }
             if (addr == null && start != null && end != null) {
-                return SIM.memory(start, end);
+                return logIO("POST /memory", __in, SIM.memory(start, end));
             }
-            return gson.toJson(new Msg(false,
-                    "Provide either {addr} OR {start,end}. Values may be decimal or hex strings like '0x1000'."));
+            return logIO("POST /memory", __in, gson.toJson(new Msg(false,
+                    "Provide either {addr} OR {start,end}. Values may be decimal or hex strings like '0x1000'.")));
         });
 
         // One step
         post("/step", (req, res) -> {
-            if (SIM == null) return gson.toJson(new Msg(false, "Simulation not started. Call /begin first."));
-            return SIM.step();
+            String __b = req.body();
+            int __in = __b == null ? 0 : __b.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+
+            if (SIM == null) return logIO("POST /step", __in, gson.toJson(new Msg(false, "Simulation not started. Call /begin first.")));
+            return logIO("POST /step", __in, SIM.step());
         });
     }
 

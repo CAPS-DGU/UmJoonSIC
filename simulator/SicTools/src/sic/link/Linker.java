@@ -32,10 +32,12 @@ public class Linker {
     }
 
     public Section link() throws LinkerError {
+        log("-------- [Linker Start] -------------------------");
         Sections sections = parse();
 
         Section combined = passAndCombine(sections);
 
+        log("-------- [Linking Complete] ---------------------");
         return combined;
     }
 
