@@ -1,5 +1,6 @@
 package sic.sim.vm;
 
+import iodevices.Devices;
 import sic.common.*;
 import sic.sim.breakpoints.DataBreakpointException;
 import sic.sim.breakpoints.ReadDataBreakpointException;

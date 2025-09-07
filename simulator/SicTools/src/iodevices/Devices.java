@@ -1,10 +1,8 @@
-package sicxe.sim.vm;
+package iodevices;
 
-import java.util.Vector;
-
-import sicxe.common.Conversion;
-import sicxe.common.Logger;
-import sicxe.common.SICXE;
+import sic.common.Conversion;
+import sic.common.Logger;
+import sic.common.SICXE;
 
 /**
  * @author jure

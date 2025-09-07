@@ -279,7 +279,7 @@ public class SicxeSimulation implements Simulation {
                     if (fr.assemblerErrors == null || fr.assemblerErrors.isEmpty()) {
                         fr.listing = null;
                         LinkerErrorDto leDto = new LinkerErrorDto();
-                        leDto.phase = "io";
+                        leDto.phase = "iodevices";
                         leDto.msg = ioe.getMessage();
                         fr.linkerError = leDto;
                     }

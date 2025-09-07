@@ -1,4 +1,4 @@
-package sic.sim.vm;
+package iodevices;
 
 /**
  * Base class for SIC/XE device.

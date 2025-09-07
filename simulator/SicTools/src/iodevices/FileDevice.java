@@ -1,4 +1,4 @@
-package sic.sim.vm;
+package iodevices;
 
 import sic.common.Logger;
 
