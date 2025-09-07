@@ -11,7 +11,10 @@
   Windows·macOS에서 설치/실행 가능하며, **리눅스 지원도 순차적으로 추진**합니다. 기존 도구 대비 현대적이고 접근성 높은 UI/UX를 제공합니다.
 
 - **백엔드(Java, Spark 기반)**  
-  jurem의 **SicTools**(Java) 프로젝트를 기반으로, 기존 **Swing 앱을 Spark(Java) 서버 애플리케이션**으로 재구성했습니다.  
+  jurem의 **SicTools**(Java) 프로젝트를 기반으로, 기존 **Swing 앱을 Spark(Java) 서버 애플리케이션**으로 재구성했습니다.
+  - 백엔드의 기초가 된 프로그램 : jurem/SicTools
+     - 원작 리포지터리 : https://github.com/jurem/SicTools
+     - 원작자 웹사이트 : https://jurem.github.io/SicTools/
   - **SIC-XE뿐 아니라 순수 SIC까지** 아우르도록 로직을 보강했습니다.  
   - **문법 오류 위치 반환의 부정확성** 등 기존 이슈를 일괄 패치하여 실습 시 디버깅 경험을 개선했습니다.
 
