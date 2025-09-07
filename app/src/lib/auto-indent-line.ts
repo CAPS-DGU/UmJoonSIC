@@ -26,7 +26,28 @@ function span_spaces(s: string, i: number): number {
 }
 function span_token(s: string, i: number): [string, number] {
   let j = i;
-  while (j < s.length && !is_space(s[j]) && s[j] !== '.') j++;
+  while (j < s.length && !is_space(s[j])) j++;
+  return [s.slice(i, j), j];
+}
+// operand can include spaces while quotes are open (outermost only)
+function span_operand(s: string, i: number): [string, number] {
+  let j = i;
+  let q: "'" | '"' | null = null;
+  while (j < s.length) {
+    const ch = s[j];
+    if (q) {
+      if (ch === q) q = null;
+      j++;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      q = ch as "'" | '"';
+      j++;
+      continue;
+    }
+    if (is_space(ch)) break; // only splits on space when not inside quotes
+    j++;
+  }
   return [s.slice(i, j), j];
 }
 function first_nonspace_index(s: string): number {
@@ -43,6 +64,11 @@ function stripTrailingSpaces(s: string): string {
 function log(...args: any[]) {
   console.log('[autoIndentLine]', ...args);
 }
+function quotesClosed(text: string): boolean {
+  const singles = (text.match(/'/g) || []).length;
+  const doubles = (text.match(/"/g) || []).length;
+  return (singles % 2 === 0) && (doubles % 2 === 0);
+}
 
 type SectionName = 'label' | 'command' | 'operand' | 'comment' | 'space' | 'none';
 type MaybeStr = string | null;
@@ -52,7 +78,7 @@ interface Parsed {
   line: string;
   codePart: string;
   commentPart: MaybeStr;
-  commentDotIndex: number;
+  commentStartIndex: number; // -1 if none
   label: MaybeStr;     // null: absent
   command: MaybeStr;   // null: absent, "": present-but-empty
   operand: MaybeStr;   // null: absent, "": present-but-empty
@@ -63,20 +89,18 @@ interface Parsed {
   labelR: Range | null;
   commandR: Range | null;
   operandR: Range | null;
-  isCommentLine: boolean;
+  isCommentLine: boolean; // leading '.' after spaces
   orderValid: boolean;
 }
 
 function parseLineStructure(s: string): Parsed {
-  const dot = s.indexOf('.');
-  const codePart = dot >= 0 ? s.slice(0, dot) : s;
-  const commentPart: MaybeStr = dot >= 0 ? s.slice(dot) : null;
-
+  // Inline comment is determined by structure, not by '.'
+  // We DO NOT pre-slice by column; we preserve the entire original line.
   const fns = first_nonspace_index(s);
   const isCommentLine = fns >= 0 && s[fns] === '.';
 
   let i = 0;
-  const lead = span_spaces(codePart, i);
+  const lead = span_spaces(s, i);
   const leadingSpaces: Range = { start: 0, end: lead };
   i += lead;
 
@@ -92,85 +116,125 @@ function parseLineStructure(s: string): Parsed {
   let sp2: Range | null = null;
   let sp3: Range | null = null;
 
+  // Start with no comment split
+  let commentStartIndex = -1;
+  let codePartEnd = s.length;
+
   if (!isCommentLine) {
     if (lead === 0) {
-      if (i < codePart.length && codePart[i] !== '.') {
+      if (i < s.length) {
         // LABEL
-        const [tokL, nextL] = span_token(codePart, i);
+        const [tokL, nextL] = span_token(s, i);
         label = tokL;
         labelR = { start: i, end: nextL };
         i = nextL;
 
-        const s1 = span_spaces(codePart, i);
+        const s1 = span_spaces(s, i);
         sp1 = { start: i, end: i + s1 };
         i += s1;
 
         // COMMAND
-        if (i < codePart.length && codePart[i] !== '.') {
-          const [tokC, nextC] = span_token(codePart, i);
+        if (i < s.length) {
+          const [tokC, nextC] = span_token(s, i);
           command = tokC;
           commandR = { start: i, end: nextC };
           i = nextC;
 
-          const s2 = span_spaces(codePart, i);
+          const s2 = span_spaces(s, i);
           sp2 = { start: i, end: i + s2 };
           i += s2;
 
           // OPERAND
-          if (i < codePart.length && codePart[i] !== '.') {
-            const [tokO, nextO] = span_token(codePart, i);
+          if (i < s.length) {
+            const [tokO, nextO] = span_operand(s, i);
             operand = tokO;
             operandR = { start: i, end: nextO };
             i = nextO;
 
-            const s3 = span_spaces(codePart, i);
+            const s3 = span_spaces(s, i);
             sp3 = { start: i, end: i + s3 };
             i += s3;
+
+            // If there is any non-space left after operand + spaces, that tail is comment
+            if (i < s.length) {
+              commentStartIndex = i;
+              codePartEnd = i;
+            } else {
+              codePartEnd = s.length;
+            }
           } else if (sp2 && sp2.end > sp2.start) {
             // spaces after command but no operand token → operand present-but-empty
             operand = '';
-            const s3 = span_spaces(codePart, i);
+            const s3 = span_spaces(s, i);
             sp3 = { start: i, end: i + s3 };
             i += s3;
+            if (i < s.length) {
+              commentStartIndex = i;
+              codePartEnd = i;
+            } else {
+              codePartEnd = s.length;
+            }
           }
         } else if (sp1 && sp1.end > sp1.start) {
           // spaces after label but no command token → command present-but-empty
           command = '';
-          const s3 = span_spaces(codePart, i);
+          const s3 = span_spaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
+          if (i < s.length) {
+            commentStartIndex = i;
+            codePartEnd = i;
+          } else {
+            codePartEnd = s.length;
+          }
         }
       }
     } else {
       // no label → COMMAND first
-      if (i < codePart.length && codePart[i] !== '.') {
-        const [tokC, nextC] = span_token(codePart, i);
+      if (i < s.length) {
+        const [tokC, nextC] = span_token(s, i);
         command = tokC;
         commandR = { start: i, end: nextC };
         i = nextC;
 
-        const s2 = span_spaces(codePart, i);
+        const s2 = span_spaces(s, i);
         sp2 = { start: i, end: i + s2 };
         i += s2;
 
-        if (i < codePart.length && codePart[i] !== '.') {
-          const [tokO, nextO] = span_token(codePart, i);
+        if (i < s.length) {
+          const [tokO, nextO] = span_operand(s, i);
           operand = tokO;
           operandR = { start: i, end: nextO };
           i = nextO;
 
-          const s3 = span_spaces(codePart, i);
+          const s3 = span_spaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
+
+          if (i < s.length) {
+            commentStartIndex = i;
+            codePartEnd = i;
+          } else {
+            codePartEnd = s.length;
+          }
         } else if (sp2 && sp2.end > sp2.start) {
           operand = '';
-          const s3 = span_spaces(codePart, i);
+          const s3 = span_spaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
+          if (i < s.length) {
+            commentStartIndex = i;
+            codePartEnd = i;
+          } else {
+            codePartEnd = s.length;
+          }
         }
       }
     }
   }
+
+  const codePart = s.slice(0, codePartEnd);
+  const commentPart: MaybeStr = commentStartIndex >= 0 ? s.slice(commentStartIndex) : null;
 
   // validity: allow comment lines or any line that could be [label]? spaces command? spaces operand?
   let orderValid = true;
@@ -182,7 +246,7 @@ function parseLineStructure(s: string): Parsed {
     line: s,
     codePart,
     commentPart,
-    commentDotIndex: dot,
+    commentStartIndex,
     label, command, operand,
     leadingSpaces,
     sp1, sp2, sp3,
@@ -197,10 +261,10 @@ function classifyCursor(
   p: Parsed,
   cp: number
 ): { section: SectionName; whichSpace: 0|1|2|3|9|null; rel: number } {
-  const { codePart, leadingSpaces, sp1, sp2, sp3, labelR, commandR, operandR, commentDotIndex } = p;
+  const { codePart, leadingSpaces, sp1, sp2, sp3, labelR, commandR, operandR, commentStartIndex } = p;
 
-  if (commentDotIndex >= 0 && cp >= commentDotIndex) {
-    return { section: 'comment', whichSpace: null, rel: cp - commentDotIndex };
+  if (commentStartIndex >= 0 && cp >= commentStartIndex) {
+    return { section: 'comment', whichSpace: null, rel: cp - commentStartIndex };
   }
 
   if (cp <= codePart.length) {
@@ -411,17 +475,17 @@ export function autoIndentLine(
 
   const cur = classifyCursor(s, parsed, cp);
   log('CURSOR', { cp, section: cur.section, whichSpace: cur.whichSpace, rel: cur.rel });
-  
+
   /* If a space was typed inside the comment section, skip all logic */
   if (space && parsed.commentPart !== null && cur.section === 'comment') {
     log('Space inside comment → skip auto-indent / reflow');
     console.groupEnd?.();
     return { line: s + (had_nl ? '\n' : ''), cursor: cp };
   }
-  
+
   // (B) Comment line → strip spaces before first '.'
   if (parsed.isCommentLine) {
-    const dot = parsed.commentDotIndex >= 0 ? parsed.commentDotIndex : s.indexOf('.');
+    const dot = s.indexOf('.', first_nonspace_index(s));
     const out = s.slice(dot) + (had_nl ? '\n' : '');
     log('Comment-line -> strip leading before "."', { before: s, after: out });
     console.groupEnd?.();
@@ -433,6 +497,39 @@ export function autoIndentLine(
     log('Order invalid -> unchanged');
     console.groupEnd?.();
     return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+  }
+
+  // Bail if any section exceeds its field width
+  const tooWide =
+    (parsed.label !== null && parsed.label.length > LEN_LABEL_FIELD) ||
+    (parsed.command !== null && parsed.command.length > LEN_INSTR_FIELD) ||
+    (parsed.operand !== null && parsed.operand.length > LEN_OPERAND_FIELD);
+  if (tooWide) {
+    log('Width overflow → no auto-indent');
+    console.groupEnd?.();
+    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+  }
+
+  // Guard: only allow stepping to comment when (a) EOL and (b) operand quotes are closed.
+  // Otherwise, when there is no real inline comment content, do not correct.
+  if (space) {
+    const inlineCommentExists = parsed.commentStartIndex >= 0;
+    const inlineCommentHasNonspace = inlineCommentExists && /[^ \t]/.test(parsed.commentPart ?? '');
+
+    const inOperand = cur.section === 'operand';
+    const afterOperandSpace = cur.section === 'space' && cur.whichSpace === 3;
+    const atCodeEnd = cp === s.length;
+
+    const operandText = parsed.operandR ? s.slice(parsed.operandR.start, parsed.operandR.end) : '';
+    const opQuotesClosed = quotesClosed(operandText);
+
+    if ((!inlineCommentExists || !inlineCommentHasNonspace) &&
+        (inOperand || afterOperandSpace || cp === parsed.codePart.length) &&
+        !(atCodeEnd && opQuotesClosed)) {
+      log('No inline comment content; not at EOL with closed quotes → no correction');
+      console.groupEnd?.();
+      return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    }
   }
 
   // ---------------------------------------------------------
@@ -452,7 +549,7 @@ export function autoIndentLine(
     let stepTo: 'operand' | 'comment' | null = null;
     const hasComment = !!parsed.commentPart && parsed.commentPart.length > 0;
 
-    // Always boolean (was showing null in logs before)
+    // Always boolean
     let engageComment = false;
 
     // Helper: previous *non-space* index for this event (only reliable when a single space was inserted)
@@ -477,9 +574,7 @@ export function autoIndentLine(
     else if (cur.section === 'space' && cur.whichSpace === 1) {
       stepTo = 'operand';
     }
-    // 5) ***NEW***: operand is empty and caret is at/after operand start → go to COMMENT
-    //    This makes the second Space at empty operand step to the comment column,
-    //    even though the previous char is a space now.
+    // 5) operand is empty and caret is at/after operand start → go to COMMENT
     else if (parsed.operand === '' && cp >= baseline.starts.operand) {
       stepTo = 'comment';
     }
@@ -534,7 +629,8 @@ export function autoIndentLine(
   // (E) Full re-spacing for non-space & non-backspace (enter/paste)
   // ---------------------------------------------------------
   {
-    const engageComment = !!parsed.commentPart && parsed.commentPart.length > 0;
+    // Engage comment column if we actually have a comment tail; this preserves all nonspace chars.
+    const engageComment = !!(parsed.commentPart && parsed.commentPart.length > 0);
 
     const { out, starts } = buildAlignedLine(
       parsed.label,

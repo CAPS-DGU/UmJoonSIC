@@ -205,29 +205,57 @@ async function createNewProjectInteractive() {
   }
 }
 
-// IPC: returns asm files, .out content, and all directories
+function getAllFiles(projectRoot: string): string[] {
+  const files: string[] = [];
+
+  const walk = (currentPath: string, relativePath: string = '') => {
+    try {
+      const items = fs.readdirSync(currentPath);
+
+      for (const item of items) {
+        // Skip .out directory
+        if (item === '.out') continue;
+
+        const fullPath = pathModule.join(currentPath, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          const relPath = relativePath ? `${relativePath}/${item}` : item;
+          walk(fullPath, relPath);
+        } else {
+          const relPath = relativePath ? `${relativePath}/${item}` : item;
+          files.push(relPath);
+        }
+      }
+    } catch (error) {
+      console.warn(`Cannot read directory: ${currentPath}`, error);
+    }
+  };
+
+  walk(projectRoot);
+  return files;
+}
+
 ipcMain.handle('getFileList', async (_event, dirPath: string) => {
   try {
     const projectRoot = pathModule.resolve(dirPath);
-    const sic = readProjectSic(projectRoot);
-    const asmRel = sic?.asm ?? [];
 
-    // 실제 파일 시스템에서 .asm 파일들 찾기
-    const actualAsmFiles = getAllAsmFiles(projectRoot);
+    // 모든 파일 수집 (단, .out 제외)
+    const allFiles = getAllFiles(projectRoot);
 
-    // project.sic에 등록된 파일들과 실제 파일들을 합치고 중복 제거
-    const allAsmFiles = [...new Set([...asmRel, ...actualAsmFiles])];
+    // project.sic은 무조건 포함 (혹시 누락됐을 경우 대비)
+    if (!allFiles.includes('project.sic')) {
+      allFiles.push('project.sic');
+    }
 
-    const asmEntries = buildAsmTreeEntries(projectRoot, allAsmFiles);
+    // .out은 listOutDirRelative로 따로 추가
     const outEntries = listOutDirRelative(projectRoot);
-    const sicEntries = ['project.sic'];
     const allDirectories = getAllDirectories(projectRoot);
 
-    // Combine all entries and remove duplicates
-    const allEntries = [...asmEntries, ...outEntries, ...allDirectories, ...sicEntries];
+    // 합치기
+    const allEntries = [...allFiles, ...outEntries, ...allDirectories];
     const uniqueEntries = [...new Set(allEntries)];
 
-    // final list: asm structure + .out + all directories
     return {
       success: true,
       data: uniqueEntries,
@@ -239,6 +267,41 @@ ipcMain.handle('getFileList', async (_event, dirPath: string) => {
     };
   }
 });
+
+// // IPC: returns asm files, .out content, and all directories
+// ipcMain.handle('getFileList', async (_event, dirPath: string) => {
+//   try {
+//     const projectRoot = pathModule.resolve(dirPath);
+//     const sic = readProjectSic(projectRoot);
+//     const asmRel = sic?.asm ?? [];
+
+//     // 실제 파일 시스템에서 .asm 파일들 찾기
+//     const actualAsmFiles = getAllAsmFiles(projectRoot);
+
+//     // project.sic에 등록된 파일들과 실제 파일들을 합치고 중복 제거
+//     const allAsmFiles = [...new Set([...asmRel, ...actualAsmFiles])];
+
+//     const asmEntries = buildAsmTreeEntries(projectRoot, allAsmFiles);
+//     const outEntries = listOutDirRelative(projectRoot);
+//     const sicEntries = ['project.sic'];
+//     const allDirectories = getAllDirectories(projectRoot);
+
+//     // Combine all entries and remove duplicates
+//     const allEntries = [...asmEntries, ...outEntries, ...allDirectories, ...sicEntries];
+//     const uniqueEntries = [...new Set(allEntries)];
+
+//     // final list: asm structure + .out + all directories
+//     return {
+//       success: true,
+//       data: uniqueEntries,
+//     };
+//   } catch (error) {
+//     return {
+//       success: false,
+//       message: error instanceof Error ? error.message : 'Unknown error',
+//     };
+//   }
+// });
 
 // IPC: create new project (interactive, asks for parent dir + name)
 ipcMain.handle('createNewProject', async () => {

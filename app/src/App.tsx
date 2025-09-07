@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import SideBar from '@/components/common/SideBar';
-import ToolBar from '@/components/common/ToolBar';
 import UnderStatusBar from '@/components/common/UnderStatusBar';
 import Debug from '@/components/debug';
 import EditorContainer from './components/editor/EditorContainer';
@@ -11,6 +10,8 @@ import { useEditorTabStore } from './stores/EditorTabStore';
 import Pannel from './components/pannel/Pannel';
 import Resizer from './components/common/Resizer';
 import SicSettingContainer from './components/setting/SicSettingContainer';
+
+import { InfoModal } from '@/components/common/InfoModal';
 
 const STATUS_BAR_HEIGHT = 40;
 
@@ -128,6 +129,7 @@ function App() {
         </div>
       </div>
       <UnderStatusBar />
+      <InfoModal />
     </div>
   );
 }
