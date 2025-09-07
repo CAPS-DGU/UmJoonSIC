@@ -58,6 +58,11 @@ const api = {
   },
 };
 
+// 서버 로그 브릿지: IPC -> DOM 이벤트
+ipcRenderer.on('server-log', (_event, payload: { type: 'out' | 'error'; message: string }) => {
+  window.dispatchEvent(new CustomEvent('server-log', { detail: payload }));
+});
+
 // 새 프로젝트 생성 이벤트 리스너
 ipcRenderer.on('create-new-project', () => {
   // 전역 이벤트 발생

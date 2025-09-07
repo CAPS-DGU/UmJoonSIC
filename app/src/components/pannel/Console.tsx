@@ -5,20 +5,20 @@ export default function Console() {
   const messages = useConsoleStore(s => s.messages);
   const addMessage = useConsoleStore(s => s.addMessage);
 
-  // 더미데이터 생성을 위한 코드로 나중에 useEffect 째로 삭제해버리시면 됩니다.
   useEffect(() => {
-    setTimeout(() => {
-      for (let i = 0; i < 20; i++) {
-        addMessage({ type: 'out', message: '5초 후 메시지' });
-        addMessage({ type: 'error', message: '5초 후 에러 메시지' });
-      }
-    }, 1000);
-  }, [addMessage]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ type: 'out' | 'error'; message: string }>).detail;
+      if (!detail) return;
+      addMessage({ type: detail.type, message: detail.message });
+    };
+    window.addEventListener('server-log', handler as EventListener);
+    return () => window.removeEventListener('server-log', handler as EventListener);
+  }, [messages]);
 
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 flex flex-col h-full overflow-hidden">
       <h2 className="font-semibold text-sm p-2 border-b border-gray-300 dark:border-gray-700">
-        Console
+        Server
       </h2>
       <div className="flex-1 overflow-auto p-2">
         {messages.length === 0 ? (

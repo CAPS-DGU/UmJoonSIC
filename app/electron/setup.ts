@@ -369,14 +369,30 @@ export async function runServer(server: ChildProcess | null) {
     app.quit();
   }
   if (server && server.stdout && server.stderr) {
+    const { BrowserWindow } = require('electron');
+    const broadcast = (type: 'out' | 'error', message: string) => {
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        try {
+          win.webContents.send('server-log', { type, message });
+        } catch {}
+      }
+    };
+
     server.stdout.on('data', data => {
-      console.log(`서버 로그: ${data}`);
+      const text = String(data);
+      console.log(text);
+      broadcast('out', text);
     });
     server.stderr.on('data', data => {
-      console.error(`서버 에러: ${data}`);
+      const text = String(data);
+      console.error(text);
+      broadcast('error', text);
     });
     server.on('close', code => {
-      console.log(`서버 종료: ${code}`);
+      const msg = `서버 종료: ${code}`;
+      console.log(msg);
+      broadcast('out', msg);
     });
   }
   setTimeout(() => {
