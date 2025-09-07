@@ -22,6 +22,7 @@ interface Props {
   onOpenFile: (item: FileStructure) => void;
   onContextMenu: (e: React.MouseEvent, item: FileStructure) => void;
   projectFiles: string[];
+  focusPath: string;
 }
 
 export function FileTreeItem({
@@ -33,13 +34,19 @@ export function FileTreeItem({
   onOpenFile,
   onContextMenu,
   projectFiles,
+  focusPath,
 }: Props) {
   if (item.type === 'folder') {
     const isOpen = expanded[item.name];
     return (
       <div>
         <div
-          className={`flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200 ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}`}
+          className={`
+            flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200
+            ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}
+            ${focusPath === item.relativePath ? 'bg-blue-100' : ''}
+          `}
+          tabIndex={0}
           onClick={() => {
             onSelect(item);
             toggleFolder(item.name);
@@ -82,6 +89,7 @@ export function FileTreeItem({
                   onOpenFile,
                   onContextMenu,
                   projectFiles,
+                  focusPath,
                 }}
               />
             ))}
@@ -99,12 +107,17 @@ export function FileTreeItem({
 
   return (
     <div
-      className={`pl-7 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}`}
+      className={`
+        pl-7 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer
+        ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}
+        ${focusPath === item.relativePath ? 'bg-blue-100' : ''}
+      `}
       onClick={() => {
         onSelect(item);
         onOpenFile(item); // 클릭 시 바로 열기
       }}
       onContextMenu={e => onContextMenu(e, item)}
+      tabIndex={0}
     >
       {getFileIcon(item.name)}
       <span

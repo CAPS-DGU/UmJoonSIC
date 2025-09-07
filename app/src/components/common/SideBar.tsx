@@ -6,6 +6,7 @@ import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useFileTree } from '@/hooks/useFileTree';
 import { useProjectFiles } from '@/hooks/useProjectFiles';
 import type { FileStructure } from '@/types/fileTree';
+import { useFileTreeNavigation } from '@/hooks/useFileTreeNavigation';
 
 import { FileTreeItem } from '@/components/fileTree/FileTreeItem';
 import { ContextMenu } from '@/components/fileTree/ContextMenu';
@@ -52,6 +53,13 @@ export default function SideBar() {
     }
   };
 
+  const { focusPath, handleKeyDown } = useFileTreeNavigation(
+    fileTreeStructure,
+    expanded,
+    toggleFolder,
+    handleOpenFile,
+  );
+
   return (
     <div className="w-full bg-white border-r border-gray-300 flex flex-col h-screen">
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
@@ -76,7 +84,7 @@ export default function SideBar() {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" tabIndex={0} onKeyDown={handleKeyDown}>
         {fileTreeStructure.map(item => (
           <FileTreeItem
             key={item.relativePath}
@@ -90,6 +98,7 @@ export default function SideBar() {
               setContextMenu({ show: true, x: e.clientX, y: e.clientY, item })
             }
             projectFiles={settings.asm}
+            focusPath={focusPath}
           />
         ))}
       </div>
