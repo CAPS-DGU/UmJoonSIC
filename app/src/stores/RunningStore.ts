@@ -230,7 +230,6 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { mode } = useMemoryViewStore.getState();
     const { settings } = useProjectStore.getState();
     const res = await axios.post('http://localhost:9090/begin', {type: mode.toLowerCase(), filedevices: settings.filedevices});
-    const res = await axios.post('http://localhost:9090/begin', { type: mode.toLowerCase() });
     const data = res.data;
     if (data.ok) {
       clearListFile();

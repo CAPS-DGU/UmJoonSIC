@@ -281,27 +281,6 @@ function RunningButton({
           <StepForward className="w-4 h-4" />
         </button>
       )}
-      <button
-        onClick={() => {
-          useRunningStore.getState().setIsPaused(true);
-          console.log('Pause');
-        }}
-        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
-        title="Pause"
-      >
-        <Pause className="w-4 h-4" />
-      </button>) : (
-      <button
-        onClick={() => {
-          console.log('Continue');
-          useRunningStore.getState().setIsPaused(false);
-          handleRunWithDelay(1000, false);
-        }}
-        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
-        title="Continue"
-      >
-        <StepForward className="w-4 h-4" />
-      </button> )}
       {useRunningStore.getState().isPaused && <button
         onClick={() => {
           fetchRegisters();
