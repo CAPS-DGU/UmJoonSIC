@@ -6,6 +6,7 @@ import { externalizeDepsPlugin, defineConfig } from 'electron-vite';
 export default defineConfig({
   main: {
     build: {
+      outDir: 'dist/main',
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, 'electron/main.ts'),
@@ -16,6 +17,7 @@ export default defineConfig({
   },
   preload: {
     build: {
+      outDir: 'dist/preload',
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, 'electron/preload.ts'),
@@ -27,6 +29,7 @@ export default defineConfig({
   renderer: {
     root: '.',
     build: {
+      outDir: 'dist/renderer',
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, 'index.html'),

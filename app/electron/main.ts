@@ -8,6 +8,7 @@ import { ChildProcess, spawn } from 'child_process';
 import { checkJreExists, checkServerExists, downloadJre, downloadServer, runServer } from './setup';
 
 let server: ChildProcess | null = null;
+app.setName('UmJoonSIC');
 
 function createWindow(): void {
   // Create the browser window.
