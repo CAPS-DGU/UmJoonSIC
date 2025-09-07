@@ -9,6 +9,7 @@ export default function RegisterValue() {
     changedRegisters, 
     clearChangedRegisters 
   } = useRegisterStore(state => state);
+  const getFHex = useRegisterStore(state => state.getFHex);
   const registerData = { A, X, L, S, T, B, SW, PC, F };
 
   // 애니메이션 완료 후 변경된 레지스터 목록 초기화
@@ -55,19 +56,19 @@ export default function RegisterValue() {
         {Object.entries(registerData).map(([key, value]) => {
           const isChanged = changedRegisters.has(key);
           return (
-            <div key={key} className="w-full flex justify-between items-center gap-4">
+            <div key={key} className={`w-full flex justify-between items-center gap-4 ${key === 'F' ? 'col-span-2' : ''}`}>
               <p className="text-base font-normal">{key}:</p>
-              <div className={`w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2 transition-all duration-300 ${
+              <div className={`w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2 transition-all duration-300 overflow-x-auto ${
                 isChanged ? 'register-flash' : ''
               }`}>
                 {key !== 'F' && (
-                  <p className="font-mono text-sm">
+                  <p className="font-mono text-sm whitespace-nowrap">
                     {isOn ? '0x' + value.toString(16).toUpperCase().padStart(6, '0') : value}
                   </p>
                 )}
                 {key === 'F' && (
-                  <p className="font-mono text-sm">
-                    {isOn ? value.toString(16).toUpperCase().padStart(6, '0') : value}
+                  <p className="font-mono text-sm whitespace-nowrap">
+                    {isOn ? getFHex() : value}
                   </p>
                 )}
               </div>

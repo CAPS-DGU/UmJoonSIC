@@ -10,7 +10,7 @@ interface Register {
   B: number;
   SW: number;
   PC: number;
-  F: number;
+  F: string;
 }
 
 interface RegisterState {
@@ -22,7 +22,8 @@ interface RegisterState {
   B: number;
   SW: number;
   PC: number;
-  F: number;
+  F: string;
+  getFHex: () => string;
   changedRegisters: Set<string>; // 변경된 레지스터 추적
   setA: (value: number) => void;
   setX: (value: number) => void;
@@ -32,7 +33,7 @@ interface RegisterState {
   setB: (value: number) => void;
   setSW: (value: number) => void;
   setPC: (value: number) => void;
-  setF: (value: number) => void;
+  setF: (value: string) => void;
   setAll: (value: Register) => void;
   fetchRegisters: () => void;
   clearChangedRegisters: () => void; // 변경 표시 초기화
@@ -47,7 +48,7 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
   B: 0,
   SW: 0,
   PC: 0,
-  F: 0,
+  F: "0",
   changedRegisters: new Set(),
   setA: value => set(state => ({ 
     A: value, 
@@ -111,6 +112,46 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
         changedRegisters: changedRegs,
       };
     }),
+    getFHex: () => {
+      const fStr = get().F;
+      const parsed = Number(fStr);
+      if (!Number.isFinite(parsed) || parsed === 0) {
+        return '0x000000000000';
+      }
+
+      const sign = parsed < 0 ? 1 : 0;
+      let value = Math.abs(parsed);
+
+      // 정규화: value = 1.x * 2^exp
+      let exp = Math.floor(Math.log2(value));
+      let mantissa = value / Math.pow(2, exp); // 1 <= mantissa < 2
+      const fraction = mantissa - 1; // [0, 1)
+
+      // 32비트 fraction으로 반올림
+      let fractionBits = Math.round(fraction * Math.pow(2, 32));
+      if (fractionBits === Math.pow(2, 32)) {
+        // 반올림으로 인해 1.000.. 이 되는 경우 지수 올림
+        fractionBits = 0;
+        exp += 1;
+      }
+
+      const EXP_BITS = 15;
+      const EXP_BIAS = Math.pow(2, EXP_BITS - 1) - 1; // 16383
+      let biased = exp + EXP_BIAS;
+
+      if (biased <= 0) {
+        // 언더플로우는 0으로 처리
+        return '0x000000000000';
+      }
+      if (biased >= (1 << EXP_BITS)) {
+        // 오버플로우는 최대 유한값으로 포화
+        const maxBits = (BigInt(sign) << 47n) | (BigInt((1 << EXP_BITS) - 2) << 32n) | 0xFFFFFFFFn;
+        return '0x' + maxBits.toString(16).toUpperCase().padStart(12, '0');
+      }
+
+      const bits = (BigInt(sign) << 47n) | (BigInt(biased) << 32n) | BigInt(fractionBits >>> 0);
+      return '0x' + bits.toString(16).toUpperCase().padStart(12, '0');
+    },
   clearChangedRegisters: () => set({ changedRegisters: new Set() }),
   fetchRegisters: async () => {
     const res = await fetch('http://localhost:9090/step', {
@@ -132,6 +173,7 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
       // setAll을 사용하여 변경된 레지스터 추적
       const { setAll } = get();
       setAll(registers);
+      console.log(registers);
     } else {
       console.error('Failed to fetch registers');
     }
