@@ -5,7 +5,7 @@ import { menuList } from './menu';
 import './ipc/file';
 import './ipc/server';
 import { ChildProcess, spawn } from 'child_process';
-import { checkJreExists, checkServerExists, checkUpdate, downloadJre, downloadServer, runServer } from './setup';
+import { checkJreExists, checkServerExists, checkUpdate, downloadJre, downloadServer, runServer, checkJARUpdate } from './setup';
 
 let server: ChildProcess | null = null;
 app.setName('UmJoonSIC');
@@ -57,7 +57,9 @@ function createWindow(): void {
       console.log('server 다운로드');
     }
 
-    await runServer(server);
+    await checkJARUpdate();
+
+    server = await runServer();
 
     setTimeout(() => {
       splash.close();
@@ -113,5 +115,11 @@ app.on('window-all-closed', () => {
       server.kill();
     }
     app.quit();
+  }
+});
+
+app.on('will-quit', () => {
+  if (server) {
+    server.kill();
   }
 });
