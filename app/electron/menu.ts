@@ -1,4 +1,3 @@
-// electron/menu.ts
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 
@@ -10,8 +9,8 @@ export const menuList = [
         label: 'About UmJoonSIC',
         click: () => {
           const aboutWindow = new BrowserWindow({
-            width: 400,
-            height: 200,
+            width: 800,
+            height: 600,
             resizable: false,
             autoHideMenuBar: true,
             title: 'About UmJoonSIC',
