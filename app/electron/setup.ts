@@ -7,6 +7,8 @@ import AdmZip from 'adm-zip';
 import { ChildProcess, spawn } from 'child_process';
 import { createHash } from 'crypto';
 
+let currentServer: ChildProcess | null = null;
+
 export function checkJreExists() {
   const jrePath = getJavaPath();
   if (!jrePath) {
@@ -365,6 +367,29 @@ export async function initServer() {
   console.log('Server initialized:', data.message);
 }
 
+async function waitForPortFree(port: number, host = '127.0.0.1', timeoutMs = 5000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const isBusy = await isPortInUse(port, host);
+    if (!isBusy) return;
+    await new Promise(r => setTimeout(r, 150));
+  }
+  // timeout: continue; spawn may still fail which we handle by stderr
+}
+
+function isPortInUse(port: number, host = '127.0.0.1'): Promise<boolean> {
+  return new Promise(resolve => {
+    const net = require('node:net');
+    const tester = net
+      .createServer()
+      .once('error', () => resolve(true))
+      .once('listening', function (this: any) {
+        this.close(() => resolve(false));
+      })
+      .listen(port, host);
+  });
+}
+
 export async function runServer(): Promise<ChildProcess> {
   const javaPath = getJavaPath();
   if (!javaPath) {
@@ -373,7 +398,10 @@ export async function runServer(): Promise<ChildProcess> {
     throw new Error('Java path not found');
   }
 
+  await waitForPortFree(9090);
+
   const serverProcess = spawn(javaPath, ['-jar', getServerPath(), '9090']);
+  currentServer = serverProcess;
 
   if (serverProcess && serverProcess.stdout && serverProcess.stderr) {
     const { BrowserWindow } = require('electron');
@@ -412,6 +440,32 @@ export async function runServer(): Promise<ChildProcess> {
     });
   }, 1000);
   return serverProcess;
+}
+
+export function getCurrentServerProcess(): ChildProcess | null {
+  return currentServer;
+}
+
+export function stopServerProcess(timeoutMs = 3000) {
+  return new Promise<void>(resolve => {
+    if (!currentServer) return resolve();
+    const proc = currentServer;
+    currentServer = null;
+    try {
+      proc.once('close', () => resolve());
+      proc.kill();
+    } catch {
+      resolve();
+    }
+    setTimeout(() => resolve(), timeoutMs);
+  });
+}
+
+export async function restartServerProcess() {
+  await stopServerProcess();
+  await checkJARUpdate();
+  await waitForPortFree(9090);
+  await runServer();
 }
 
 export async function checkUpdate() {

@@ -66,6 +66,9 @@ const api = {
   pickFile: (): IpcApiResponse<string> => {
     return ipcRenderer.invoke('pickFile');
   },
+  restartServer: (): IpcApiResponse<void> => {
+    return ipcRenderer.invoke('restartServer');
+  },
 };
 
 // 서버 로그 브릿지: IPC -> DOM 이벤트
