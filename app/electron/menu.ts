@@ -19,7 +19,7 @@ export const menuList = [
             parent: BrowserWindow.getFocusedWindow() ?? undefined,
           });
 
-          aboutWindow.loadFile(path.join(app.getAppPath(), 'public/about-link.html'));
+          aboutWindow.loadFile(path.join(app.getAppPath(), 'public/about.html'));
 
           aboutWindow.webContents.on('will-navigate', (e, url) => {
             e.preventDefault();
