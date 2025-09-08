@@ -30,9 +30,11 @@ function span_token(s: string, i: number): [string, number] {
   return [s.slice(i, j), j];
 }
 // operand can include spaces while quotes are open (outermost only)
+// CHANGE: additionally allow exactly one "comma + single space" sequence to be part of operand.
 function span_operand(s: string, i: number): [string, number] {
   let j = i;
   let q: "'" | '"' | null = null;
+  let allowPostCommaSpace = false; // allow one space right after a comma
   while (j < s.length) {
     const ch = s[j];
     if (q) {
@@ -45,7 +47,21 @@ function span_operand(s: string, i: number): [string, number] {
       j++;
       continue;
     }
-    if (is_space(ch)) break; // only splits on space when not inside quotes
+    if (ch === ',') {
+      allowPostCommaSpace = true;
+      j++;
+      continue;
+    }
+    if (is_space(ch)) {
+      if (allowPostCommaSpace) {
+        // consume exactly one space after a comma as part of operand
+        j++;
+        allowPostCommaSpace = false;
+        continue;
+      }
+      break; // only splits on space when not inside quotes and not the single post-comma space
+    }
+    allowPostCommaSpace = false; // reset when a non-space, non-comma char appears
     j++;
   }
   return [s.slice(i, j), j];
@@ -562,8 +578,10 @@ export function autoIndentLine(
       stepTo = 'operand';
     }
     // 2) If just typed first space right after OPERAND token → go to COMMENT
+    //    BUT ignore the single space immediately following a comma inside operand.
     else if (prevNonSpaceIdx !== -1 && parsed.operandR &&
-            prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end) {
+            prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end &&
+            s[prevNonSpaceIdx] !== ',') {
       stepTo = 'comment';
     }
     // 3) If cursor is in the space block between COMMAND and OPERAND (sp2) → go to COMMENT
@@ -582,7 +600,7 @@ export function autoIndentLine(
     // Engage comment column?
     if (hasComment || stepTo === 'comment' ||
         (prevNonSpaceIdx !== -1 && parsed.operandR &&
-        prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end)) {
+        prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end && s[prevNonSpaceIdx] !== ',')) {
       engageComment = true;
     }
 
