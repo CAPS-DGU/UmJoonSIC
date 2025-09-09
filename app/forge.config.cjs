@@ -6,6 +6,12 @@ module.exports = {
     asar: true,
     icon: './src/assets/icon',
     executableName: 'UmJoonSIC',
+    osxSign: {},
+    osxNotarize: {
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_PASSWORD,
+      teamId: process.env.APPLE_TEAM_ID
+    },
   },
   rebuildConfig: {},
   makers: [
@@ -21,12 +27,12 @@ module.exports = {
         icon: './src/assets/icon.icns',
       },
     },
-    {
-      name: '@electron-forge/maker-dmg',
-      config: {
-        icon: './src/assets/icon.icns',
-      },
-    },
+    // {
+    //   name: '@electron-forge/maker-dmg',
+    //   config: {
+    //     icon: './src/assets/icon.icns',
+    //   },
+    // },
     {
       name: '@electron-forge/maker-deb',
       config: {
