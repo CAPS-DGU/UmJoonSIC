@@ -5,8 +5,9 @@ import * as monaco_editor from 'monaco-editor';
 import { useEditorTabStore } from '@/stores/EditorTabStore';
 import { useProjectStore } from '@/stores/ProjectStore';
 import { useErrorStore } from '@/stores/pannel/ErrorStore';
-import { useSyntaxCheck } from '@/hooks/useSyntaxCheck';
+import { useSyntaxCheck } from '@/hooks/editor/useSyntaxCheck';
 import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
+import { useDebounceFn } from '@/hooks/editor/useDebounceFn';
 
 import { editorOptions } from '@/constants/monaco/editor-config';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
@@ -49,6 +50,8 @@ export default function CodeEditor() {
   } = useAutoIndentation(editorRef, monaco);
 
   const { runCheck } = useSyntaxCheck();
+  // Debounce된 runCheck 함수, 지금은 1000ms로 설정
+  const debouncedRunCheck = useDebounceFn(runCheck, 1000);
   const errors = useErrorStore(state => state.errors);
   const hasRunRef = useRef(false);
 
@@ -243,17 +246,14 @@ export default function CodeEditor() {
       // 구문 분석 (공백, 탭, 엔터)
       if (key === ' ' || key === 'Tab' || key === 'Enter') {
         if (editor) {
-          // 키 입력 후 업데이트된 내용을 기준으로 구문 분석
-          setTimeout(() => {
-            runCheck([editor.getValue()], [activeTab!.filePath]);
-          }, 0);
+          debouncedRunCheck([editor.getValue()], [activeTab!.filePath]);
         }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [getActiveTab, projectPath, setIsModified, formatDocument, runCheck]);
+  }, [getActiveTab, projectPath, setIsModified, formatDocument, runCheck, debouncedRunCheck]);
 
   useEffect(() => {
     if (activeTab && activeTab.filePath && projectPath) {
