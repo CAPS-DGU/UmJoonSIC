@@ -13,7 +13,7 @@ import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
 import { sicxeTheme } from '@/constants/monaco/sicxeTheme';
 
 import { clampLine } from '@/lib/editor-utils';
-import { useBreakpointManager } from '@/hooks/editor/useBreakpointManager';
+// import { useBreakpointManager } from '@/hooks/editor/useBreakpointManager';
 
 import EditorErrorBoundary from './EditorErrorBoundary';
 import '@/styles/SyntaxError.css';
@@ -41,7 +41,7 @@ export default function CodeEditor() {
   const isLoadingRef = useRef(false);
   const loadErrorDecorationIdsRef = useRef<string[]>([]);
 
-  const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
+  // const { handleBreakpointMouseDown } = useBreakpointManager(editorRef, activeTab);
   const {
     handleKeyDown: handleAutoIndentationKeyDown,
     handlePaste: handleAutoIndentationPaste,
@@ -163,7 +163,7 @@ export default function CodeEditor() {
     setupEditorAfterFontLoad();
 
     // --- Wiring (unchanged) ---
-    editor.onMouseDown(handleBreakpointMouseDown);
+    // editor.onMouseDown(handleBreakpointMouseDown);
 
     editor.onDidChangeCursorPosition(e => {
       const currentActiveTab = getActiveTab();
