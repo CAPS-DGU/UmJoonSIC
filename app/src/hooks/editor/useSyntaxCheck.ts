@@ -44,5 +44,10 @@ export function useSyntaxCheck() {
     }
   }, []);
 
-  return { result, loading, error, runCheck };
+  return {
+    result,
+    loading,
+    error,
+    runCheck,
+  };
 }
