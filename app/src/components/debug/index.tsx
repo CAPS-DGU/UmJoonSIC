@@ -113,7 +113,7 @@ export default function Debug() {
           {' '}
           {/* ref 할당 */}
           {isRunning ? (
-            <RunningButton handleRunWithDelay={handleRunWithDelay} />
+            <RunningButton handleRunWithDelay={handleRunWithDelay} setIsExecuting={setIsExecuting} />
           ) : (
             <DefaultButton
               handleRun={handleRun}
@@ -297,6 +297,7 @@ function RunningButton({
           await stopRunning();
           await fetchLoad();
           toggleIsRunning();
+          useRunningStore.getState().setIsPaused(true);
         }}
         className="hover:bg-gray-100 p-2 rounded-md transition-colors"
         title="재실행"
