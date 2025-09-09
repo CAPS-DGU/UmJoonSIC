@@ -14,7 +14,7 @@ export const menuList = [
             resizable: false,
             autoHideMenuBar: true,
             title: 'About UmJoonSIC',
-            modal: true,
+            // modal: true,
             parent: BrowserWindow.getFocusedWindow() ?? undefined,
           });
 
@@ -86,9 +86,9 @@ export const menuList = [
   {
     label: 'View',
     submenu: [
-      { role: 'reload' },
-      { role: 'forceReload' },
-      { role: 'toggleDevTools' },
+      // { role: 'reload' },
+      // { role: 'forceReload' },
+      // { role: 'toggleDevTools' },
       { type: 'separator' },
       { role: 'resetZoom' },
       { role: 'zoomIn' },
