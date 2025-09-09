@@ -1,0 +1,17 @@
+
+본 프로젝트는 BSD-2-Clause 라이선스로 배포됩니다. 자세한 내용은 저장소의 LICENSE 파일을 참조하세요.
+
+이 저장소에는 jurem/SicTools의 일부 코드 및 아이디어가 Git subtree 형태로 포함될 수 있습니다. 해당 부분은 원저작권자 및 라이선스 고지(BSD-2-Clause)를 그대로 상속합니다.
+
+BSD-2-Clause 조건에 따라, 원저작권 고지 및 면책 조항은 소스/바이너리 재배포 시 반드시 함께 제공되어야 합니다.
+
+이하는 BSD2 라이선스 전문입니다.
+
+Copyright (c) 2025, COPYRIGHT CAPS
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

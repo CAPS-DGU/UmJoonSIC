@@ -27,8 +27,8 @@ function createWindow(): void {
   });
 
   const splash = new BrowserWindow({
-    width: 500,
-    height: 300,
+    width: 600,
+    height: 400,
     autoHideMenuBar: true,
     frame: false,
     resizable: false,

@@ -1,12 +1,31 @@
-// electron/menu.ts
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 
 export const menuList = [
   {
     label: 'Application',
     submenu: [
-      { role: 'about' },
+      {
+        label: 'About UmJoonSIC',
+        click: () => {
+          const aboutWindow = new BrowserWindow({
+            width: 800,
+            height: 600,
+            resizable: false,
+            autoHideMenuBar: true,
+            title: 'About UmJoonSIC',
+            modal: true,
+            parent: BrowserWindow.getFocusedWindow() ?? undefined,
+          });
+
+          aboutWindow.loadFile(path.join(app.getAppPath(), 'public/about.html'));
+
+          aboutWindow.webContents.on('will-navigate', (e, url) => {
+            e.preventDefault();
+            shell.openExternal(url);
+          });
+        },
+      },
       { type: 'separator' },
       { role: 'hide' },
       { role: 'hideOthers' },
@@ -22,7 +41,6 @@ export const menuList = [
       {
         label: 'New Project',
         click: () => {
-          // 모든 브라우저 윈도우에 새 프로젝트 생성 이벤트 전송
           const { BrowserWindow } = require('electron');
           const windows = BrowserWindow.getAllWindows();
           windows.forEach(window => {
@@ -40,10 +58,6 @@ export const menuList = [
           });
         },
       },
-      // {
-      //   label: 'Open Recent',
-      //   submenu: [{ role: 'clearRecentDocuments' }, { role: 'recentDocuments' }],
-      // },
       {
         label: 'Close Project',
         click: () => {
@@ -91,25 +105,13 @@ export const menuList = [
     label: 'Help',
     submenu: [
       {
-        label: 'About UmJoonSIC',
-        click: async () => {
-          const aboutWindow = new BrowserWindow({
-            width: 800,
-            height: 600,
-            show: false,
-            autoHideMenuBar: true,
-          });
-          aboutWindow.loadFile(path.join(__dirname, '../renderer/about.html'))
-          aboutWindow.center();
-          aboutWindow.show();
-        },
-      },
-      {
         label: 'How to use',
         click: async () => {
-          shell.openExternal('https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link');
-        }
-      }
+          await shell.openExternal(
+            'https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link',
+          );
+        },
+      },
     ],
   },
 ];
