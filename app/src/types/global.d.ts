@@ -30,6 +30,7 @@ interface Window {
       relativePath: string,
     ) => Promise<{ success: boolean; message?: string }>;
     pickFile: () => Promise<{ success: boolean; data?: string; message?: string }>;
+    restartServer: () => Promise<{ success: boolean; message?: string }>;
   };
 }
 
