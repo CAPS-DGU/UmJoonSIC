@@ -86,9 +86,9 @@ export const menuList = [
   {
     label: 'View',
     submenu: [
-      { role: 'reload' },
-      { role: 'forceReload' },
-      { role: 'toggleDevTools' },
+      // { role: 'reload' },
+      // { role: 'forceReload' },
+      // { role: 'toggleDevTools' },
       { type: 'separator' },
       { role: 'resetZoom' },
       { role: 'zoomIn' },
