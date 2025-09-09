@@ -14,7 +14,7 @@ export const menuList = [
             resizable: false,
             autoHideMenuBar: true,
             title: 'About UmJoonSIC',
-            modal: true,
+            // modal: true,
             parent: BrowserWindow.getFocusedWindow() ?? undefined,
           });
 
