@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import useConsoleStore from '@/stores/pannel/ConsoleStore';
+import { useRunningStore } from '@/stores/RunningStore';
 
 export default function Console() {
   const messages = useConsoleStore(s => s.messages);
@@ -16,6 +17,7 @@ export default function Console() {
   }, [messages]);
 
   const handleRestart = async () => {
+    useRunningStore.getState().stopRunning();
     const res = await window.api.restartServer();
     if (res.success) {
       addMessage({ type: 'out', message: 'Server restarted.' });
