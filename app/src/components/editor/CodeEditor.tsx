@@ -214,9 +214,15 @@ export default function CodeEditor() {
       const key = event.key;
       const activeTab = getActiveTab();
 
+      // 줌 단축키는 Electron이 처리하도록 그대로 둡니다
+      if ((event.ctrlKey || event.metaKey) && (key === '+' || key === '-' || key === '=' || key === '0')) {
+        return; // Electron의 기본 줌 기능이 처리하도록 함
+      }
+
       // 저장 (Ctrl+S or Cmd+S)
       if ((event.ctrlKey || event.metaKey) && key.toLowerCase() === 's') {
         event.preventDefault();
+        event.stopPropagation();
         if (activeTab && editor) {
           // 1. 먼저 전체 문서를 포맷합니다.
           formatDocument();
@@ -243,9 +249,9 @@ export default function CodeEditor() {
         return;
       }
 
-      // 구문 분석 (공백, 탭, 엔터)
+      // 구문 분석 (공백, 탭, 엔터) - 에디터가 포커스되어 있을 때만
       if (key === ' ' || key === 'Tab' || key === 'Enter') {
-        if (editor) {
+        if (editor && document.activeElement === editor.getDomNode()) {
           debouncedRunCheck([editor.getValue()], [activeTab!.filePath]);
         }
       }
