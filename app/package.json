@@ -36,6 +36,7 @@
     "clsx": "^2.1.1",
     "electron": "^37.2.6",
     "electron-squirrel-startup": "^1.0.1",
+    "es-toolkit": "^1.39.10",
     "lucide-react": "^0.540.0",
     "monaco-editor": "^0.52.2",
     "path-browserify": "^1.0.1",
