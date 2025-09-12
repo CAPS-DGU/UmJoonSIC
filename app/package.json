@@ -8,17 +8,18 @@
   "main": "./dist/main/index.js",
   "productName": "UmJoonSIC",
   "scripts": {
-    "dev": "electron-vite dev",
-    "start": "electron-forge start",
+    "dev": "cross-env SHOW_DEVTOOLS=true electron-vite dev",
+    "dev:no-devtools": "cross-env SHOW_DEVTOOLS=false electron-vite dev",
+    "start": "cross-env SHOW_DEVTOOLS=false electron-forge start",
     "build": "tsc -b && vite build",
     "premake": "electron-vite build",
     "prepackage": "electron-vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "preview": "vite preview",
-    "prebuild": "electron-vite build",
-    "package": "electron-forge package",
-    "make": "electron-forge make"
+    "prebuild": "cross-env SHOW_DEVTOOLS=false electron-vite build",
+    "package": "cross-env SHOW_DEVTOOLS=false electron-forge package",
+    "make": "cross-env SHOW_DEVTOOLS=false electron-forge make"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -64,6 +65,7 @@
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
+    "cross-env": "^10.0.0",
     "electron": "37.2.6",
     "electron-vite": "^4.0.0",
     "eslint": "^9.32.0",
