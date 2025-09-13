@@ -1,6 +1,8 @@
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 
+const isDevtoolsEnabled = process.env.SHOW_DEVTOOLS === 'true';
+
 export const menuList = [
   {
     label: 'Application',
@@ -86,9 +88,14 @@ export const menuList = [
   {
     label: 'View',
     submenu: [
-      // { role: 'reload' },
-      // { role: 'forceReload' },
-      // { role: 'toggleDevTools' },
+      ...(isDevtoolsEnabled
+        ? [
+            { role: 'reload' },
+            { role: 'forceReload' },
+            { role: 'toggleDevTools' },
+            { type: 'separator' },
+          ]
+        : []),
       { type: 'separator' },
       { role: 'resetZoom' },
       { role: 'zoomIn' },
