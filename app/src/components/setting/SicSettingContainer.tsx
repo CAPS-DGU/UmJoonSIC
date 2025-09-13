@@ -12,6 +12,7 @@ export default function SicSettingContainer() {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
+        e.stopPropagation();
         saveSettings().then((res: { success: boolean; message?: string }) => {
           if (res.success) {
             setIsModified(activeTabIdx, false);

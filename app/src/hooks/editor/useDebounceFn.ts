@@ -1,17 +1,7 @@
-// useDebounceFn.ts
-import { useRef, useCallback } from 'react';
+import { useMemo } from 'react';
+import { debounce } from 'es-toolkit/function';
 
-export function useDebounceFn<T extends (...args: string[][]) => unknown>(
-  fn: T,
-  delay: number,
-): (...args: Parameters<T>) => void {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  return useCallback(
-    (...args: Parameters<T>) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => fn(...args), delay);
-    },
-    [fn, delay],
-  );
+export function useDebounceFn<T extends (...args: string[][]) => unknown>(fn: T, delay: number) {
+  const debounced = useMemo(() => debounce(fn, delay), [fn, delay]);
+  return debounced;
 }
