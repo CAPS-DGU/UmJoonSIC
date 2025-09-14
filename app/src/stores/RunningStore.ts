@@ -103,6 +103,10 @@ export const useRunningStore = create<RunningState>((set, get) => ({
     const { addErrors, clearErrors } = useErrorStore.getState();
 
     await fetchBegin();
+    const { success } = await useEditorTabStore.getState().saveAllTabs();
+    if (!success) {
+      return;
+    }
     const res = await axios.post('http://localhost:9090/load', {
       filePaths: settings.asm.map(file => path.join(projectPath, file)),
       outputDir: path.join(projectPath, '.out'),
