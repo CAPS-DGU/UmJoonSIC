@@ -45,6 +45,8 @@ export async function downloadFile(relativePath: string, url: string) {
     show: false,
     modal: false,
     alwaysOnTop: true,
+    autoHideMenuBar: true,
+    frame: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
