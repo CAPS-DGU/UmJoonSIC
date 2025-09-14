@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { useProjectStore } from './ProjectStore';
+import path from 'path-browserify';
 
 export interface EditorTab {
   idx: number;
@@ -32,6 +34,12 @@ interface EditorTabState {
   removeBreakpoint: (idx: number, lineNumber: number) => void;
   toggleBreakpoint: (idx: number, lineNumber: number) => void;
   clearBreakpoints: (idx: number) => void;
+  saveAllTabs: () => Promise<{
+    success: boolean;
+    savedCount: number;
+    totalCount: number;
+    failedCount: number;
+  }>;
 }
 
 // const defaultTab: EditorTab = {
@@ -221,4 +229,67 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
         return tab;
       }),
     })),
+    saveAllTabs: async () => {
+      const { tabs } = get();
+      const { projectPath } = useProjectStore.getState();
+      
+      const modifiedTabs = tabs.filter(tab => 
+        tab.isModified && 
+        !tab.filePath.endsWith('.lst') && 
+        !tab.filePath.endsWith('.sic')
+      );
+
+      if (modifiedTabs.length === 0) {
+        console.log('저장할 수정된 탭이 없습니다.');
+        return { success: true, savedCount: 0, totalCount: 0, failedCount: 0 };
+      }
+
+      const savePromises = modifiedTabs.map(async (tab) => {
+        const fullPath = path.join(projectPath, tab.filePath);
+        try {
+          const res = await window.api.saveFile(fullPath, tab.fileContent);
+          if (res.success) {
+            // 개별 탭의 isModified만 false로 설정
+            set(state => ({
+              tabs: state.tabs.map(t => 
+                t.idx === tab.idx ? { ...t, isModified: false } : t
+              ),
+            }));
+            return { success: true, tabIdx: tab.idx };
+          } else {
+            console.error(`파일 저장 실패: ${fullPath}`, res.message);
+            return { success: false, tabIdx: tab.idx, error: res.message };
+          }
+        } catch (error) {
+          console.error(`파일 저장 중 오류 발생: ${fullPath}`, error);
+          return { 
+            success: false, 
+            tabIdx: tab.idx, 
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+      });
+
+      const results = await Promise.allSettled(savePromises);
+      const successCount = results.filter(result => 
+        result.status === 'fulfilled' && result.value.success
+      ).length;
+      
+      const failedResults = results.filter(result => 
+        result.status === 'rejected' || 
+        (result.status === 'fulfilled' && !result.value.success)
+      );
+
+      if (failedResults.length > 0) {
+        console.warn(`${failedResults.length}개 파일 저장 실패:`, failedResults);
+      }
+
+      console.log(`${successCount}/${modifiedTabs.length}개 파일 저장 완료`);
+      return { 
+        success: failedResults.length === 0, 
+        savedCount: successCount,
+        totalCount: modifiedTabs.length,
+        failedCount: failedResults.length
+      };
+    },
 }));
