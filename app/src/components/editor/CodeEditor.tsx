@@ -8,6 +8,7 @@ import { useErrorStore } from '@/stores/pannel/ErrorStore';
 import { useSyntaxCheck } from '@/hooks/editor/useSyntaxCheck';
 import { useAutoIndentation } from '@/hooks/editor/useAutoIndentation';
 import { useDebounceFn } from '@/hooks/editor/useDebounceFn';
+import { useMemoryViewStore } from '@/stores/MemoryViewStore';
 
 import { editorOptions } from '@/constants/monaco/editor-config';
 import { sicxeLanguage } from '@/constants/monaco/sicxeLanguage';
@@ -35,8 +36,15 @@ export default function CodeEditor() {
   const setFileContent = useEditorTabStore(state => state.setFileContent);
   const setCursor = useEditorTabStore(state => state.setCursor);
   const setIsModified = useEditorTabStore(state => state.setIsModified);
+  const mode = useMemoryViewStore(state => state.mode);
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
+
+  const isProjectFile = (fp?: string) => {
+    if (!fp) return false;
+    const { settings } = useProjectStore.getState();
+    return Array.isArray(settings?.asm) && settings.asm.includes(fp);
+  };
 
   const editorRef = useRef<monaco_editor.editor.IStandaloneCodeEditor | null>(null);
   const isLoadingRef = useRef(false);
@@ -59,7 +67,7 @@ export default function CodeEditor() {
   useEffect(() => {
     if (!activeTab || hasRunRef.current) return;
     if (!activeTab.fileContent) return; // 파일 내용이 준비되지 않았으면 대기
-
+    if (!isProjectFile(activeTab.filePath)) return; // 파일이 project에 소속된 asm파일이 아니면 검사하지 않음
     runCheck([activeTab.fileContent], [activeTab.filePath]);
     hasRunRef.current = true; // 한 번만 실행
   }, [activeTab?.idx, runCheck]);
@@ -96,14 +104,20 @@ export default function CodeEditor() {
       return;
     }
 
-    const markers = errors[activeTab.filePath].map(err => ({
-      severity: monaco.MarkerSeverity.Error,
-      message: err.message,
-      startLineNumber: clampLine(err.row, model),
-      startColumn: clampLine(err.col, model),
-      endLineNumber: clampLine(err.row, model),
-      endColumn: clampLine(err.col + (err.length ?? 1), model),
-    }));
+    const markers = errors[activeTab.filePath].map(err => {
+      const line = clampLine(err.row, model);
+      const maxColumn = model.getLineMaxColumn(line);
+
+      return {
+        severity: monaco.MarkerSeverity.Error,
+        message: err.message,
+        startLineNumber: line,
+        startColumn: Math.max(1, Math.min(err.col, maxColumn)),
+        endLineNumber: line,
+        endColumn: Math.max(1, Math.min(err.col + (err.length ?? 1), maxColumn)),
+      };
+    });
+
     monaco.editor.setModelMarkers(model, 'sicxe', markers);
 
     const loadErrorLines = errors[activeTab.filePath]
@@ -180,6 +194,9 @@ export default function CodeEditor() {
 
     // Run syntax check on paste (full doc)
     editorRef.current.onDidPaste(() => {
+      // 파일이 asm목록에 소속되었을 경우에만 검사
+      const t = getActiveTab();
+      if (!t || !isProjectFile(t.filePath)) return;
       runCheck([editorRef.current!.getValue()], [activeTab!.filePath]);
     });
 
@@ -187,22 +204,33 @@ export default function CodeEditor() {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab && !isLoadingRef.current) {
         setIsModified(currentActiveTab.idx, true);
-        setFileContent(currentActiveTab.idx, editor.getValue());
+        const value = editor.getValue();
+        setFileContent(currentActiveTab.idx, value);
+        // 파일이 asm목록에 소속되었을 경우에만 검사
+        if (isProjectFile(currentActiveTab.filePath)) {
+          debouncedRunCheck([value], [currentActiveTab.filePath]);
+        }
       }
     });
+
 
     // Delegate keys to our auto-indenter (it will prevent default for Tab/Enter)
     editor.onKeyDown(e => {
       const model = editor.getModel();
       if (!model) return;
-      handleAutoIndentationKeyDown(e);
+      const t = getActiveTab();
+      if (t && isProjectFile(t.filePath)) {
+        handleAutoIndentationKeyDown(e);
+      }
     });
 
-    // Let our paste hook reflow pasted lines
     editor.onDidPaste(e => {
       const model = editor.getModel();
       if (!model) return;
-      handleAutoIndentationPaste(e);
+      const t = getActiveTab();
+      if (t && isProjectFile(t.filePath)) {
+        handleAutoIndentationPaste(e);
+      }
     });
   };
 
@@ -225,13 +253,19 @@ export default function CodeEditor() {
         event.stopPropagation();
         if (activeTab && editor) {
           // 1. 먼저 전체 문서를 포맷합니다.
-          formatDocument();
+          // only format project files
+          if (isProjectFile(activeTab.filePath)) {
+            formatDocument();
+          }
 
           // 2. 포맷팅이 적용될 시간을 짧게 기다린 후, 구문 분석과 저장을 실행합니다.
           setTimeout(() => {
             const formattedContent = editor.getValue();
             // 구문 분석 실행
-            runCheck([formattedContent], [activeTab.filePath]);
+            // only syntax-check project files
+            if (isProjectFile(activeTab.filePath)) {
+              runCheck([formattedContent], [activeTab.filePath]);
+            }
 
             // 파일 저장 API 호출
             window.api
@@ -249,10 +283,11 @@ export default function CodeEditor() {
         return;
       }
 
-      // 구문 분석 (공백, 탭, 엔터) - 에디터가 포커스되어 있을 때만
-      if (key === ' ' || key === 'Tab' || key === 'Enter') {
-        if (editor && document.activeElement === editor.getDomNode()) {
-          debouncedRunCheck([editor.getValue()], [activeTab!.filePath]);
+      // 구문 분석 (모든 키) - 에디터가 포커스되어 있을 때만
+      if (editor && editor.hasTextFocus()) {
+        const t = getActiveTab();
+        if (t && isProjectFile(t.filePath)) {
+          debouncedRunCheck([editor.getValue()], [t.filePath]);
         }
       }
     };
@@ -288,6 +323,21 @@ export default function CodeEditor() {
   useEffect(() => {
     registerAssemblyLanguage(monaco);
   }, [monaco]);
+
+  // Mode-change re-check (project files only)
+  useEffect(() => {
+    const { tabs: currentTabs } = useEditorTabStore.getState();
+    const { settings } = useProjectStore.getState();
+    const asmSet = new Set(settings?.asm ?? []);
+
+    const projTabs = currentTabs.filter(t => asmSet.has(t.filePath));
+    if (!projTabs.length) return;
+
+    runCheck(
+      projTabs.map(t => t.fileContent ?? ''),
+      projTabs.map(t => t.filePath),
+    );
+  }, [mode, runCheck]);
 
   if (tabs.length === 0) {
     return (
