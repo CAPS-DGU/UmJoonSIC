@@ -193,9 +193,12 @@ export default function CodeEditor() {
       const currentActiveTab = getActiveTab();
       if (currentActiveTab && !isLoadingRef.current) {
         setIsModified(currentActiveTab.idx, true);
-        setFileContent(currentActiveTab.idx, editor.getValue());
+        const value = editor.getValue();
+        setFileContent(currentActiveTab.idx, value);
+        debouncedRunCheck([value], [currentActiveTab.filePath]);
       }
     });
+
 
     // Delegate keys to our auto-indenter (it will prevent default for Tab/Enter)
     editor.onKeyDown(e => {
@@ -255,11 +258,9 @@ export default function CodeEditor() {
         return;
       }
 
-      // 구문 분석 (공백, 탭, 엔터) - 에디터가 포커스되어 있을 때만
-      if (key === ' ' || key === 'Tab' || key === 'Enter') {
-        if (editor && document.activeElement === editor.getDomNode()) {
-          debouncedRunCheck([editor.getValue()], [activeTab!.filePath]);
-        }
+      // 구문 분석 (모든 키) - 에디터가 포커스되어 있을 때만
+      if (editor && editor.hasTextFocus()) {
+        debouncedRunCheck([editor.getValue()], [activeTab!.filePath]);
       }
     };
 
