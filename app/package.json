@@ -3,7 +3,7 @@
   "description": "UmJoonSIC",
   "author": "CAPS",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "main": "./dist/main/index.js",
   "productName": "UmJoonSIC",
