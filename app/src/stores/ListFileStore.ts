@@ -42,7 +42,7 @@ const processRows = (rows: ListFileRow[]): ListFileRow[] =>
     ...row,
     // operand: processOperand(row.operand),
     operand: (row.operand),
-    nixbpe: '0', // NIXBPE를 0으로 초기화
+    // nixbpe: '0', // NIXBPE를 0으로 초기화
   }));
 
 export const useListFileStore = create<ListFileState>(set => ({
