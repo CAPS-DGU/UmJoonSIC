@@ -1,288 +1,189 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About</title>
     <style>
-      :root {
-        --bg: #f7fafc; /* light bg */
-        --bg-grad-1: rgba(59, 130, 246, 0.08);
-        --bg-grad-2: rgba(99, 102, 241, 0.06);
-        --card: #ffffff; /* white card */
-        --text: #0f172a; /* slate-900 */
-        --muted: #475569; /* slate-600 */
-        --primary: #2563eb; /* blue-600 */
-        --ring: rgba(37, 99, 235, 0.25);
-        --divider: rgba(15, 23, 42, 0.08);
-      }
+        :root {
+            --bg: #f7fafc;            /* light bg */
+            --bg-grad-1: rgba(59,130,246,0.08);
+            --bg-grad-2: rgba(99,102,241,0.06);
+            --card: #ffffff;          /* white card */
+            --text: #0f172a;          /* slate-900 */
+            --muted: #475569;         /* slate-600 */
+            --primary: #2563eb;       /* blue-600 */
+            --ring: rgba(37,99,235,0.25);
+            --divider: rgba(15,23,42,0.08);
+        }
 
-      * {
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        height: 100%;
-      }
-      body {
-        margin: 0;
-        background:
-          radial-gradient(1200px 600px at 10% -20%, var(--bg-grad-1), transparent),
-          radial-gradient(900px 500px at 90% 10%, var(--bg-grad-2), transparent), var(--bg);
-        color: var(--text);
-        font-family:
-          ui-sans-serif,
-          system-ui,
-          -apple-system,
-          Segoe UI,
-          Roboto,
-          Helvetica,
-          Arial,
-          'Apple Color Emoji',
-          'Segoe UI Emoji';
-        line-height: 1.6;
-      }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: radial-gradient(1200px 600px at 10% -20%, var(--bg-grad-1), transparent),
+                        radial-gradient(900px 500px at 90% 10%, var(--bg-grad-2), transparent),
+                        var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            line-height: 1.6;
+        }
 
-      .container {
-        min-height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px 16px;
-      }
+        .container {
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+        }
 
-      .card {
-        width: 100%;
-        max-width: 880px;
-        background: var(--card);
-        border: 1px solid var(--divider);
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);
-        padding: 28px;
-      }
+        .card {
+            width: 100%;
+            max-width: 880px;
+            background: var(--card);
+            border: 1px solid var(--divider);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+            padding: 28px;
+        }
 
-      .header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        border-bottom: 1px solid var(--divider);
-        padding-bottom: 16px;
-      }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border-bottom: 1px solid var(--divider);
+            padding-bottom: 16px;
+        }
 
-      h1 {
-        margin: 0;
-        font-size: 28px;
-        font-weight: 800;
-        letter-spacing: 0.3px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-      .badge {
-        font-size: 12px;
-        color: var(--primary);
-        background: rgba(37, 99, 235, 0.1);
-        border: 1px solid var(--ring);
-        padding: 2px 8px;
-        border-radius: 999px;
-      }
+        .badge {
+            font-size: 12px;
+            color: var(--primary);
+            background: rgba(37,99,235,0.10);
+            border: 1px solid var(--ring);
+            padding: 2px 8px;
+            border-radius: 999px;
+        }
 
-      .section {
-        padding: 18px 0;
-        display: grid;
-        grid-template-columns: 160px 1fr;
-        gap: 16px;
-        border-bottom: 1px dashed var(--divider);
-      }
-      .section:last-child {
-        border-bottom: 0;
-      }
+        .section {
+            padding: 18px 0;
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 16px;
+            border-bottom: 1px dashed var(--divider);
+        }
+        .section:last-child { border-bottom: 0; }
 
-      .section h3 {
-        margin: 0;
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--muted);
-        letter-spacing: 0.4px;
-        text-transform: uppercase;
-      }
+        .section h3 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
 
-      .content p {
-        margin: 0 0 6px 0;
-      }
-      .content p:last-child {
-        margin-bottom: 0;
-      }
+        .content p { margin: 0 0 6px 0; }
+        .content p:last-child { margin-bottom: 0; }
 
-      .content a {
-        color: var(--primary);
-        text-decoration: none;
-      }
-      .content a:hover {
-        text-decoration: underline;
-      }
+        ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 6px;
+        }
+        li { color: var(--text); }
 
-      ul {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        display: grid;
-        gap: 6px;
-      }
-      li {
-        color: var(--text);
-      }
-
-      .footer {
-        margin-top: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 10px;
-        color: var(--muted);
-        font-size: 12px;
-      }
+        .footer {
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
     </style>
-  </head>
-  <body>
+</head>
+<body>
     <div class="container">
-      <main class="card" role="main" aria-labelledby="about-title">
-        <header class="header">
-          <h1 id="about-title">About <span class="badge">BSD-2</span></h1>
-        </header>
+        <main class="card" role="main" aria-labelledby="about-title">
+            <header class="header">
+                <h1 id="about-title">About UmJoonSIC <span class="badge">v1.0.4</span> <span class="badge">BSD-2</span></h1>
+            </header>
 
-        <section class="section" aria-labelledby="tos">
-          <h3 id="tos">이용약관</h3>
-          <div class="content">
-            <p>
-              본 프로젝트는 BSD-2-Clause 라이선스로 배포됩니다. 자세한 내용은 저장소의
-              <code>LICENSE</code> 파일을 참조하세요.
-            </p>
-            <p>
-              이 저장소에는 <code>jurem/SicTools</code>의 일부 코드 및 아이디어가 Git subtree 형태로
-              포함될 수 있습니다. 해당 부분은 원저작권자 및 라이선스 고지(BSD-2-Clause)를 그대로
-              상속합니다.
-            </p>
-            <p>
-              BSD-2-Clause 조건에 따라, 원저작권 고지 및 면책 조항은 소스/바이너리 재배포 시 반드시
-              함께 제공되어야 합니다.
-            </p>
-            <p><strong>이하는 BSD2 라이선스 전문입니다.</strong></p>
-            <p>
-              Copyright (c) 2025, COPYRIGHT CAPS<br />
-              All rights reserved.
-            </p>
-            <p>
-              Redistribution and use in source and binary forms, with or without modification, are
-              permitted provided that the following conditions are met:
-            </p>
-            <ul>
-              <li>
-                1. Redistributions of source code must retain the above copyright notice, this list
-                of conditions and the following disclaimer.
-              </li>
-              <li>
-                2. Redistributions in binary form must reproduce the above copyright notice, this
-                list of conditions and the following disclaimer in the documentation and/or other
-                materials provided with the distribution.
-              </li>
-            </ul>
-            <p>
-              THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
-              EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-              OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
-              SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-              INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-              TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-              BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-              CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY
-              WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
-              DAMAGE.
-            </p>
-          </div>
-        </section>
+            <section class="section" aria-labelledby="tos">
+                <h3 id="tos">이용약관</h3>
+                <div class="content">
+                    <p>본 프로젝트는 BSD-2-Clause 라이선스로 배포됩니다. 자세한 내용은 저장소의 <code>LICENSE</code> 파일을 참조하세요.</p>
+                    <p>이 저장소에는 <code>jurem/SicTools</code>의 일부 코드 및 아이디어가 Git subtree 형태로 포함될 수 있습니다. 해당 부분은 원저작권자 및 라이선스 고지(BSD-2-Clause)를 그대로 상속합니다.</p>
+                    <p>BSD-2-Clause 조건에 따라, 원저작권 고지 및 면책 조항은 소스/바이너리 재배포 시 반드시 함께 제공되어야 합니다.</p>
+                    <p><strong>이하는 BSD2 라이선스 전문입니다.</strong></p>
+                    <p>Copyright (c) 2025, COPYRIGHT CAPS<br/>
+                    All rights reserved.</p>
+                    <p>Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:</p>
+                    <ul>
+                        <li>1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.</li>
+                        <li>2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.</li>
+                    </ul>
+                    <p>THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</p>
+                </div>
+            </section>
 
-        <section class="section" aria-labelledby="references">
-          <h3 id="references">참고 문헌</h3>
-          <div class="content">
-            <ul>
-              <li>
-                Leland L. Beck, System Software: An Introduction to Systems Programming, 3rd ed.,
-                Addison-Wesley, 1997.
-              </li>
-              <li>
-                Jurij Mihelič, Tomaž Dobravec, “SicSim: A simulator of the educational SIC/XE
-                computer for a system-software course,” Computer Applications in Engineering
-                Education, 23(1):137–146, 2015. doi:10.1002/cae.21585
-              </li>
-            </ul>
-          </div>
-        </section>
+            <section class="section" aria-labelledby="references">
+                <h3 id="references">참고 문헌</h3>
+                <div class="content">
+                    <ul>
+                        <li>Leland L. Beck, System Software: An Introduction to Systems Programming, 3rd ed., Addison-Wesley, 1997.</li>
+                        <li>Jurij Mihelič, Tomaž Dobravec, “SicSim: A simulator of the educational SIC/XE computer for a system-software course,” Computer Applications in Engineering Education, 23(1):137–146, 2015. doi:10.1002/cae.21585</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="section" aria-labelledby="mentors">
-          <h3 id="mentors">개발 지도</h3>
-          <div class="content">
-            <p>동국대학교 컴퓨터·AI학부 교수 정준호</p>
-            <p>동국대학교 컴퓨터·AI학부 교수 한인</p>
-          </div>
-        </section>
+            <section class="section" aria-labelledby="mentors">
+                <h3 id="mentors">개발 지도</h3>
+                <div class="content">
+                    <p>동국대학교 컴퓨터·AI학부 교수 정준호</p>
+                    <p>동국대학교 컴퓨터·AI학부 교수 한인</p>
+                </div>
+            </section>
 
-        <section class="section" aria-labelledby="contributors">
-          <h3 id="contributors">개발 총괄 및 참여</h3>
-          <div class="content">
-            <ul>
-              <li>
-                <span class="badge">개발 총괄</span> 컴퓨터공학과 20학번 정상원, 약학과 23학번
-                원종인, 컴퓨터·AI학부 24학번 송윤석, 컴퓨터공학과 24학번 안지민
-              </li>
-              <li>
-                <span class="badge">검수</span> 중앙동아리 CAPS 여름 프로젝트형 스터디 참가자 일동
-              </li>
-              <li>
-                <span class="badge">참여</span> 통계학과 24학번 전가희, 컴퓨터공학전공 24학번
-                박예진, 컴퓨터AI학부 25학번 원종호, 컴퓨터AI학부 22학번 서동건, 통계학과 23학번
-                박서연, 컴퓨터AI학부 24학번 노혜륜, 경찰행정학부 20학번 조준용, 경영정보학과 23학번
-                최지인, 컴퓨터AI학부 25학번 김영주, 기계로봇에너지공학과 24학번 채건, 컴퓨터AI학부
-                22학번 김민설, 컴퓨터공학전공 23학번 김예원, 컴퓨터AI학부 23학번 신효환,
-                컴퓨터AI학부 23학번 이정은, 컴퓨터공학과 24학번 윤재필, 멀티미디어소프트웨어공학전공
-                23학번 이서연, 컴퓨터AI학부 21학번 장길빈, 컴퓨터공학전공 23학번 박준홍,
-                정보통신공학과 20학번 한병헌, 컴퓨터AI학부 25학번 심현서, 컴퓨터AI학부 25학번 강성찬,
-                수학과 24학번 성준영, 컴퓨터AI학부 25학번 박재관, 통계학과 25학번 김주혜
-              </li>
-            </ul>
-          </div>
-        </section>
+            <section class="section" aria-labelledby="contributors">
+                <h3 id="contributors">개발 총괄 및 참여</h3>
+                <div class="content">
+                    <ul>
+                        <li><span class="badge">개발 총괄</span> 컴퓨터공학과 20학번 정상원, 약학과 23학번 원종인, 컴퓨터·AI학부 24학번 송윤석, 컴퓨터공학과 24학번 안지민</li>
+                        <li><span class="badge">검수</span> 중앙동아리 CAPS 여름 프로젝트형 스터디 참가자 일동</li>
+                        <li><span class="badge">참여</span> 통계학과 24학번 전가희, 컴퓨터공학전공 24학번 박예진, 컴퓨터AI학부 25학번 원종호, 컴퓨터AI학부 22학번 서동건, 통계학과 23학번 박서연, 컴퓨터AI학부 24학번 노혜륜, 경찰행정학부 20학번 조준용, 경영정보학과 23학번 최지인, 컴퓨터AI학부 25학번 김영주, 기계로봇에너지공학과 24학번 채건, 컴퓨터AI학부 22학번 김민설, 컴퓨터공학전공 23학번 김예원, 컴퓨터AI학부 23학번 신효환, 컴퓨터AI학부 23학번 이정은, 컴퓨터공학과 24학번 윤재필, 멀티미디어소프트웨어공학전공 23학번 이서연, 컴퓨터AI학부 21학번 장길빈, 컴퓨터공학전공 23학번 박준홍, 정보통신공학과 20학번 한병헌, 컴퓨터AI학부 25학번 심현서, 컴퓨터AI학부 25학번 강성찬, 수학과 24학번 성준영, 컴퓨터AI학부 25학번 박재관, 통계학과 25학번 김주혜</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="section" aria-labelledby="github-page">
-          <h3 id="github-page">제작자 GitHub 페이지</h3>
-          <div class="content">
-            <p>
-              <a href="https://github.com/CAPS-DGU/UmJoonSIC" target="_blank"
-                >https://github.com/CAPS-DGU/UmJoonSIC</a
-              >
-            </p>
-          </div>
-        </section>
+            <section class="section" aria-labelledby="issues">
+                <h3 id="issues">오류 제보 및 이용 안내</h3>
+                <div class="content">
+                    <p>오류 제보는 자유롭게 Issues로 등록해 주세요. BSD-2-Clause 라이선스를 준수하는 범위에서 자유로운 이용과 파생 작업을 환영합니다.</p>
+                    <p>함께해 주신 스터디원들과 정준호 교수님, 한 인 교수님께 깊이 감사드립니다.</p>
+                </div>
+            </section>
 
-        <section class="section" aria-labelledby="issues">
-          <h3 id="issues">오류 제보 및 이용 안내</h3>
-          <div class="content">
-            <p>
-              오류 제보는 자유롭게 Issues로 등록해 주세요. BSD-2-Clause 라이선스를 준수하는 범위에서
-              자유로운 이용과 파생 작업을 환영합니다.
-            </p>
-            <p>함께해 주신 스터디원들과 정준호 교수님, 한 인 교수님께 깊이 감사드립니다.</p>
-          </div>
-        </section>
-
-        <footer class="footer" aria-label="meta">
-          <span>© Dongguk University</span>
-          <span>•</span>
-          <span>CAPS</span>
-        </footer>
-      </main>
+            <footer class="footer" aria-label="meta">
+                <span>© Dongguk University</span>
+                <span>•</span>
+                <span>CAPS</span>
+            </footer>
+        </main>
     </div>
-  </body>
+</body>
 </html>
