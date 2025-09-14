@@ -96,14 +96,20 @@ export default function CodeEditor() {
       return;
     }
 
-    const markers = errors[activeTab.filePath].map(err => ({
-      severity: monaco.MarkerSeverity.Error,
-      message: err.message,
-      startLineNumber: clampLine(err.row, model),
-      startColumn: clampLine(err.col, model),
-      endLineNumber: clampLine(err.row, model),
-      endColumn: clampLine(err.col + (err.length ?? 1), model),
-    }));
+    const markers = errors[activeTab.filePath].map(err => {
+      const line = clampLine(err.row, model);
+      const maxColumn = model.getLineMaxColumn(line);
+
+      return {
+        severity: monaco.MarkerSeverity.Error,
+        message: err.message,
+        startLineNumber: line,
+        startColumn: Math.max(1, Math.min(err.col, maxColumn)),
+        endLineNumber: line,
+        endColumn: Math.max(1, Math.min(err.col + (err.length ?? 1), maxColumn)),
+      };
+    });
+
     monaco.editor.setModelMarkers(model, 'sicxe', markers);
 
     const loadErrorLines = errors[activeTab.filePath]
