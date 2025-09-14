@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { useWatchStore } from './pannel/WatchStore';
 import type { WatchRow } from './pannel/WatchStore';
+import { useProjectStore } from './ProjectStore';
 
 export type MemoryNodeStatus = 'normal' | 'highlighted' | 'red bold';
 
@@ -61,20 +62,41 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   loadedRanges: new Set(),
   loadingRanges: new Set(),
 
-  setMode: newMode => {
-    const totalSize = newMode === 'SIC' ? 0x8000 : 0x100000;
-    set({
-      mode: newMode,
-      totalMemorySize: totalSize,
-      memoryRange: { start: 0, end: totalSize - 1 },
-      memoryValues: [],
-      loadedRanges: new Set(),
-      loadingRanges: new Set(),
-      changedNodes: new Set(),
-      labels: [],
-      visibleRange: { start: 0, end: 256 },
-    });
-  },
+setMode: newMode => {
+  const totalSize = newMode === 'SIC' ? 0x8000 : 0x100000;
+
+  // update local memory-view state
+  set({
+    mode: newMode,
+    totalMemorySize: totalSize,
+    memoryRange: { start: 0, end: totalSize - 1 },
+    memoryValues: [],
+    loadedRanges: new Set(),
+    loadingRanges: new Set(),
+    changedNodes: new Set(),
+    labels: [],
+    visibleRange: { start: 0, end: 256 },
+  });
+
+  // kick off the same "begin" request used in RunningStore.fetchBegin
+  (async () => {
+    try {
+      const { settings } = useProjectStore.getState();
+      console.log('mode (after setMode): ', newMode);
+      console.log('filedevices: ', settings.filedevices);
+      const res = await axios.post('http://localhost:9090/begin', {
+        type: newMode.toLowerCase(),
+        filedevices: settings.filedevices,
+      });
+      const data = res.data;
+      if (!data.ok) {
+        console.error('Failed to begin after mode change');
+      }
+    } catch (e) {
+      console.error('Begin request failed after mode change:', e);
+    }
+  })();
+},
 
   setMemoryRange: memoryRange => set({ memoryRange }),
   setMemoryValues: memoryValues => set({ memoryValues }),
