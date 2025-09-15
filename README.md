@@ -1,6 +1,10 @@
 # 동국대학교 컴퓨터·AI학부 공식 실습 프로그램 **엄준SIC**
 <img width="2100" height="1400" alt="splash" src="https://github.com/user-attachments/assets/f293ede4-6af5-4723-b066-98ae02784de6" />
 
+
+[>>설치 방법 및 사용 설명서(클릭)<<](https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link)
+
+
 컴퓨터공학과(현 컴퓨터·AI학부) 전공과목 **시스템소프트웨어(구 시스템소프트웨어및실습)** 전반부의 SIC/SIC-XE 어셈블리 실습은 오랫동안 `sicsim.exe`, `sicedit.exe`, `sicasm.exe` 세 프로그램에 의존해 왔습니다. 그러나 이 도구들은 **DOSBox**가 필요하고 기본적인 CLI만 제공해 실습·디버깅·보고서 작성이 매우 불편했습니다. 특히 **DOSBox 출력은 복사가 어렵고**, `sicedit.exe`는 **macOS에서 동작하지 않아** 맥북 사용자들이 메모장으로 공백 수를 직접 계산하며 코드를 작성해야 하는 문제가 있었습니다.
 
 이 문제를 해결하기 위해 동국대학교 중앙동아리 **CAPS**는 2025년 여름 스터디로 실습 프로그램을 **리마스터**했습니다. 목표는 운영체제 제약 없이 누구나 현대적인 UI로 편리하게 실습하고, 결과를 쉽게 복사·공유할 수 있는 환경을 제공하는 것입니다.
