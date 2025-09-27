@@ -26,6 +26,7 @@ function App() {
   const [panelHeight, setPanelHeight] = useState(250);
   const [isResizing, setIsResizing] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
+  const lastOpenedProjectPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleCreateNewProject = () => {
@@ -52,7 +53,11 @@ function App() {
     const handleOpenProjectByPath = (event: Event) => {
       const sicPath = (event as CustomEvent<string>).detail;
       if (typeof sicPath === 'string' && sicPath.length > 0) {
+        if (lastOpenedProjectPathRef.current === sicPath) {
+          return;
+        }
         console.log('[UmJoonSIC] Handling open-project-path event for', sicPath);
+        lastOpenedProjectPathRef.current = sicPath;
         openProjectByPath(sicPath);
       }
     };
@@ -65,7 +70,12 @@ function App() {
     const tryConsumeQueuedPath = () => {
       const initialPath = window.api.consumeQueuedProjectPath?.();
       if (typeof initialPath === 'string' && initialPath.length > 0) {
+        if (lastOpenedProjectPathRef.current === initialPath) {
+          retryHandle = null;
+          return;
+        }
         console.log('[UmJoonSIC] Consuming queued project path', initialPath);
+        lastOpenedProjectPathRef.current = initialPath;
         openProjectByPath(initialPath);
         retryHandle = null;
         return;
@@ -88,6 +98,12 @@ function App() {
       }
     };
   }, [openProjectByPath]);
+
+  useEffect(() => {
+    if (!projectName) {
+      lastOpenedProjectPathRef.current = null;
+    }
+  }, [projectName]);
 
   useEffect(() => {
     const handleCloseProject = () => {
