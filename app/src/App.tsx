@@ -18,6 +18,7 @@ const STATUS_BAR_HEIGHT = 40;
 function App() {
   const createNewProject = useProjectStore(s => s.createNewProject);
   const openProject = useProjectStore(s => s.openProject);
+  const openProjectByPath = useProjectStore(s => s.openProjectByPath);
   const projectName = useProjectStore(s => s.projectName);
   const closeProject = useProjectStore(s => s.closeProject);
   const { tabs, activeTabIdx } = useEditorTabStore();
@@ -46,6 +47,47 @@ function App() {
       window.removeEventListener('open-project', handleOpenProject);
     };
   }, [openProject]);
+
+  useEffect(() => {
+    const handleOpenProjectByPath = (event: Event) => {
+      const sicPath = (event as CustomEvent<string>).detail;
+      if (typeof sicPath === 'string' && sicPath.length > 0) {
+        console.log('[UmJoonSIC] Handling open-project-path event for', sicPath);
+        openProjectByPath(sicPath);
+      }
+    };
+
+    window.addEventListener('open-project-path', handleOpenProjectByPath as EventListener);
+
+    let retryHandle: number | null = null;
+    let attempts = 0;
+
+    const tryConsumeQueuedPath = () => {
+      const initialPath = window.api.consumeQueuedProjectPath?.();
+      if (typeof initialPath === 'string' && initialPath.length > 0) {
+        console.log('[UmJoonSIC] Consuming queued project path', initialPath);
+        openProjectByPath(initialPath);
+        retryHandle = null;
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < 20) {
+        retryHandle = window.setTimeout(tryConsumeQueuedPath, 250);
+      } else {
+        retryHandle = null;
+      }
+    };
+
+    retryHandle = window.setTimeout(tryConsumeQueuedPath, 0);
+
+    return () => {
+      window.removeEventListener('open-project-path', handleOpenProjectByPath as EventListener);
+      if (retryHandle !== null) {
+        window.clearTimeout(retryHandle);
+      }
+    };
+  }, [openProjectByPath]);
 
   useEffect(() => {
     const handleCloseProject = () => {

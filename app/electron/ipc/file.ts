@@ -53,6 +53,40 @@ function listOutDirRelative(projectRoot: string): string[] {
   return rels;
 }
 
+function loadProjectFromSic(sicPath: string) {
+  const resolved = pathModule.resolve(sicPath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error('Project file not found.');
+  }
+
+  const projectRoot = pathModule.dirname(resolved);
+  const projectName = pathModule.basename(projectRoot);
+
+  const sicRaw = fs.readFileSync(resolved, 'utf8');
+  const sic = JSON.parse(sicRaw) as {
+    asm?: unknown;
+    main?: unknown;
+    filedevices?: unknown;
+  };
+
+  const asm: string[] = Array.isArray(sic.asm) ? sic.asm.map(item => String(item)) : [];
+  const mainProgram = typeof sic.main === 'string' ? sic.main : '';
+  const filedevices = Array.isArray(sic.filedevices)
+    ? (sic.filedevices as Array<{ index: number; filename: string }>).
+        map(device => ({ index: Number(device.index), filename: String(device.filename ?? '') }))
+    : [];
+
+  return {
+    name: projectName,
+    path: projectRoot,
+    settings: {
+      asm,
+      main: mainProgram,
+      filedevices,
+    },
+  };
+}
+
 // Build a tree-ish flat list that includes intermediate folders for the asm files
 function buildAsmTreeEntries(projectRoot: string, asmRelFiles: string[]): string[] {
   const set = new Set<string>();
@@ -328,26 +362,33 @@ ipcMain.handle('openProject', async () => {
     }
 
     const sicPath = pick.filePaths[0];
-    const projectRoot = pathModule.dirname(sicPath);
-    const projectName = pathModule.basename(projectRoot);
-
-    const sicRaw = fs.readFileSync(sicPath, 'utf8');
-    const sic = JSON.parse(sicRaw);
-
-    // Normalize fields
-    const asm: string[] = Array.isArray(sic.asm) ? sic.asm : [];
-    const main: string = typeof sic.main === 'string' ? sic.main : '';
-    const filedevices: FileDevice[] = Array.isArray(sic.filedevices) ? sic.filedevices : [];
+    const project = loadProjectFromSic(sicPath);
 
     return {
       success: true,
-      data: {
-        name: projectName,
-        path: projectRoot,
-        settings: { asm, main, filedevices },
-      },
+      data: project,
     };
   } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+});
+
+ipcMain.handle('openProjectByPath', async (_event, sicPath: string) => {
+  try {
+    if (!sicPath || typeof sicPath !== 'string') {
+      console.warn('[UmJoonSIC] openProjectByPath called with invalid path:', sicPath);
+      return { success: false, message: 'Invalid project path.' };
+    }
+
+    console.log('[UmJoonSIC] openProjectByPath loading', sicPath);
+    const project = loadProjectFromSic(sicPath);
+    console.log('[UmJoonSIC] openProjectByPath succeeded for', project.path);
+    return { success: true, data: project };
+  } catch (error) {
+    console.error('[UmJoonSIC] openProjectByPath failed', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error',
