@@ -1,40 +1,35 @@
 import { create } from 'zustand';
-import axios from 'axios';
+import { simulator } from '@/api/simulator';
+import type { WatchVariable } from '@/api/types';
 
-export interface WatchRow {
+/** A watched variable of one source file, with its current bytes once fetched. */
+export interface WatchRow extends WatchVariable {
   filePath: string;
-  name: string;
-  address: number;
-  dataType: string;
-  elementSize: number;
-  elementCount: number;
   value?: number[];
 }
 
 interface WatchState {
   watch: WatchRow[];
-  setWatch: (watch: WatchRow[]) => void;
   addWatch: (watch: WatchRow) => void;
   clearWatch: () => void;
+  /** Re-read the memory behind every watched variable. */
   fetchVarMemoryValue: () => void;
 }
 
 export const useWatchStore = create<WatchState>(set => ({
   watch: [],
-  setWatch: watch => set({ watch }),
-  addWatch: (watch: WatchRow) => set(state => ({ watch: [...state.watch, watch] })),
+  addWatch: watch => set(state => ({ watch: [...state.watch, watch] })),
   clearWatch: () => set({ watch: [] }),
   fetchVarMemoryValue: () => {
     const { watch } = useWatchStore.getState();
-    watch.forEach(async w => {
-      const res = await axios.post(`http://localhost:9090/memory`, {
-        start: w.address,
-        end: w.address + w.elementCount * w.elementSize - 1,
-      });
-      console.log(res.data);
+    watch.forEach(async variable => {
+      const data = await simulator.memory(
+        variable.address,
+        variable.address + variable.elementCount * variable.elementSize - 1,
+      );
       set(state => ({
-        watch: state.watch.map(ww =>
-          w.address === ww.address ? { ...ww, value: res.data.values } : ww,
+        watch: state.watch.map(row =>
+          row.address === variable.address ? { ...row, value: data.values } : row,
         ),
       }));
     });
