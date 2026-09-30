@@ -44,7 +44,9 @@ const api = {
   }> => {
     return ipcRenderer.invoke('openProject');
   },
-  openProjectByPath: (sicPath: string): IpcApiResponse<{
+  openProjectByPath: (
+    sicPath: string,
+  ): IpcApiResponse<{
     name: string;
     path: string;
     settings: { asm: string[]; main: string; filedevices: FileDevice[] };

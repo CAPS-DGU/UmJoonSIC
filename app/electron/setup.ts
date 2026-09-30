@@ -522,7 +522,7 @@ export async function checkUpdate() {
     console.warn('checkUpdate failed:', e);
   }
 }
-  
+
 export async function checkJARUpdate() {
   try {
     // 네트워크/릴리즈 정보 조회 시도
@@ -588,7 +588,10 @@ export async function checkJARUpdate() {
 }
 
 // 현재 앱 버전 태그 우선, 없으면 latest에서 simulator.jar / simulator-hash.txt 페어를 해석
-async function resolveJarAndHashFromReleases(): Promise<{ jarUrl: string; hashUrl: string } | null> {
+async function resolveJarAndHashFromReleases(): Promise<{
+  jarUrl: string;
+  hashUrl: string;
+} | null> {
   try {
     const currentTag = `v${app.getVersion()}`;
 
@@ -652,7 +655,9 @@ async function getAssetUrlFromCurrentTag(assetName: string): Promise<string | nu
     if (!res.ok) {
       return null;
     }
-    const data = (await res.json()) as { assets?: Array<{ name?: string; browser_download_url?: string }> };
+    const data = (await res.json()) as {
+      assets?: Array<{ name?: string; browser_download_url?: string }>;
+    };
     const asset = data.assets?.find(a => a.name === assetName);
     return asset?.browser_download_url || null;
   } catch {
@@ -669,4 +674,3 @@ function computeFileSha256(filePath: string): Promise<string> {
     stream.on('end', () => resolve(hash.digest('hex')));
   });
 }
-  

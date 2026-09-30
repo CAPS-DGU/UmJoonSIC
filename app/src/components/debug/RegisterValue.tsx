@@ -4,11 +4,9 @@ import { useRegisterStore } from '@/stores/RegisterStore';
 
 export default function RegisterValue() {
   const [isOn, setIsOn] = useState(true);
-  const { 
-    A, X, L, S, T, B, SW, PC, F, 
-    changedRegisters, 
-    clearChangedRegisters 
-  } = useRegisterStore(state => state);
+  const { A, X, L, S, T, B, SW, PC, F, changedRegisters, clearChangedRegisters } = useRegisterStore(
+    state => state,
+  );
   const getFHex = useRegisterStore(state => state.getFHex);
   const registerData = { A, X, L, S, T, B, SW, PC, F };
 
@@ -56,20 +54,23 @@ export default function RegisterValue() {
         {Object.entries(registerData).map(([key, value]) => {
           const isChanged = changedRegisters.has(key);
           return (
-            <div key={key} className={`w-full flex justify-between items-center gap-4 ${key === 'F' ? 'col-span-2' : ''}`}>
+            <div
+              key={key}
+              className={`w-full flex justify-between items-center gap-4 ${key === 'F' ? 'col-span-2' : ''}`}
+            >
               <p className="text-base font-normal">{key}:</p>
-              <div className={`w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2 transition-all duration-300 overflow-x-auto ${
-                isChanged ? 'register-flash' : ''
-              }`}>
+              <div
+                className={`w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2 transition-all duration-300 overflow-x-auto ${
+                  isChanged ? 'register-flash' : ''
+                }`}
+              >
                 {key !== 'F' && (
                   <p className="font-mono text-sm whitespace-nowrap">
                     {isOn ? '0x' + value.toString(16).toUpperCase().padStart(6, '0') : value}
                   </p>
                 )}
                 {key === 'F' && (
-                  <p className="font-mono text-sm whitespace-nowrap">
-                    {isOn ? getFHex() : value}
-                  </p>
+                  <p className="font-mono text-sm whitespace-nowrap">{isOn ? getFHex() : value}</p>
                 )}
               </div>
             </div>

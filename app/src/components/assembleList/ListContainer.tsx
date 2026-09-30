@@ -32,8 +32,8 @@ export default function ListContainer() {
 
     // Find list files whose rows contain the current PC and non-empty rawCode
     const matches = listFile.filter(file =>
-      file.rows.some(r =>
-        parseInt(r.addressHex, 16) === PC && (r.rawCodeHex?.replaceAll(' ', '') || '') !== ''
+      file.rows.some(
+        r => parseInt(r.addressHex, 16) === PC && (r.rawCodeHex?.replaceAll(' ', '') || '') !== '',
       ),
     );
 

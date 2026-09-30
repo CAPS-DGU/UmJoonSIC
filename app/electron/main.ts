@@ -206,7 +206,7 @@ if (!gotSingleInstanceLock) {
     // Set app user model id for windows
     electronApp.setAppUserModelId('com.electron');
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(menuList as MenuItemConstructorOptions[]));
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menuList as MenuItemConstructorOptions[]));
 
     // Default open or close DevTools by F12 in development
     // and ignore CommandOrControl + R in production.

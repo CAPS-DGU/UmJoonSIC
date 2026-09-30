@@ -41,7 +41,7 @@ const processRows = (rows: ListFileRow[]): ListFileRow[] =>
   rows.map(row => ({
     ...row,
     // operand: processOperand(row.operand),
-    operand: (row.operand),
+    operand: row.operand,
     // nixbpe: '0', // NIXBPE를 0으로 초기화
   }));
 
