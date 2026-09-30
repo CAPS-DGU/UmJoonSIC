@@ -1,71 +1,62 @@
 import { create } from 'zustand';
-import axios from 'axios';
-import { useWatchStore } from '@/features/panel/watchStore';
-import type { WatchRow } from '@/features/panel/watchStore';
+import { simulator } from '@/api/simulator';
+import type { MachineMode } from '@/api/types';
 import { useProjectStore } from '@/features/project/projectStore';
+
+export type { MachineMode };
 
 export type MemoryNodeStatus = 'normal' | 'highlighted' | 'red bold';
 
+/** One byte as the viewer shows it: two hex digits, or 'ER' when loading it failed. */
 export interface MemoryNodeData {
   value: string;
   status?: MemoryNodeStatus;
   isLoading?: boolean;
 }
 
-export interface MemoryLabel {
+interface AddressRange {
   start: number;
   end: number;
-  name: string;
 }
 
-export type MachineMode = 'SIC' | 'SICXE';
+/** Address space per machine mode: SIC has 32 KiB, SIC/XE has 1 MiB. */
+const MEMORY_SIZE: Record<MachineMode, number> = { SIC: 0x8000, SICXE: 0x100000 };
+
+const toHexByte = (value: number) => value.toString(16).toUpperCase().padStart(2, '0');
 
 interface MemoryViewState {
   mode: MachineMode;
-  memoryRange: {
-    start: number;
-    end: number;
-  };
-  memoryValues: MemoryNodeData[];
-  labels: MemoryLabel[];
-  changedNodes: Set<number>;
-  visibleRange: {
-    start: number;
-    end: number;
-  };
   totalMemorySize: number;
+  /** The range refreshed after every step (around the program). */
+  memoryRange: AddressRange;
+  /** Sparse by address; bytes never requested are undefined. */
+  memoryValues: MemoryNodeData[];
+  /** Addresses whose value changed in the last refresh; the viewer flashes them. */
+  changedNodes: Set<number>;
   loadedRanges: Set<string>;
   loadingRanges: Set<string>;
 
+  /** Switch machine mode: clears the view and restarts the simulation in that mode. */
   setMode: (newMode: MachineMode) => void;
-  setMemoryRange: (memoryRange: { start: number; end: number }) => void;
-  setMemoryValues: (memoryValues: MemoryNodeData[]) => void;
-  setLabels: (labels: MemoryLabel[]) => void;
-  updateMemoryNode: (index: number, patch: Partial<MemoryNodeData>) => void;
+  setMemoryRange: (memoryRange: AddressRange) => void;
   clearChangedNodes: () => void;
+  /** Re-read `memoryRange` and mark the bytes that changed. */
   fetchMemoryValues: () => Promise<void>;
-  setVisibleRange: (range: { start: number; end: number }) => void;
-  setTotalMemorySize: (size: number) => void;
+  /** Load a range once; later calls for the same range are ignored. */
   loadMemoryRange: (start: number, end: number) => Promise<void>;
-  getMemoryValue: (address: number) => MemoryNodeData | null;
-  getMemoryLabelFromWatch: () => MemoryLabel[];
 }
 
 export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   mode: 'SIC',
-  totalMemorySize: 0x8000,
+  totalMemorySize: MEMORY_SIZE.SIC,
   memoryRange: { start: 0, end: 256 },
   memoryValues: [],
-  labels: [],
   changedNodes: new Set(),
-  visibleRange: { start: 0, end: 256 },
   loadedRanges: new Set(),
   loadingRanges: new Set(),
 
   setMode: newMode => {
-    const totalSize = newMode === 'SIC' ? 0x8000 : 0x100000;
-
-    // update local memory-view state
+    const totalSize = MEMORY_SIZE[newMode];
     set({
       mode: newMode,
       totalMemorySize: totalSize,
@@ -74,21 +65,13 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       loadedRanges: new Set(),
       loadingRanges: new Set(),
       changedNodes: new Set(),
-      labels: [],
-      visibleRange: { start: 0, end: 256 },
     });
 
-    // kick off the same "begin" request used in RunningStore.fetchBegin
+    // Same request as when a run starts; not awaited.
     (async () => {
       try {
         const { settings } = useProjectStore.getState();
-        console.log('mode (after setMode): ', newMode);
-        console.log('filedevices: ', settings.filedevices);
-        const res = await axios.post('http://localhost:9090/begin', {
-          type: newMode.toLowerCase(),
-          filedevices: settings.filedevices,
-        });
-        const data = res.data;
+        const data = await simulator.begin(newMode, settings.filedevices);
         if (!data.ok) {
           console.error('Failed to begin after mode change');
         }
@@ -99,29 +82,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
   },
 
   setMemoryRange: memoryRange => set({ memoryRange }),
-  setMemoryValues: memoryValues => set({ memoryValues }),
-  setLabels: labels => set({ labels }),
-  updateMemoryNode: (index, patch) =>
-    set(state => {
-      const newValues = [...state.memoryValues];
-      const oldValue = newValues[index]?.value;
-      newValues[index] = { ...newValues[index], ...patch } as MemoryNodeData;
-
-      if (patch.value !== undefined && oldValue !== patch.value) {
-        const newChangedNodes = new Set(state.changedNodes);
-        newChangedNodes.add(index);
-        return {
-          memoryValues: newValues,
-          changedNodes: newChangedNodes,
-        };
-      }
-
-      return { memoryValues: newValues };
-    }),
   clearChangedNodes: () => set({ changedNodes: new Set() }),
-
-  setVisibleRange: visibleRange => set({ visibleRange }),
-  setTotalMemorySize: totalMemorySize => set({ totalMemorySize }),
 
   loadMemoryRange: async (start, end) => {
     if (start < 0 || start >= end) {
@@ -129,73 +90,53 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
     }
 
     const rangeKey = `${start}-${end}`;
-    const currentState = get();
-
-    if (currentState.loadedRanges.has(rangeKey) || currentState.loadingRanges.has(rangeKey)) {
+    const { loadedRanges, loadingRanges } = get();
+    if (loadedRanges.has(rangeKey) || loadingRanges.has(rangeKey)) {
       return;
     }
 
+    // Mark the range as loading, growing the array with placeholders if needed.
     set(state => {
-      const newLoadingRanges = new Set(state.loadingRanges).add(rangeKey);
       const mergedValues = [...state.memoryValues];
-      const requiredSize = end;
-
-      if (mergedValues.length < requiredSize) {
-        const diff = requiredSize - mergedValues.length;
-        const newPlaceholders = Array.from({ length: diff }, () => ({
+      if (mergedValues.length < end) {
+        const placeholders = Array.from({ length: end - mergedValues.length }, () => ({
           value: '00',
           status: 'normal' as const,
           isLoading: false,
         }));
-        mergedValues.push(...newPlaceholders);
+        mergedValues.push(...placeholders);
       }
 
       for (let i = start; i < end; i++) {
         if (i < mergedValues.length && (!mergedValues[i] || !mergedValues[i].isLoading)) {
-          mergedValues[i] = {
-            value: '00',
-            status: 'normal',
-            isLoading: true,
-          };
+          mergedValues[i] = { value: '00', status: 'normal', isLoading: true };
         }
       }
 
       return {
         memoryValues: mergedValues,
-        loadingRanges: newLoadingRanges,
+        loadingRanges: new Set(state.loadingRanges).add(rangeKey),
       };
     });
 
     try {
-      const res = await axios.post('http://localhost:9090/memory', {
-        start,
-        end,
-      });
-
-      const data = res.data;
-      const newValues = data.values.map((value: number) => ({
-        value: value.toString(16).toUpperCase().padStart(2, '0'),
-        status: 'normal' as const,
-        isLoading: false,
-      }));
+      const data = await simulator.memory(start, end);
 
       set(state => {
         const mergedValues = [...state.memoryValues];
-        newValues.forEach((val: any, i: any) => {
-          const globalIndex = start + i;
-          if (globalIndex < mergedValues.length) {
-            mergedValues[globalIndex] = val;
+        data.values.forEach((value, i) => {
+          const address = start + i;
+          if (address < mergedValues.length) {
+            mergedValues[address] = { value: toHexByte(value), status: 'normal', isLoading: false };
           }
         });
 
         const newLoadingRanges = new Set(state.loadingRanges);
         newLoadingRanges.delete(rangeKey);
-        const newLoadedRanges = new Set(state.loadedRanges).add(rangeKey);
-
         return {
           memoryValues: mergedValues,
           loadingRanges: newLoadingRanges,
-          loadedRanges: newLoadedRanges,
+          loadedRanges: new Set(state.loadedRanges).add(rangeKey),
         };
       });
     } catch (error) {
@@ -210,46 +151,28 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
 
         const newLoadingRanges = new Set(state.loadingRanges);
         newLoadingRanges.delete(rangeKey);
-        return {
-          loadingRanges: newLoadingRanges,
-          memoryValues: mergedValues,
-        };
+        return { loadingRanges: newLoadingRanges, memoryValues: mergedValues };
       });
     }
-  },
-
-  getMemoryValue: address => {
-    const { memoryValues } = get();
-    if (address >= 0 && address < memoryValues.length) {
-      return memoryValues[address];
-    }
-    return null;
   },
 
   fetchMemoryValues: async () => {
     const { memoryRange } = get();
     try {
-      const res = await axios.post('http://localhost:9090/memory', {
-        start: memoryRange.start,
-        end: memoryRange.end,
-      });
-      const data = res.data;
-      const newValues = data.values.map((value: number) => ({
-        value: value.toString(16).toUpperCase().padStart(2, '0'),
-        status: 'normal' as const,
-      }));
+      const data = await simulator.memory(memoryRange.start, memoryRange.end);
 
       set(state => {
         const mergedValues = [...state.memoryValues];
         const changedNodes = new Set<number>();
-        newValues.forEach((newNode: any, i: any) => {
-          const globalIndex = memoryRange.start + i;
-          const oldNode = state.memoryValues[globalIndex];
-          if (oldNode && oldNode.value !== newNode.value) {
-            changedNodes.add(globalIndex);
+        data.values.forEach((value, i) => {
+          const address = memoryRange.start + i;
+          const hex = toHexByte(value);
+          const oldNode = state.memoryValues[address];
+          if (oldNode && oldNode.value !== hex) {
+            changedNodes.add(address);
           }
-          if (globalIndex < mergedValues.length) {
-            mergedValues[globalIndex] = newNode;
+          if (address < mergedValues.length) {
+            mergedValues[address] = { value: hex, status: 'normal' };
           }
         });
         return { memoryValues: mergedValues, changedNodes };
@@ -257,18 +180,5 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
     } catch (error) {
       console.error('메모리 값 fetch 실패:', error);
     }
-  },
-
-  getMemoryLabelFromWatch: () => {
-    const { watch } = useWatchStore.getState();
-    const labels: MemoryLabel[] = [];
-    watch.forEach((watchRow: WatchRow) => {
-      const { address, name, elementCount, elementSize } = watchRow;
-      if (typeof address === 'number' && elementCount > 0) {
-        const end = address + elementSize * elementCount - 1;
-        labels.push({ start: address, end, name: name });
-      }
-    });
-    return labels;
   },
 }));

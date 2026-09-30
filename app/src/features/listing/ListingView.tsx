@@ -1,100 +1,53 @@
-// src/components/editor/ListContainer.tsx
-import React, { useState, useEffect } from 'react';
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
-import { useListFileStore } from '@/features/listing/listingStore';
-import type { ListFileRow } from '@/features/listing/listingStore';
-import TabBar from '@/features/editor/TabBar';
-import List from '@/features/listing/ListingTable';
+import { useEffect } from 'react';
 import path from 'path-browserify';
-import { useProjectStore } from '@/features/project/projectStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import TabBar from '@/features/editor/TabBar';
+import ListingTable from '@/features/listing/ListingTable';
+import { useListingStore } from '@/features/listing/listingStore';
 
-export default function ListContainer() {
-  const {
-    tabs,
-    activeTabIdx,
-    addBreakpoint,
-    removeBreakpoint,
-    toggleBreakpoint,
-    clearBreakpoints,
-    getActiveTab,
-    setActiveTab,
-  } = useEditorTabStore();
-  const { projectPath } = useProjectStore();
-  const { listFile } = useListFileStore();
-  // const [breakpoints, setBreakpoints] = useState<number[]>([]);
+/** The editor area while a "List: <file>" tab is active. */
+export default function ListingView() {
+  const { tabs, activeTabIdx, toggleBreakpoint, getActiveTab, setActiveTab } = useEditorTabStore();
+  const { listings } = useListingStore();
   const activeTab = getActiveTab();
   const PC = useRegisterStore(state => state.PC);
 
-  // When PC changes, switch to the first matching List tab per rules
+  // Follow the PC across files: when it enters another file's code, switch to that file's List tab.
   useEffect(() => {
-    if (!listFile || listFile.length === 0) return;
+    if (!listings || listings.length === 0) return;
 
-    // Find list files whose rows contain the current PC and non-empty rawCode
-    const matches = listFile.filter(file =>
+    // Listings that have an instruction (not a directive) at the PC
+    const matches = listings.filter(file =>
       file.rows.some(
         r => parseInt(r.addressHex, 16) === PC && (r.rawCodeHex?.replaceAll(' ', '') || '') !== '',
       ),
     );
+    if (matches.length === 0) return;
 
-    if (matches.length === 0) return; // No match → do not switch
-
-    // If current tab is a ListView with a matching file, do not switch
+    // The tab already showing a matching listing stays.
     if (activeTab && activeTab.filePath.endsWith('.lst')) {
-      const currentFileNoExt = activeTab.filePath.replace(/\.lst$/i, '');
-      const currentIsMatch = matches.some(m => m.filePath === currentFileNoExt);
-      if (currentIsMatch) return;
+      const currentFile = activeTab.filePath.replace(/\.lst$/i, '');
+      if (matches.some(m => m.filePath === currentFile)) return;
     }
 
-    // Otherwise, switch to the first matching list file tab (if it exists)
-    const firstMatch = matches[0];
-    const targetLstPath = `${firstMatch.filePath}.lst`;
-    const targetTab = tabs.find(t => t.filePath === targetLstPath);
+    const targetTab = tabs.find(t => t.filePath === `${matches[0].filePath}.lst`);
     if (targetTab) {
       setActiveTab(targetTab.idx);
     }
-  }, [PC, listFile, activeTabIdx]);
+    // Runs when the PC, the listings or the active tab index change, as before.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [PC, listings, activeTabIdx]);
 
-  /*
-  useEffect(() => {
-    const fetchFileData = async () => {
-      if (activeTab?.filePath?.endsWith('.lst')) {
-        try {
-          // 백엔드(Electron Main Process)에 파일 내용 요청
-          const result = await window.electronAPI.readFile(activeTab.filePath);
-          if (result.success) {
-            // 성공적으로 데이터를 받으면, 스토어에 저장합니다.
-            setListFile(result.data as ListFileRow[]);
-          } else {
-            console.error('Failed to read .lst file:', result.message);
-            setListFile([]);
-          }
-        } catch (error) {
-          console.error('Error fetching file data:', error);
-          setListFile([]);
-        }
-      } else {
-        // .lst 파일이 아니면 스토어 데이터를 초기화합니다.
-        setListFile([]);
-      }
-    };
-
-    fetchFileData();
-  }, [activeTab, setListFile]);
-  */
-  // toggleBreakpoint 변수가 중복 선언되어 오류가 발생하므로, 아래 코드를 삭제하거나 기존 toggleBreakpoint를 사용하세요.
+  const listingPath = path.join(activeTab?.filePath.replace('.lst', '') || '');
+  const rows = listings.find(file => file.filePath === listingPath)?.rows ?? [];
 
   return (
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
-      <List
-        data={
-          listFile.find(
-            file => file.filePath === path.join(activeTab?.filePath.replace('.lst', '') || ''),
-          )?.rows ?? []
-        } // 스토어에서 가져온 listFile을 사용합니다.
-        activeTabTitle={activeTab?.title}
-        breakpoints={getActiveTab()?.breakpoints ?? []}
+      <ListingTable
+        rows={rows}
+        breakpoints={activeTab?.breakpoints ?? []}
         onBreakpointToggle={index => toggleBreakpoint(activeTab?.idx || 0, index)}
       />
     </div>
