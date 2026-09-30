@@ -37,7 +37,6 @@ export function ContextMenu({ x, y, item, onDelete, onClose }: Props) {
   }, [onClose]);
 
   const handleDelete = () => {
-    console.log('Deleting item:', item);
     onDelete(item);
     setShowConfirm(false);
     onClose();
