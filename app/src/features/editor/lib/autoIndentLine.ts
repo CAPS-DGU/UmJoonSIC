@@ -13,25 +13,25 @@ const LEN_OPERAND_FIELD = COL_COMMENT_START - COL_OPERAND_START; // 18
 // -------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------
-function is_space(ch: string): boolean {
+function isSpace(ch: string): boolean {
   return ch === ' ' || ch === '\t';
 }
-function replace_tabs_with_spaces(s: string): string {
+function replaceTabsWithSpaces(s: string): string {
   return s.replace(/\t/g, ' ');
 }
-function span_spaces(s: string, i: number): number {
+function spanSpaces(s: string, i: number): number {
   let j = i;
-  while (j < s.length && is_space(s[j])) j++;
+  while (j < s.length && isSpace(s[j])) j++;
   return j - i;
 }
-function span_token(s: string, i: number): [string, number] {
+function spanToken(s: string, i: number): [string, number] {
   let j = i;
-  while (j < s.length && !is_space(s[j])) j++;
+  while (j < s.length && !isSpace(s[j])) j++;
   return [s.slice(i, j), j];
 }
 // operand can include spaces while quotes are open (outermost only)
 // CHANGE: additionally allow exactly one "comma + single space" sequence to be part of operand.
-function span_operand(s: string, i: number): [string, number] {
+function spanOperand(s: string, i: number): [string, number] {
   let j = i;
   let q: "'" | '"' | null = null;
   let allowPostCommaSpace = false; // allow one space right after a comma
@@ -52,7 +52,7 @@ function span_operand(s: string, i: number): [string, number] {
       j++;
       continue;
     }
-    if (is_space(ch)) {
+    if (isSpace(ch)) {
       if (allowPostCommaSpace) {
         // consume exactly one space after a comma as part of operand
         j++;
@@ -66,19 +66,13 @@ function span_operand(s: string, i: number): [string, number] {
   }
   return [s.slice(i, j), j];
 }
-function first_nonspace_index(s: string): number {
+function firstNonSpaceIndex(s: string): number {
   let i = 0;
-  while (i < s.length && is_space(s[i])) i++;
+  while (i < s.length && isSpace(s[i])) i++;
   return i === s.length ? -1 : i;
 }
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
-}
-function stripTrailingSpaces(s: string): string {
-  return s.replace(/[ \t]+$/g, '');
-}
-function log(...args: any[]) {
-  console.log('[autoIndentLine]', ...args);
 }
 function quotesClosed(text: string): boolean {
   const singles = (text.match(/'/g) || []).length;
@@ -115,11 +109,11 @@ interface Parsed {
 function parseLineStructure(s: string): Parsed {
   // Inline comment is determined by structure, not by '.'
   // We DO NOT pre-slice by column; we preserve the entire original line.
-  const fns = first_nonspace_index(s);
+  const fns = firstNonSpaceIndex(s);
   const isCommentLine = fns >= 0 && s[fns] === '.';
 
   let i = 0;
-  const lead = span_spaces(s, i);
+  const lead = spanSpaces(s, i);
   const leadingSpaces: Range = { start: 0, end: lead };
   i += lead;
 
@@ -143,34 +137,34 @@ function parseLineStructure(s: string): Parsed {
     if (lead === 0) {
       if (i < s.length) {
         // LABEL
-        const [tokL, nextL] = span_token(s, i);
+        const [tokL, nextL] = spanToken(s, i);
         label = tokL;
         labelR = { start: i, end: nextL };
         i = nextL;
 
-        const s1 = span_spaces(s, i);
+        const s1 = spanSpaces(s, i);
         sp1 = { start: i, end: i + s1 };
         i += s1;
 
         // COMMAND
         if (i < s.length) {
-          const [tokC, nextC] = span_token(s, i);
+          const [tokC, nextC] = spanToken(s, i);
           command = tokC;
           commandR = { start: i, end: nextC };
           i = nextC;
 
-          const s2 = span_spaces(s, i);
+          const s2 = spanSpaces(s, i);
           sp2 = { start: i, end: i + s2 };
           i += s2;
 
           // OPERAND
           if (i < s.length) {
-            const [tokO, nextO] = span_operand(s, i);
+            const [tokO, nextO] = spanOperand(s, i);
             operand = tokO;
             operandR = { start: i, end: nextO };
             i = nextO;
 
-            const s3 = span_spaces(s, i);
+            const s3 = spanSpaces(s, i);
             sp3 = { start: i, end: i + s3 };
             i += s3;
 
@@ -184,7 +178,7 @@ function parseLineStructure(s: string): Parsed {
           } else if (sp2 && sp2.end > sp2.start) {
             // spaces after command but no operand token → operand present-but-empty
             operand = '';
-            const s3 = span_spaces(s, i);
+            const s3 = spanSpaces(s, i);
             sp3 = { start: i, end: i + s3 };
             i += s3;
             if (i < s.length) {
@@ -197,7 +191,7 @@ function parseLineStructure(s: string): Parsed {
         } else if (sp1 && sp1.end > sp1.start) {
           // spaces after label but no command token → command present-but-empty
           command = '';
-          const s3 = span_spaces(s, i);
+          const s3 = spanSpaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
           if (i < s.length) {
@@ -211,22 +205,22 @@ function parseLineStructure(s: string): Parsed {
     } else {
       // no label → COMMAND first
       if (i < s.length) {
-        const [tokC, nextC] = span_token(s, i);
+        const [tokC, nextC] = spanToken(s, i);
         command = tokC;
         commandR = { start: i, end: nextC };
         i = nextC;
 
-        const s2 = span_spaces(s, i);
+        const s2 = spanSpaces(s, i);
         sp2 = { start: i, end: i + s2 };
         i += s2;
 
         if (i < s.length) {
-          const [tokO, nextO] = span_operand(s, i);
+          const [tokO, nextO] = spanOperand(s, i);
           operand = tokO;
           operandR = { start: i, end: nextO };
           i = nextO;
 
-          const s3 = span_spaces(s, i);
+          const s3 = spanSpaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
 
@@ -238,7 +232,7 @@ function parseLineStructure(s: string): Parsed {
           }
         } else if (sp2 && sp2.end > sp2.start) {
           operand = '';
-          const s3 = span_spaces(s, i);
+          const s3 = spanSpaces(s, i);
           sp3 = { start: i, end: i + s3 };
           i += s3;
           if (i < s.length) {
@@ -282,7 +276,6 @@ function parseLineStructure(s: string): Parsed {
 }
 
 function classifyCursor(
-  s: string,
   p: Parsed,
   cp: number,
 ): { section: SectionName; whichSpace: 0 | 1 | 2 | 3 | 9 | null; rel: number } {
@@ -336,7 +329,7 @@ function buildAlignedLine(
   const C = command ?? null; // null = absent, '' = present-but-empty
   const O = operand ?? null; // null = absent, '' = present-but-empty
 
-  let starts = { label: 0, command: 0, operand: 0, comment: 0 };
+  const starts = { label: 0, command: 0, operand: 0, comment: 0 };
 
   // label → command start
   let line = '';
@@ -369,14 +362,6 @@ function buildAlignedLine(
   starts.comment = line.length;
 
   const out = line + (commentPart ?? '');
-  log('buildAlignedLine', {
-    L,
-    C,
-    O,
-    engageCommentColumn,
-    starts,
-    outPreview: out.slice(0, 80),
-  });
   return { out, starts };
 }
 
@@ -389,95 +374,59 @@ function buildAlignedLine(
  * @param line         Current line (may end with '\n')
  * @param backspace    True if the last action was Backspace (already applied by editor)
  * @param space        True if the last action was Space (already applied by editor)
- * @param cursorpos    Cursor index into the CURRENT line (AFTER the edit)
+ * @param cursorPos    Cursor index into the CURRENT line (AFTER the edit)
  * @param selStart     (optional) selection start in CURRENT line
  * @param selEnd       (optional) selection end in CURRENT line
  * @param erased       (optional) text that was erased by the edit; null if none
- * @param lineChanged  (optional) true if this keystroke changed line structure (Enter/Backspace join)
- * @param prevPos      (optional) cursor position BEFORE the edit (for context if needed)
  * @returns            { line, cursor } — adjusted line and where the cursor should go
  */
 export function autoIndentLine(
   line: string,
   backspace: boolean = false,
   space: boolean = false,
-  cursorpos: number = 0,
+  cursorPos: number = 0,
   selStart?: number,
   selEnd?: number,
   erased: string | null = null,
-  lineChanged: boolean = false,
-  prevPos?: { lineNumber: number; column: number },
 ): { line: string; cursor: number } {
-  console.group?.('[autoIndentLine] call');
-
-  let had_nl = false;
+  let hadNewline = false;
   let raw = line;
   if (raw.endsWith('\n')) {
-    had_nl = true;
+    hadNewline = true;
     raw = raw.slice(0, -1);
   }
 
   // 1) SELECTION short-circuit (if provided and non-empty)
   if (typeof selStart === 'number' && typeof selEnd === 'number' && selStart !== selEnd) {
-    log('Selection detected — skipping formatting', {
-      selStart,
-      selEnd,
-      backspace,
-      space,
-      erased,
-      lineChanged,
-      prevPos,
-    });
-    console.groupEnd?.();
-    return { line, cursor: cursorpos };
+    return { line, cursor: cursorPos };
   }
 
-  let cp = clamp(cursorpos, 0, raw.length);
-  log('INPUT', { raw, backspace, space, cursorpos, had_nl, erased, lineChanged, prevPos });
+  let cp = clamp(cursorPos, 0, raw.length);
 
   // normalize tabs early
-  let s = replace_tabs_with_spaces(raw);
+  let s = replaceTabsWithSpaces(raw);
 
   // ---------------------------------------------------------
   // 0) BACKSPACE handling (post-edit)
   // ---------------------------------------------------------
   if (backspace) {
     const erasedIsSpaces = !!erased && /^[ \t]+$/.test(erased);
-    const erasedIsNonspace = !!erased && !/^[ \t]+$/.test(erased);
 
-    // If next char is a space, DO NOT collapse run
+    // Deleting spaces collapses the whole run of spaces left of the cursor, unless a space
+    // follows: then the run is structural (column padding) and is kept. Deleting anything
+    // else leaves the spacing alone.
     const nextCharIsSpace = cp < s.length && s[cp] === ' ';
-
     if (erasedIsSpaces && !nextCharIsSpace) {
-      // collapse the entire left run
       let k = cp - 1;
       if (k >= 0 && s[k] === ' ') {
         while (k >= 0 && s[k] === ' ') k--;
         const start = k + 1;
-        const before = s;
         s = s.slice(0, start) + s.slice(cp);
-        const newCp = start;
-        log('Backspace collapse(left-run)', {
-          before,
-          after: s,
-          oldCp: cp,
-          newCp,
-          removed: cp - start,
-        });
-        cp = newCp;
-      } else {
-        log('Backspace deleted spaces but no left run — nothing to collapse');
+        cp = start;
       }
-    } else if (erasedIsSpaces && nextCharIsSpace) {
-      log('Backspace: next char is space → skip collapse (keep structural run)');
-    } else if (erasedIsNonspace) {
-      log('Backspace deleted non-space token — preserve structural spaces (no trailing strip)');
-    } else {
-      log('Backspace erased unknown — conservative: do not strip trailing spaces automatically');
     }
 
-    console.groupEnd?.();
-    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
   }
 
   // ---------------------------------------------------------
@@ -485,71 +434,42 @@ export function autoIndentLine(
   // ---------------------------------------------------------
 
   // Compute once
-  const isBlank = first_nonspace_index(s) === -1;
+  const isBlank = firstNonSpaceIndex(s) === -1;
 
   // (A) Blank/empty line + Space → jump to command column
   const justInsertedSingleSpace =
-    space && cp > 0 && s[cp - 1] === ' ' && (cp - 2 < 0 || !is_space(s[cp - 2]));
+    space && cp > 0 && s[cp - 1] === ' ' && (cp - 2 < 0 || !isSpace(s[cp - 2]));
   if (isBlank && justInsertedSingleSpace) {
     const toOpcode = ' '.repeat(COL_OPCODE_START - 1); // col 10 → index 9
-    const out = toOpcode + (had_nl ? '\n' : '');
-    log('Blank + Space → indent to opcode column', { outPreview: out });
-    console.groupEnd?.();
+    const out = toOpcode + (hadNewline ? '\n' : '');
     return { line: out, cursor: toOpcode.length };
   }
 
   // If not space/backspace and blank line (enter/paste), do nothing
   if (!space && !backspace && isBlank) {
-    log('Non-space/backspace on blank line → no reflow');
-    console.groupEnd?.();
-    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
   }
 
   // Parse for the rest
   const parsed = parseLineStructure(s);
-  log('PARSED', {
-    codePart: parsed.codePart,
-    commentPart: parsed.commentPart,
-    label: parsed.label,
-    command: parsed.command,
-    operand: parsed.operand,
-    ranges: {
-      leadingSpaces: parsed.leadingSpaces,
-      sp1: parsed.sp1,
-      sp2: parsed.sp2,
-      sp3: parsed.sp3,
-      labelR: parsed.labelR,
-      commandR: parsed.commandR,
-      operandR: parsed.operandR,
-    },
-    isCommentLine: parsed.isCommentLine,
-    orderValid: parsed.orderValid,
-  });
 
-  const cur = classifyCursor(s, parsed, cp);
-  log('CURSOR', { cp, section: cur.section, whichSpace: cur.whichSpace, rel: cur.rel });
+  const cur = classifyCursor(parsed, cp);
 
   /* If a space was typed inside the comment section, skip all logic */
   if (space && parsed.commentPart !== null && cur.section === 'comment') {
-    log('Space inside comment → skip auto-indent / reflow');
-    console.groupEnd?.();
-    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
   }
 
   // (B) Comment line → strip spaces before first '.'
   if (parsed.isCommentLine) {
-    const dot = s.indexOf('.', first_nonspace_index(s));
-    const out = s.slice(dot) + (had_nl ? '\n' : '');
-    log('Comment-line -> strip leading before "."', { before: s, after: out });
-    console.groupEnd?.();
+    const dot = s.indexOf('.', firstNonSpaceIndex(s));
+    const out = s.slice(dot) + (hadNewline ? '\n' : '');
     return { line: out, cursor: Math.max(0, cp - dot) };
   }
 
   // (C) If invalid order, don’t reflow
   if (!parsed.orderValid) {
-    log('Order invalid -> unchanged');
-    console.groupEnd?.();
-    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
   }
 
   // Bail if any section exceeds its field width
@@ -558,9 +478,7 @@ export function autoIndentLine(
     (parsed.command !== null && parsed.command.length > LEN_INSTR_FIELD) ||
     (parsed.operand !== null && parsed.operand.length > LEN_OPERAND_FIELD);
   if (tooWide) {
-    log('Width overflow → no auto-indent');
-    console.groupEnd?.();
-    return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
   }
 
   // Guard: only allow stepping to comment when (a) EOL and (b) operand quotes are closed.
@@ -581,9 +499,7 @@ export function autoIndentLine(
       (inOperand || afterOperandSpace || cp === parsed.codePart.length) &&
       !(atCodeEnd && opQuotesClosed)
     ) {
-      log('No inline comment content; not at EOL with closed quotes → no correction');
-      console.groupEnd?.();
-      return { line: s + (had_nl ? '\n' : ''), cursor: cp };
+      return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
     }
   }
 
@@ -608,7 +524,7 @@ export function autoIndentLine(
     let engageComment = false;
 
     // Helper: previous *non-space* index for this event (only reliable when a single space was inserted)
-    const prevNonSpaceIdx = cp > 1 && s[cp - 1] === ' ' && !is_space(s[cp - 2]) ? cp - 2 : -1;
+    const prevNonSpaceIdx = cp > 1 && s[cp - 1] === ' ' && !isSpace(s[cp - 2]) ? cp - 2 : -1;
 
     // 1) If just typed first space right after COMMAND token → go to OPERAND
     if (
@@ -656,8 +572,6 @@ export function autoIndentLine(
       engageComment = true;
     }
 
-    log('Space → step decision', { stepTo, engageComment });
-
     const { out, starts } = buildAlignedLine(
       parsed.label,
       parsed.command, // '' allowed
@@ -689,9 +603,7 @@ export function autoIndentLine(
       }
     }
 
-    log('RESULT (space step)', { before: s, after: out, newCursor });
-    console.groupEnd?.();
-    return { line: out + (had_nl ? '\n' : ''), cursor: newCursor };
+    return { line: out + (hadNewline ? '\n' : ''), cursor: newCursor };
   }
 
   // ---------------------------------------------------------
@@ -727,8 +639,6 @@ export function autoIndentLine(
       }
     }
 
-    log('RESULT (full respacing for enter/paste/other)', { before: s, after: out, newCursor });
-    console.groupEnd?.();
-    return { line: out + (had_nl ? '\n' : ''), cursor: newCursor };
+    return { line: out + (hadNewline ? '\n' : ''), cursor: newCursor };
   }
 }
