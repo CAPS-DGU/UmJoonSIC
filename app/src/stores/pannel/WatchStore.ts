@@ -29,11 +29,13 @@ export const useWatchStore = create<WatchState>(set => ({
     watch.forEach(async w => {
       const res = await axios.post(`http://localhost:9090/memory`, {
         start: w.address,
-        end: w.address + w.elementCount * w.elementSize -1,
+        end: w.address + w.elementCount * w.elementSize - 1,
       });
       console.log(res.data);
       set(state => ({
-        watch: state.watch.map(ww => w.address === ww.address ? { ...ww, value: res.data.values } : ww),
+        watch: state.watch.map(ww =>
+          w.address === ww.address ? { ...ww, value: res.data.values } : ww,
+        ),
       }));
     });
   },

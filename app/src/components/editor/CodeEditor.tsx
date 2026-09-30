@@ -213,7 +213,6 @@ export default function CodeEditor() {
       }
     });
 
-
     // Delegate keys to our auto-indenter (it will prevent default for Tab/Enter)
     editor.onKeyDown(e => {
       const model = editor.getModel();
@@ -243,7 +242,10 @@ export default function CodeEditor() {
       const activeTab = getActiveTab();
 
       // 줌 단축키는 Electron이 처리하도록 그대로 둡니다
-      if ((event.ctrlKey || event.metaKey) && (key === '+' || key === '-' || key === '=' || key === '0')) {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        (key === '+' || key === '-' || key === '=' || key === '0')
+      ) {
         return; // Electron의 기본 줌 기능이 처리하도록 함
       }
 

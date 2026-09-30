@@ -1,13 +1,13 @@
 // -------------------------------------------------------------
 // Column layout (Leland SIC/XE style)
 // -------------------------------------------------------------
-const COL_OPCODE_START = 10;   // Command starts in col 10 (1-based)
-const COL_OPERAND_START = 18;  // Operand starts in col 18 (1-based)
-const COL_COMMENT_START = 36;  // Comment starts in col 36 (1-based)
+const COL_OPCODE_START = 10; // Command starts in col 10 (1-based)
+const COL_OPERAND_START = 18; // Operand starts in col 18 (1-based)
+const COL_COMMENT_START = 36; // Comment starts in col 36 (1-based)
 
 // Derived field lengths
-const LEN_LABEL_FIELD   = COL_OPCODE_START - 1;                  // 9
-const LEN_INSTR_FIELD   = COL_OPERAND_START - COL_OPCODE_START;  // 8
+const LEN_LABEL_FIELD = COL_OPCODE_START - 1; // 9
+const LEN_INSTR_FIELD = COL_OPERAND_START - COL_OPCODE_START; // 8
 const LEN_OPERAND_FIELD = COL_COMMENT_START - COL_OPERAND_START; // 18
 
 // -------------------------------------------------------------
@@ -83,25 +83,28 @@ function log(...args: any[]) {
 function quotesClosed(text: string): boolean {
   const singles = (text.match(/'/g) || []).length;
   const doubles = (text.match(/"/g) || []).length;
-  return (singles % 2 === 0) && (doubles % 2 === 0);
+  return singles % 2 === 0 && doubles % 2 === 0;
 }
 
 type SectionName = 'label' | 'command' | 'operand' | 'comment' | 'space' | 'none';
 type MaybeStr = string | null;
-interface Range { start: number; end: number; } // [start,end)
+interface Range {
+  start: number;
+  end: number;
+} // [start,end)
 
 interface Parsed {
   line: string;
   codePart: string;
   commentPart: MaybeStr;
   commentStartIndex: number; // -1 if none
-  label: MaybeStr;     // null: absent
-  command: MaybeStr;   // null: absent, "": present-but-empty
-  operand: MaybeStr;   // null: absent, "": present-but-empty
+  label: MaybeStr; // null: absent
+  command: MaybeStr; // null: absent, "": present-but-empty
+  operand: MaybeStr; // null: absent, "": present-but-empty
   leadingSpaces: Range;
-  sp1: Range | null;   // spaces label→command
-  sp2: Range | null;   // spaces command→operand
-  sp3: Range | null;   // spaces operand→(comment|EOL)
+  sp1: Range | null; // spaces label→command
+  sp2: Range | null; // spaces command→operand
+  sp3: Range | null; // spaces operand→(comment|EOL)
   labelR: Range | null;
   commandR: Range | null;
   operandR: Range | null;
@@ -263,10 +266,16 @@ function parseLineStructure(s: string): Parsed {
     codePart,
     commentPart,
     commentStartIndex,
-    label, command, operand,
+    label,
+    command,
+    operand,
     leadingSpaces,
-    sp1, sp2, sp3,
-    labelR, commandR, operandR,
+    sp1,
+    sp2,
+    sp3,
+    labelR,
+    commandR,
+    operandR,
     isCommentLine,
     orderValid,
   };
@@ -275,9 +284,10 @@ function parseLineStructure(s: string): Parsed {
 function classifyCursor(
   s: string,
   p: Parsed,
-  cp: number
-): { section: SectionName; whichSpace: 0|1|2|3|9|null; rel: number } {
-  const { codePart, leadingSpaces, sp1, sp2, sp3, labelR, commandR, operandR, commentStartIndex } = p;
+  cp: number,
+): { section: SectionName; whichSpace: 0 | 1 | 2 | 3 | 9 | null; rel: number } {
+  const { codePart, leadingSpaces, sp1, sp2, sp3, labelR, commandR, operandR, commentStartIndex } =
+    p;
 
   if (commentStartIndex >= 0 && cp >= commentStartIndex) {
     return { section: 'comment', whichSpace: null, rel: cp - commentStartIndex };
@@ -320,11 +330,11 @@ function buildAlignedLine(
   command: MaybeStr,
   operand: MaybeStr,
   commentPart: MaybeStr,
-  engageCommentColumn: boolean
-): { out: string; starts: Record<'label'|'command'|'operand'|'comment', number> } {
+  engageCommentColumn: boolean,
+): { out: string; starts: Record<'label' | 'command' | 'operand' | 'comment', number> } {
   const L = label ?? '';
-  const C = command ?? null;   // null = absent, '' = present-but-empty
-  const O = operand ?? null;   // null = absent, '' = present-but-empty
+  const C = command ?? null; // null = absent, '' = present-but-empty
+  const O = operand ?? null; // null = absent, '' = present-but-empty
 
   let starts = { label: 0, command: 0, operand: 0, comment: 0 };
 
@@ -345,7 +355,7 @@ function buildAlignedLine(
   // command
   if (C !== null) {
     line += C;
-    const gap2 = (C.length > 0) ? Math.max(1, LEN_INSTR_FIELD - C.length) : 0; // no push when empty
+    const gap2 = C.length > 0 ? Math.max(1, LEN_INSTR_FIELD - C.length) : 0; // no push when empty
     line += ' '.repeat(gap2);
   }
   starts.operand = line.length;
@@ -353,16 +363,19 @@ function buildAlignedLine(
   // operand
   if (O !== null) {
     line += O;
-    const gap3 = (engageCommentColumn) ? Math.max(1, LEN_OPERAND_FIELD - O.length) : 0;
+    const gap3 = engageCommentColumn ? Math.max(1, LEN_OPERAND_FIELD - O.length) : 0;
     line += ' '.repeat(gap3);
   }
   starts.comment = line.length;
 
   const out = line + (commentPart ?? '');
   log('buildAlignedLine', {
-    L, C, O, engageCommentColumn,
+    L,
+    C,
+    O,
+    engageCommentColumn,
     starts,
-    outPreview: out.slice(0, 80)
+    outPreview: out.slice(0, 80),
   });
   return { out, starts };
 }
@@ -399,11 +412,22 @@ export function autoIndentLine(
 
   let had_nl = false;
   let raw = line;
-  if (raw.endsWith('\n')) { had_nl = true; raw = raw.slice(0, -1); }
+  if (raw.endsWith('\n')) {
+    had_nl = true;
+    raw = raw.slice(0, -1);
+  }
 
   // 1) SELECTION short-circuit (if provided and non-empty)
   if (typeof selStart === 'number' && typeof selEnd === 'number' && selStart !== selEnd) {
-    log('Selection detected — skipping formatting', { selStart, selEnd, backspace, space, erased, lineChanged, prevPos });
+    log('Selection detected — skipping formatting', {
+      selStart,
+      selEnd,
+      backspace,
+      space,
+      erased,
+      lineChanged,
+      prevPos,
+    });
     console.groupEnd?.();
     return { line, cursor: cursorpos };
   }
@@ -433,7 +457,13 @@ export function autoIndentLine(
         const before = s;
         s = s.slice(0, start) + s.slice(cp);
         const newCp = start;
-        log('Backspace collapse(left-run)', { before, after: s, oldCp: cp, newCp, removed: cp - start });
+        log('Backspace collapse(left-run)', {
+          before,
+          after: s,
+          oldCp: cp,
+          newCp,
+          removed: cp - start,
+        });
         cp = newCp;
       } else {
         log('Backspace deleted spaces but no left run — nothing to collapse');
@@ -480,10 +510,17 @@ export function autoIndentLine(
   log('PARSED', {
     codePart: parsed.codePart,
     commentPart: parsed.commentPart,
-    label: parsed.label, command: parsed.command, operand: parsed.operand,
+    label: parsed.label,
+    command: parsed.command,
+    operand: parsed.operand,
     ranges: {
-      leadingSpaces: parsed.leadingSpaces, sp1: parsed.sp1, sp2: parsed.sp2, sp3: parsed.sp3,
-      labelR: parsed.labelR, commandR: parsed.commandR, operandR: parsed.operandR,
+      leadingSpaces: parsed.leadingSpaces,
+      sp1: parsed.sp1,
+      sp2: parsed.sp2,
+      sp3: parsed.sp3,
+      labelR: parsed.labelR,
+      commandR: parsed.commandR,
+      operandR: parsed.operandR,
     },
     isCommentLine: parsed.isCommentLine,
     orderValid: parsed.orderValid,
@@ -539,9 +576,11 @@ export function autoIndentLine(
     const operandText = parsed.operandR ? s.slice(parsed.operandR.start, parsed.operandR.end) : '';
     const opQuotesClosed = quotesClosed(operandText);
 
-    if ((!inlineCommentExists || !inlineCommentHasNonspace) &&
-        (inOperand || afterOperandSpace || cp === parsed.codePart.length) &&
-        !(atCodeEnd && opQuotesClosed)) {
+    if (
+      (!inlineCommentExists || !inlineCommentHasNonspace) &&
+      (inOperand || afterOperandSpace || cp === parsed.codePart.length) &&
+      !(atCodeEnd && opQuotesClosed)
+    ) {
       log('No inline comment content; not at EOL with closed quotes → no correction');
       console.groupEnd?.();
       return { line: s + (had_nl ? '\n' : ''), cursor: cp };
@@ -558,7 +597,7 @@ export function autoIndentLine(
       parsed.command,
       parsed.operand,
       parsed.commentPart,
-      false // no comment engagement for baseline
+      false, // no comment engagement for baseline
     );
 
     // Decide step target
@@ -569,19 +608,26 @@ export function autoIndentLine(
     let engageComment = false;
 
     // Helper: previous *non-space* index for this event (only reliable when a single space was inserted)
-    const prevNonSpaceIdx =
-      (cp > 1 && s[cp - 1] === ' ' && !is_space(s[cp - 2])) ? (cp - 2) : -1;
+    const prevNonSpaceIdx = cp > 1 && s[cp - 1] === ' ' && !is_space(s[cp - 2]) ? cp - 2 : -1;
 
     // 1) If just typed first space right after COMMAND token → go to OPERAND
-    if (prevNonSpaceIdx !== -1 && parsed.commandR &&
-        prevNonSpaceIdx >= parsed.commandR.start && prevNonSpaceIdx < parsed.commandR.end) {
+    if (
+      prevNonSpaceIdx !== -1 &&
+      parsed.commandR &&
+      prevNonSpaceIdx >= parsed.commandR.start &&
+      prevNonSpaceIdx < parsed.commandR.end
+    ) {
       stepTo = 'operand';
     }
     // 2) If just typed first space right after OPERAND token → go to COMMENT
     //    BUT ignore the single space immediately following a comma inside operand.
-    else if (prevNonSpaceIdx !== -1 && parsed.operandR &&
-            prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end &&
-            s[prevNonSpaceIdx] !== ',') {
+    else if (
+      prevNonSpaceIdx !== -1 &&
+      parsed.operandR &&
+      prevNonSpaceIdx >= parsed.operandR.start &&
+      prevNonSpaceIdx < parsed.operandR.end &&
+      s[prevNonSpaceIdx] !== ','
+    ) {
       stepTo = 'comment';
     }
     // 3) If cursor is in the space block between COMMAND and OPERAND (sp2) → go to COMMENT
@@ -598,9 +644,15 @@ export function autoIndentLine(
     }
 
     // Engage comment column?
-    if (hasComment || stepTo === 'comment' ||
-        (prevNonSpaceIdx !== -1 && parsed.operandR &&
-        prevNonSpaceIdx >= parsed.operandR.start && prevNonSpaceIdx < parsed.operandR.end && s[prevNonSpaceIdx] !== ',')) {
+    if (
+      hasComment ||
+      stepTo === 'comment' ||
+      (prevNonSpaceIdx !== -1 &&
+        parsed.operandR &&
+        prevNonSpaceIdx >= parsed.operandR.start &&
+        prevNonSpaceIdx < parsed.operandR.end &&
+        s[prevNonSpaceIdx] !== ',')
+    ) {
       engageComment = true;
     }
 
@@ -608,10 +660,10 @@ export function autoIndentLine(
 
     const { out, starts } = buildAlignedLine(
       parsed.label,
-      parsed.command,   // '' allowed
-      parsed.operand,   // '' allowed
+      parsed.command, // '' allowed
+      parsed.operand, // '' allowed
       parsed.commentPart,
-      engageComment
+      engageComment,
     );
 
     // Cursor mapping: snap when we chose a step
@@ -642,7 +694,6 @@ export function autoIndentLine(
     return { line: out + (had_nl ? '\n' : ''), cursor: newCursor };
   }
 
-
   // ---------------------------------------------------------
   // (E) Full re-spacing for non-space & non-backspace (enter/paste)
   // ---------------------------------------------------------
@@ -655,7 +706,7 @@ export function autoIndentLine(
       parsed.command,
       parsed.operand,
       parsed.commentPart,
-      engageComment
+      engageComment,
     );
 
     // best-effort cursor remap

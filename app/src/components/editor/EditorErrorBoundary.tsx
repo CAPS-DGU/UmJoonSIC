@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 interface EditorErrorBoundaryProps {
   children: React.ReactNode;
@@ -25,18 +25,16 @@ export default class EditorErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // 로깅
-    console.error("CodeEditor crashed:", error, errorInfo);
+    console.error('CodeEditor crashed:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: "1rem", color: "red" }}>
+        <div style={{ padding: '1rem', color: 'red' }}>
           <h2>에디터에서 오류가 발생했습니다 😢</h2>
           {this.state.error && (
-            <pre style={{ whiteSpace: "pre-wrap" }}>
-              {this.state.error.message}
-            </pre>
+            <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error.message}</pre>
           )}
         </div>
       );

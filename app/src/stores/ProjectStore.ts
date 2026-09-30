@@ -83,7 +83,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         const { mode } = useMemoryViewStore.getState();
         const payload: any = { type: mode.toLowerCase() };
         if (settings.filedevices && settings.filedevices.length > 0) {
-          payload.filedevices = settings.filedevices.map(fd => ({ index: fd.index, filename: fd.filename }));
+          payload.filedevices = settings.filedevices.map(fd => ({
+            index: fd.index,
+            filename: fd.filename,
+          }));
         }
         await axios.post('http://localhost:9090/begin', payload);
       } catch (e) {
@@ -220,5 +223,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     });
   },
 
-  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) => set({ settings }),
+  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) =>
+    set({ settings }),
 }));

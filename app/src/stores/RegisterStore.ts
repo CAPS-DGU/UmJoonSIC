@@ -48,44 +48,53 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
   B: 0,
   SW: 0,
   PC: 0,
-  F: "0",
+  F: '0',
   changedRegisters: new Set(),
-  setA: value => set(state => ({ 
-    A: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'A']) 
-  })),
-  setX: value => set(state => ({ 
-    X: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'X']) 
-  })),
-  setL: value => set(state => ({ 
-    L: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'L']) 
-  })),
-  setS: value => set(state => ({ 
-    S: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'S']) 
-  })),
-  setT: value => set(state => ({ 
-    T: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'T']) 
-  })),
-  setB: value => set(state => ({ 
-    B: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'B']) 
-  })),
-  setSW: value => set(state => ({ 
-    SW: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'SW']) 
-  })),
-  setPC: value => set(state => ({ 
-    PC: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'PC']) 
-  })),
-  setF: value => set(state => ({ 
-    F: value, 
-    changedRegisters: new Set([...state.changedRegisters, 'F']) 
-  })),
+  setA: value =>
+    set(state => ({
+      A: value,
+      changedRegisters: new Set([...state.changedRegisters, 'A']),
+    })),
+  setX: value =>
+    set(state => ({
+      X: value,
+      changedRegisters: new Set([...state.changedRegisters, 'X']),
+    })),
+  setL: value =>
+    set(state => ({
+      L: value,
+      changedRegisters: new Set([...state.changedRegisters, 'L']),
+    })),
+  setS: value =>
+    set(state => ({
+      S: value,
+      changedRegisters: new Set([...state.changedRegisters, 'S']),
+    })),
+  setT: value =>
+    set(state => ({
+      T: value,
+      changedRegisters: new Set([...state.changedRegisters, 'T']),
+    })),
+  setB: value =>
+    set(state => ({
+      B: value,
+      changedRegisters: new Set([...state.changedRegisters, 'B']),
+    })),
+  setSW: value =>
+    set(state => ({
+      SW: value,
+      changedRegisters: new Set([...state.changedRegisters, 'SW']),
+    })),
+  setPC: value =>
+    set(state => ({
+      PC: value,
+      changedRegisters: new Set([...state.changedRegisters, 'PC']),
+    })),
+  setF: value =>
+    set(state => ({
+      F: value,
+      changedRegisters: new Set([...state.changedRegisters, 'F']),
+    })),
   setAll: (value: Register) =>
     set(state => {
       const changedRegs = new Set<string>();
@@ -98,7 +107,7 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
       if (state.SW !== value.SW) changedRegs.add('SW');
       if (state.PC !== value.PC) changedRegs.add('PC');
       if (state.F !== value.F) changedRegs.add('F');
-      
+
       return {
         A: value.A,
         X: value.X,
@@ -112,46 +121,46 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
         changedRegisters: changedRegs,
       };
     }),
-    getFHex: () => {
-      const fStr = get().F;
-      const parsed = Number(fStr);
-      if (!Number.isFinite(parsed) || parsed === 0) {
-        return '0x000000000000';
-      }
+  getFHex: () => {
+    const fStr = get().F;
+    const parsed = Number(fStr);
+    if (!Number.isFinite(parsed) || parsed === 0) {
+      return '0x000000000000';
+    }
 
-      const sign = parsed < 0 ? 1 : 0;
-      let value = Math.abs(parsed);
+    const sign = parsed < 0 ? 1 : 0;
+    let value = Math.abs(parsed);
 
-      // 정규화: value = 1.x * 2^exp
-      let exp = Math.floor(Math.log2(value));
-      let mantissa = value / Math.pow(2, exp); // 1 <= mantissa < 2
-      const fraction = mantissa - 1; // [0, 1)
+    // 정규화: value = 1.x * 2^exp
+    let exp = Math.floor(Math.log2(value));
+    let mantissa = value / Math.pow(2, exp); // 1 <= mantissa < 2
+    const fraction = mantissa - 1; // [0, 1)
 
-      // 32비트 fraction으로 반올림
-      let fractionBits = Math.round(fraction * Math.pow(2, 32));
-      if (fractionBits === Math.pow(2, 32)) {
-        // 반올림으로 인해 1.000.. 이 되는 경우 지수 올림
-        fractionBits = 0;
-        exp += 1;
-      }
+    // 32비트 fraction으로 반올림
+    let fractionBits = Math.round(fraction * Math.pow(2, 32));
+    if (fractionBits === Math.pow(2, 32)) {
+      // 반올림으로 인해 1.000.. 이 되는 경우 지수 올림
+      fractionBits = 0;
+      exp += 1;
+    }
 
-      const EXP_BITS = 15;
-      const EXP_BIAS = Math.pow(2, EXP_BITS - 1) - 1; // 16383
-      let biased = exp + EXP_BIAS;
+    const EXP_BITS = 15;
+    const EXP_BIAS = Math.pow(2, EXP_BITS - 1) - 1; // 16383
+    let biased = exp + EXP_BIAS;
 
-      if (biased <= 0) {
-        // 언더플로우는 0으로 처리
-        return '0x000000000000';
-      }
-      if (biased >= (1 << EXP_BITS)) {
-        // 오버플로우는 최대 유한값으로 포화
-        const maxBits = (BigInt(sign) << 47n) | (BigInt((1 << EXP_BITS) - 2) << 32n) | 0xFFFFFFFFn;
-        return '0x' + maxBits.toString(16).toUpperCase().padStart(12, '0');
-      }
+    if (biased <= 0) {
+      // 언더플로우는 0으로 처리
+      return '0x000000000000';
+    }
+    if (biased >= 1 << EXP_BITS) {
+      // 오버플로우는 최대 유한값으로 포화
+      const maxBits = (BigInt(sign) << 47n) | (BigInt((1 << EXP_BITS) - 2) << 32n) | 0xffffffffn;
+      return '0x' + maxBits.toString(16).toUpperCase().padStart(12, '0');
+    }
 
-      const bits = (BigInt(sign) << 47n) | (BigInt(biased) << 32n) | BigInt(fractionBits >>> 0);
-      return '0x' + bits.toString(16).toUpperCase().padStart(12, '0');
-    },
+    const bits = (BigInt(sign) << 47n) | (BigInt(biased) << 32n) | BigInt(fractionBits >>> 0);
+    return '0x' + bits.toString(16).toUpperCase().padStart(12, '0');
+  },
   clearChangedRegisters: () => set({ changedRegisters: new Set() }),
   fetchRegisters: async () => {
     const res = await fetch('http://localhost:9090/step', {

@@ -10,12 +10,14 @@ const toHex = (value: number[]) => {
 
 const toChar = (value: number[]) => {
   if (!Array.isArray(value)) return '';
-  return value.map(v => {
-    if (v < 32 || v > 126) {
-      return '.';
-    }
-    return String.fromCharCode(v);
-  }).join(' ');
+  return value
+    .map(v => {
+      if (v < 32 || v > 126) {
+        return '.';
+      }
+      return String.fromCharCode(v);
+    })
+    .join(' ');
 };
 
 interface GroupedWatchData {
@@ -42,7 +44,7 @@ export default function WatchPannel() {
   const toggleExpanded = (key: string) => {
     setExpanded(prev => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: !prev[key],
     }));
   };
 
@@ -54,7 +56,7 @@ export default function WatchPannel() {
       const startIndex = i * row.elementSize;
       const endIndex = startIndex + row.elementSize;
       const elementValue = row.value?.slice(startIndex, endIndex) || [];
-      
+
       elements.push(
         <tr key={`${row.name}[${i}]`} className="hover:bg-gray-100 dark:hover:bg-gray-800">
           <td className="py-1 font-mono pl-8">
@@ -70,7 +72,7 @@ export default function WatchPannel() {
           </td>
           <td className="py-1 font-mono">{toHex(elementValue)}</td>
           <td className="py-1 font-mono">{toChar(elementValue)}</td>
-        </tr>
+        </tr>,
       );
     }
     return elements;
@@ -95,11 +97,11 @@ export default function WatchPannel() {
             {Object.entries(groupedData).map(([filePath, rows]) => {
               const fileKey = filePath;
               const isFileExpanded = expanded[fileKey];
-              
+
               return (
                 <React.Fragment key={filePath}>
                   {/* 파일 헤더 */}
-                  <tr 
+                  <tr
                     className="hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
                     onClick={() => toggleExpanded(fileKey)}
                   >
@@ -113,51 +115,52 @@ export default function WatchPannel() {
                       {filePath.split('/').pop()}
                     </td>
                   </tr>
-                  
+
                   {/* 파일 내용 */}
-                  {isFileExpanded && rows.map(row => {
-                    const arrayKey = `${filePath}-${row.name}`;
-                    const isArrayExpanded = expanded[arrayKey];
-                    const isArray = row.elementCount > 1;
-                    
-                    return (
-                      <React.Fragment key={row.name}>
-                        {/* 메인 변수 행 */}
-                        <tr className="hover:bg-gray-200 dark:hover:bg-gray-800">
-                          <td className="py-1 font-mono pl-4">
-                            {isArray && (
-                              <span 
-                                className="cursor-pointer mr-1"
-                                onClick={() => toggleExpanded(arrayKey)}
-                              >
-                                {isArrayExpanded ? (
-                                  <ChevronDown className="inline w-3 h-3" />
-                                ) : (
-                                  <ChevronRight className="inline w-3 h-3" />
-                                )}
-                              </span>
-                            )}
-                            <FileText className="inline w-3 h-3 mr-1" />
-                            {row.name} ({row.dataType.toUpperCase()})
-                          </td>
-                          <td className="py-1 font-mono">{row.dataType}</td>
-                          <td className="py-1 font-mono">
-                            {'0x' + row.address.toString(16).toUpperCase().padStart(6, '0')}
-                          </td>
-                          <td className="py-1 font-mono">
-                            {row.value && row.value.length > 0 
-                              ? parseInt(toHex(row.value).replaceAll(' ', ''), 16) 
-                              : ''}
-                          </td>
-                          <td className="py-1 font-mono">{toHex(row.value ?? [])}</td>
-                          <td className="py-1 font-mono">{toChar(row.value ?? [])}</td>
-                        </tr>
-                        
-                        {/* 배열 요소들 */}
-                        {isArray && isArrayExpanded && renderArrayElements(row)}
-                      </React.Fragment>
-                    );
-                  })}
+                  {isFileExpanded &&
+                    rows.map(row => {
+                      const arrayKey = `${filePath}-${row.name}`;
+                      const isArrayExpanded = expanded[arrayKey];
+                      const isArray = row.elementCount > 1;
+
+                      return (
+                        <React.Fragment key={row.name}>
+                          {/* 메인 변수 행 */}
+                          <tr className="hover:bg-gray-200 dark:hover:bg-gray-800">
+                            <td className="py-1 font-mono pl-4">
+                              {isArray && (
+                                <span
+                                  className="cursor-pointer mr-1"
+                                  onClick={() => toggleExpanded(arrayKey)}
+                                >
+                                  {isArrayExpanded ? (
+                                    <ChevronDown className="inline w-3 h-3" />
+                                  ) : (
+                                    <ChevronRight className="inline w-3 h-3" />
+                                  )}
+                                </span>
+                              )}
+                              <FileText className="inline w-3 h-3 mr-1" />
+                              {row.name} ({row.dataType.toUpperCase()})
+                            </td>
+                            <td className="py-1 font-mono">{row.dataType}</td>
+                            <td className="py-1 font-mono">
+                              {'0x' + row.address.toString(16).toUpperCase().padStart(6, '0')}
+                            </td>
+                            <td className="py-1 font-mono">
+                              {row.value && row.value.length > 0
+                                ? parseInt(toHex(row.value).replaceAll(' ', ''), 16)
+                                : ''}
+                            </td>
+                            <td className="py-1 font-mono">{toHex(row.value ?? [])}</td>
+                            <td className="py-1 font-mono">{toChar(row.value ?? [])}</td>
+                          </tr>
+
+                          {/* 배열 요소들 */}
+                          {isArray && isArrayExpanded && renderArrayElements(row)}
+                        </React.Fragment>
+                      );
+                    })}
                 </React.Fragment>
               );
             })}

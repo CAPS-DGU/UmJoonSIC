@@ -88,13 +88,18 @@ export default function SicSettingContainer() {
             <ul className="divide-y rounded border bg-white">
               {(settings.filedevices || []).map(d => (
                 <li key={d.index} className="flex items-center justify-between px-2 py-1">
-                  <span className="font-mono text-xs">{`0x${d.index.toString(16).toUpperCase().padStart(2,'0')}`}</span>
+                  <span className="font-mono text-xs">{`0x${d.index.toString(16).toUpperCase().padStart(2, '0')}`}</span>
                   <span className="flex-1 px-2 truncate font-mono text-sm">{d.filename}</span>
-                  <button className="text-xs text-gray-500" onClick={() => {
-                    const next = (settings.filedevices || []).filter(x => x.index !== d.index);
-                    setSettings({ ...settings, filedevices: next });
-                    setIsModified(activeTabIdx, true);
-                  }}>x</button>
+                  <button
+                    className="text-xs text-gray-500"
+                    onClick={() => {
+                      const next = (settings.filedevices || []).filter(x => x.index !== d.index);
+                      setSettings({ ...settings, filedevices: next });
+                      setIsModified(activeTabIdx, true);
+                    }}
+                  >
+                    x
+                  </button>
                 </li>
               ))}
               {(settings.filedevices || []).length === 0 && (
@@ -109,13 +114,18 @@ export default function SicSettingContainer() {
                 onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
               >
                 {Array.from({ length: 256 }, (_, i) => i).map(i => (
-                  <option key={i} value={i.toString(16)}>{`0x${i.toString(16).toUpperCase().padStart(2,'0')}`}</option>
+                  <option
+                    key={i}
+                    value={i.toString(16)}
+                  >{`0x${i.toString(16).toUpperCase().padStart(2, '0')}`}</option>
                 ))}
               </select>
               <input
                 type="text"
                 className="border border-gray-300 rounded-md p-1 flex-1 bg-gray-100 cursor-not-allowed"
-                value={(settings.filedevices || []).find(d => d.index === deviceIndex)?.filename ?? ''}
+                value={
+                  (settings.filedevices || []).find(d => d.index === deviceIndex)?.filename ?? ''
+                }
                 placeholder="파일을 선택하세요"
                 disabled
               />
@@ -125,7 +135,9 @@ export default function SicSettingContainer() {
                   const res = await window.api.pickFile();
                   if (res.success && res.data) {
                     const filename = res.data as string;
-                    const next = (settings.filedevices || []).filter(d => d.index !== deviceIndex).concat([{ index: deviceIndex, filename }]);
+                    const next = (settings.filedevices || [])
+                      .filter(d => d.index !== deviceIndex)
+                      .concat([{ index: deviceIndex, filename }]);
                     setSettings({ ...settings, filedevices: next });
                     setIsModified(activeTabIdx, true);
                   }

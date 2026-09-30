@@ -21,7 +21,7 @@ export default function Debug() {
   const setDelayTime = useRunningStore(s => s.setDelayTime);
   const [showDelayModal, setShowDelayModal] = useState(false);
   const [delayInput, setDelayInput] = useState<string>('1000');
-  
+
   const delay = async (time: number) => {
     await new Promise(resolve => setTimeout(resolve, time));
   };
@@ -36,32 +36,32 @@ export default function Debug() {
   };
 
   const handleRunWithDelay = async (time: number, start: boolean = true) => {
-  if (start) {
-    await fetchLoad();
-  }
-  console.log('run with delay toggleIsRunning', isRunning);
-  
-  if (!isRunning) {
-    toggleIsRunning();
-  }
-  setIsExecuting(true);
-  
-  await fetchMemory();
-  fetchVarMemoryValue();
-  console.log('run with delay start', useRunningStore.getState().isRunning);
-
-  while (useRunningStore.getState().isRunning) {
-    if (useRunningStore.getState().isPaused) {
-      break;
+    if (start) {
+      await fetchLoad();
     }
-    console.log('run with delay loop');
-    await delay(time);
-    fetchRegisters();
-    fetchMemory();
+    console.log('run with delay toggleIsRunning', isRunning);
+
+    if (!isRunning) {
+      toggleIsRunning();
+    }
+    setIsExecuting(true);
+
+    await fetchMemory();
     fetchVarMemoryValue();
-  }
-  console.log('run with delay end');
-};
+    console.log('run with delay start', useRunningStore.getState().isRunning);
+
+    while (useRunningStore.getState().isRunning) {
+      if (useRunningStore.getState().isPaused) {
+        break;
+      }
+      console.log('run with delay loop');
+      await delay(time);
+      fetchRegisters();
+      fetchMemory();
+      fetchVarMemoryValue();
+    }
+    console.log('run with delay end');
+  };
 
   const openDelayModal = () => {
     setDelayInput(String(delayTime || 1000));
@@ -113,7 +113,10 @@ export default function Debug() {
           {' '}
           {/* ref 할당 */}
           {isRunning ? (
-            <RunningButton handleRunWithDelay={handleRunWithDelay} setIsExecuting={setIsExecuting} />
+            <RunningButton
+              handleRunWithDelay={handleRunWithDelay}
+              setIsExecuting={setIsExecuting}
+            />
           ) : (
             <DefaultButton
               handleRun={handleRun}
@@ -206,8 +209,13 @@ interface DefaultButtonProps {
   delayTime: number;
 }
 
-function DefaultButton({ handleRun, handleRunWithDelay, onToggleModeMenu, onOpenDelayModal, delayTime }: DefaultButtonProps) {
-
+function DefaultButton({
+  handleRun,
+  handleRunWithDelay,
+  onToggleModeMenu,
+  onOpenDelayModal,
+  delayTime,
+}: DefaultButtonProps) {
   return (
     <>
       <button
@@ -254,7 +262,7 @@ function RunningButton({
   const fetchLoad = useRunningStore(s => s.fetchLoad);
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
-  
+
   return (
     <>
       {!useRunningStore.getState().isPaused ? (
@@ -281,17 +289,19 @@ function RunningButton({
           <StepForward className="w-4 h-4" />
         </button>
       )}
-      {useRunningStore.getState().isPaused && <button
-        onClick={() => {
-          fetchRegisters();
-          fetchMemory();
-          fetchVarMemoryValue();
-        }}
-        className="hover:bg-gray-100 p-2 rounded-md transition-colors"
-        title="Step Over"
-      >
-        <Redo className="w-4 h-4" />
-      </button>}
+      {useRunningStore.getState().isPaused && (
+        <button
+          onClick={() => {
+            fetchRegisters();
+            fetchMemory();
+            fetchVarMemoryValue();
+          }}
+          className="hover:bg-gray-100 p-2 rounded-md transition-colors"
+          title="Step Over"
+        >
+          <Redo className="w-4 h-4" />
+        </button>
+      )}
       <button
         onClick={async () => {
           await stopRunning();

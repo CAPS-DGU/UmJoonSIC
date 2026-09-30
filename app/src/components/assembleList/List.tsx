@@ -35,7 +35,6 @@ export default function List({ data, activeTabTitle, breakpoints, onBreakpointTo
     }
   }, [PC, data, breakpoints]);
 
-
   // if (data.some(row => parseInt(row.addressHex, 16) === PC)) {
   //   console.log('PC is in data');
   // }

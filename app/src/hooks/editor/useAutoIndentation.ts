@@ -31,8 +31,8 @@ export function useAutoIndentation(
       backspace = false,
       space = false,
       // NEW: minimal intercept data captured synchronously in keydown
-      erased: string | null = null,          // 어떤 문자가 지워졌는지 (Backspace 시), 없으면 null
-      lineChanged: boolean = false,          // Enter/Backspace 등으로 라인 수가 변했는지
+      erased: string | null = null, // 어떤 문자가 지워졌는지 (Backspace 시), 없으면 null
+      lineChanged: boolean = false, // Enter/Backspace 등으로 라인 수가 변했는지
       prevPos?: { lineNumber: number; column: number }, // 변경 이전 커서 위치(옵션)
     ) => {
       const editor = editorRef.current;
@@ -60,7 +60,7 @@ export function useAutoIndentation(
         // Convert selection columns to 0-based indices within this line.
         // Monaco columns are 1-based and inclusive; our function expects 0-based.
         selStart = Math.max(0, sel.startColumn - 1);
-        selEnd   = Math.max(0, sel.endColumn   - 1);
+        selEnd = Math.max(0, sel.endColumn - 1);
 
         // If it's a non-empty selection on this line, we still pass it so autoIndentLine
         // returns immediately without formatting. (You could also short-circuit here.)
@@ -75,9 +75,9 @@ export function useAutoIndentation(
         cursorIndex, // 0-based index into CURRENT line
         selStart,
         selEnd,
-        erased,        // NEW: nullable String erased
-        lineChanged,   // NEW: boolean lineChanged (Enter/Backspace 시 true)
-        prevPos,       // optional: 이전 커서 위치 (필요 시 사용)
+        erased, // NEW: nullable String erased
+        lineChanged, // NEW: boolean lineChanged (Enter/Backspace 시 true)
+        prevPos, // optional: 이전 커서 위치 (필요 시 사용)
       );
 
       // If nothing changed, just set the caret (in case the function adjusted it),
@@ -90,8 +90,7 @@ export function useAutoIndentation(
       const maxLen = newLine.length;
       const clampedCursor0 = Math.max(0, Math.min(newCursor0, maxLen));
       const newColumn = clampedCursor0 + 1;
-      if(!newLine)
-        editor.setPosition({ lineNumber, column: newColumn });
+      if (!newLine) editor.setPosition({ lineNumber, column: newColumn });
     },
     [editorRef, monaco],
   );
@@ -145,7 +144,9 @@ export function useAutoIndentation(
 
           // 무엇이 지워질지 동기적으로 파악
           if (hasSelection && sel) {
-            erased = readRange(sel.startLineNumber, sel.startColumn, sel.endLineNumber, sel.endColumn) || '';
+            erased =
+              readRange(sel.startLineNumber, sel.startColumn, sel.endLineNumber, sel.endColumn) ||
+              '';
           } else {
             // 커서의 왼쪽 한 글자
             if (column > 1) {
@@ -162,7 +163,7 @@ export function useAutoIndentation(
             handleAutoIndent(
               currentPos.lineNumber,
               currentPos.column - 1,
-              true,  // backspace
+              true, // backspace
               false, // space
               erased,
               lineChanged,
@@ -183,7 +184,7 @@ export function useAutoIndentation(
               currentPos.lineNumber,
               currentPos.column - 1,
               false, // backspace
-              true,  // space
+              true, // space
               null,
               lineChanged,
               prevPos,
@@ -210,7 +211,7 @@ export function useAutoIndentation(
               null,
               lineChanged,
               prevPos,
-            );/*
+            ); /*
             handleAutoIndent(
               newPos.lineNumber,
               0,
@@ -242,13 +243,13 @@ export function useAutoIndentation(
         // autoIndentLine 의 확장된 시그니처에 맞춰 기본값 전달
         const { line: newText } = autoIndentLine(
           content,
-          false,     // backspace
-          false,     // space
-          0,         // cursorIndex
+          false, // backspace
+          false, // space
+          0, // cursorIndex
           undefined, // selStart
           undefined, // selEnd
-          null,      // erased
-          false,     // lineChanged
+          null, // erased
+          false, // lineChanged
           undefined, // prevPos
         );
 

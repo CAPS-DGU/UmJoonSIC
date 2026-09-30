@@ -12,7 +12,9 @@ function ensureDir(p: string) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
-function readProjectSic(projectRoot: string): { asm: string[]; main: string; filedevices: FileDevice[] } | null {
+function readProjectSic(
+  projectRoot: string,
+): { asm: string[]; main: string; filedevices: FileDevice[] } | null {
   const sicPath = pathModule.join(projectRoot, 'project.sic');
   if (!fs.existsSync(sicPath)) return null;
   try {
@@ -72,8 +74,10 @@ function loadProjectFromSic(sicPath: string) {
   const asm: string[] = Array.isArray(sic.asm) ? sic.asm.map(item => String(item)) : [];
   const mainProgram = typeof sic.main === 'string' ? sic.main : '';
   const filedevices = Array.isArray(sic.filedevices)
-    ? (sic.filedevices as Array<{ index: number; filename: string }>).
-        map(device => ({ index: Number(device.index), filename: String(device.filename ?? '') }))
+    ? (sic.filedevices as Array<{ index: number; filename: string }>).map(device => ({
+        index: Number(device.index),
+        filename: String(device.filename ?? ''),
+      }))
     : [];
 
   return {
