@@ -1,20 +1,22 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { ConsoleMessage } from '@/features/panel/consoleMessage';
+import type { ServerLogPayload } from '@shared/ipc';
+
+/** One line of simulator output shown in the Server tab. */
+export interface ConsoleMessage extends ServerLogPayload {
+  id: string;
+  timestamp: number;
+}
 
 interface ConsoleState {
   messages: ConsoleMessage[];
-  addMessage: (message: Omit<ConsoleMessage, 'id' | 'timestamp'>) => void;
-  clearMessages: () => void;
+  addMessage: (message: ServerLogPayload) => void;
 }
 
-const useConsoleStore = create<ConsoleState>(set => ({
+export const useConsoleStore = create<ConsoleState>(set => ({
   messages: [],
   addMessage: message =>
     set(state => ({
       messages: [...state.messages, { ...message, id: uuidv4(), timestamp: Date.now() }],
     })),
-  clearMessages: () => set({ messages: [] }),
 }));
-
-export default useConsoleStore;

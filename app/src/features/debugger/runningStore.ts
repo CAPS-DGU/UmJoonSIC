@@ -41,18 +41,12 @@ function beginSimulation() {
 function publishLoadedFiles(files: LoadedFile[]) {
   const { addWatch, fetchVarMemoryValue } = useWatchStore.getState();
   const { addListing } = useListingStore.getState();
-  const { addTab } = useEditorTabStore.getState();
+  const { openTab } = useEditorTabStore.getState();
 
   files.forEach(file => {
-    addTab({
-      idx: 0,
+    openTab({
       title: `List: ${file.fileName.split('/').pop()!}`,
       filePath: path.join(file.fileName + '.lst'),
-      isModified: false,
-      isActive: true,
-      fileContent: '',
-      breakpoints: [],
-      cursor: { line: 0, column: 0 },
     });
     addListing(file.fileName, file.listing.rows);
     file.listing.watch.forEach(variable => addWatch({ filePath: file.fileName, ...variable }));
@@ -63,8 +57,6 @@ function publishLoadedFiles(files: LoadedFile[]) {
 /** Record the assembler errors, show a linker error if any, and open the first failing file. */
 function publishLoadErrors(files: LoadedFile[], projectPath: string) {
   const { addErrors } = useErrorStore.getState();
-  const { addTab } = useEditorTabStore.getState();
-
   files.forEach(file => {
     if (file.assemblerErrors?.length) {
       addErrors(
@@ -89,15 +81,9 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
   if (firstFailing) {
     const firstError = firstFailing.assemblerErrors![0];
     const relativeFileName = toProjectRelativePath(projectPath, firstFailing.fileName);
-    // addTab activates the tab if the file is already open.
-    addTab({
-      idx: useEditorTabStore.getState().tabs.length,
+    useEditorTabStore.getState().openTab({
       title: relativeFileName.split('/').pop()!,
       filePath: relativeFileName,
-      isModified: false,
-      isActive: true,
-      fileContent: '',
-      breakpoints: [],
       cursor: { line: firstError.row, column: firstError.col },
     });
   }

@@ -1,291 +1,184 @@
 import { create } from 'zustand';
-import { useProjectStore } from '@/features/project/projectStore';
 import path from 'path-browserify';
+import { useProjectStore } from '@/features/project/projectStore';
+
+export interface CursorPosition {
+  line: number;
+  column: number;
+}
 
 export interface EditorTab {
+  /** Position in `tabs`; kept equal to the array index. */
   idx: number;
   title: string;
+  /** Project-relative path. A listing tab uses `<source file>.lst`, which is not a file on disk. */
   filePath: string;
   isModified: boolean;
   fileContent: string;
+  /** Row indexes (listing tabs). */
   breakpoints: number[];
   isActive: boolean;
-  cursor: {
-    line: number;
-    column: number;
-  };
+  cursor: CursorPosition;
 }
 
-// Add activeTabIdx to the state interface
+/** What a caller has to say to open a tab; the rest starts from defaults. */
+export type NewTab = Pick<EditorTab, 'title' | 'filePath'> & { cursor?: CursorPosition };
+
+interface SaveAllResult {
+  success: boolean;
+  savedCount: number;
+  totalCount: number;
+  failedCount: number;
+}
+
 interface EditorTabState {
   tabs: EditorTab[];
-  activeTabIdx: number; // New property to track the active tab's index
+  /** Index of the active tab; -1 when no tab is open. */
+  activeTabIdx: number;
   getActiveTab: () => EditorTab | undefined;
-  addTab: (tab: EditorTab) => void;
+  /** Open a tab for the file, or activate the one that is already open for it. */
+  openTab: (tab: NewTab) => void;
   closeTab: (idx: number) => void;
   closeAllListFileTabs: () => void;
   setActiveTab: (idx: number) => void;
-  setCursor: (idx: number, cursor: { line: number; column: number }) => void;
+  setCursor: (idx: number, cursor: CursorPosition) => void;
   setFileContent: (idx: number, fileContent: string) => void;
-  clearTabs: () => void;
   setIsModified: (idx: number, isModified: boolean) => void;
-  // Breakpoint 관련 함수들
-  addBreakpoint: (idx: number, lineNumber: number) => void;
-  removeBreakpoint: (idx: number, lineNumber: number) => void;
   toggleBreakpoint: (idx: number, lineNumber: number) => void;
-  clearBreakpoints: (idx: number) => void;
-  saveAllTabs: () => Promise<{
-    success: boolean;
-    savedCount: number;
-    totalCount: number;
-    failedCount: number;
-  }>;
+  /** Write every modified source tab to disk (listing and project.sic tabs are skipped). */
+  saveAllTabs: () => Promise<SaveAllResult>;
 }
 
-// const defaultTab: EditorTab = {
-//   idx: 0,
-//   title: 'Untitled',
-//   filePath: './main.asm',
-//   isModified: false,
-//   fileContent: 'hello',
-//   breakpoints: [],
-//   isActive: false,
-//   cursor: {
-//     line: 0,
-//     column: 0,
-//   },
-// };
+const isListingTab = (tab: EditorTab) => tab.filePath.endsWith('.lst');
 
-// 'activeTabIdx'를 기준으로 모든 탭의 'isActive' 상태를 동기화하는 헬퍼 함수
-const syncActiveState = (tabs: EditorTab[], activeIdx: number): EditorTab[] => {
-  return tabs.map((tab, index) => ({
-    ...tab,
-    isActive: index === activeIdx,
-  }));
-};
+/** Renumber the tabs and mark the one at `activeIdx` as active. */
+const withActive = (tabs: EditorTab[], activeIdx: number): EditorTab[] =>
+  tabs.map((tab, index) => ({ ...tab, idx: index, isActive: index === activeIdx }));
+
+const patchTab = (tabs: EditorTab[], idx: number, patch: Partial<EditorTab>): EditorTab[] =>
+  tabs.map(tab => (tab.idx === idx ? { ...tab, ...patch } : tab));
 
 export const useEditorTabStore = create<EditorTabState>((set, get) => ({
   tabs: [],
-  activeTabIdx: -1, // default value (e.g., -1 for no active tab)
+  activeTabIdx: -1,
 
   getActiveTab: () => {
     const { tabs, activeTabIdx } = get();
-    // 유효한 인덱스인지 확인 후 반환
-    if (activeTabIdx >= 0 && activeTabIdx < tabs.length) {
-      return tabs[activeTabIdx];
-    }
-    return undefined;
+    return activeTabIdx >= 0 && activeTabIdx < tabs.length ? tabs[activeTabIdx] : undefined;
   },
 
-  addTab: newTab =>
+  openTab: ({ title, filePath, cursor }) =>
     set(state => {
-      const exists = state.tabs.some(tab => tab.filePath === newTab.filePath);
-      // 이미 탭이 존재하는 경우
-      if (exists) {
-        const newActiveTabIdx = state.tabs.findIndex(tab => tab.filePath === newTab.filePath);
-        const syncedTabs = syncActiveState(state.tabs, newActiveTabIdx);
-        return { tabs: syncedTabs, activeTabIdx: newActiveTabIdx };
+      const existingIdx = state.tabs.findIndex(tab => tab.filePath === filePath);
+      if (existingIdx !== -1) {
+        return { tabs: withActive(state.tabs, existingIdx), activeTabIdx: existingIdx };
       }
 
-      // 새 탭 추가하는 경우
       const newIdx = state.tabs.length;
-      const updatedTabs = [...state.tabs, { ...newTab, idx: newIdx }];
-      const syncedTabs = syncActiveState(updatedTabs, newIdx);
-      return { tabs: syncedTabs, activeTabIdx: newIdx };
+      const newTab: EditorTab = {
+        idx: newIdx,
+        title,
+        filePath,
+        isModified: false,
+        fileContent: '',
+        breakpoints: [],
+        isActive: true,
+        cursor: cursor ?? { line: 0, column: 0 },
+      };
+      return { tabs: withActive([...state.tabs, newTab], newIdx), activeTabIdx: newIdx };
     }),
 
   closeTab: idx =>
     set(state => {
       const closedTabWasActive = state.tabs[idx]?.idx === state.activeTabIdx;
-      const updatedTabs = state.tabs.filter(tab => tab.idx !== idx);
-      const reindexedTabs = updatedTabs.map((tab, i) => ({ ...tab, idx: i }));
-
-      let newActiveTabIdx = -1;
-      if (reindexedTabs.length > 0) {
-        if (closedTabWasActive) {
-          // 닫은 탭이 활성 탭이었다면, 마지막 탭을 활성화
-          newActiveTabIdx = reindexedTabs.length - 1;
-        } else {
-          // 다른 탭을 닫았다면, 기존 활성 탭의 새 인덱스 찾기
-          const oldActiveTab = state.tabs[state.activeTabIdx];
-          if (oldActiveTab) {
-            newActiveTabIdx = reindexedTabs.findIndex(t => t.filePath === oldActiveTab.filePath);
-          }
-        }
-      }
-
-      const finalTabs = syncActiveState(reindexedTabs, newActiveTabIdx);
-      return {
-        tabs: finalTabs,
-        activeTabIdx: newActiveTabIdx,
-      };
-    }),
-  closeAllListFileTabs: () => {
-    set(state => {
-      const wasActive = state.tabs[state.activeTabIdx];
-      const filtered = state.tabs.filter(tab => !tab.filePath.endsWith('.lst'));
-      const reindexed = filtered.map((tab, i) => ({ ...tab, idx: i }));
+      const remaining = state.tabs.filter(tab => tab.idx !== idx);
 
       let newActiveIdx = -1;
-      if (reindexed.length > 0) {
-        if (wasActive && !wasActive.filePath.endsWith('.lst')) {
-          const idx = reindexed.findIndex(t => t.filePath === wasActive.filePath);
-          newActiveIdx = idx !== -1 ? idx : reindexed.length - 1;
+      if (remaining.length > 0) {
+        if (closedTabWasActive) {
+          // The active tab was closed: the last tab takes over.
+          newActiveIdx = remaining.length - 1;
         } else {
-          newActiveIdx = reindexed.length - 1;
-        }
-      }
-
-      const syncedTabs = syncActiveState(reindexed, newActiveIdx);
-      return {
-        tabs: syncedTabs,
-        activeTabIdx: newActiveIdx,
-      };
-    });
-  },
-  setActiveTab: idx =>
-    set(state => {
-      const syncedTabs = syncActiveState(state.tabs, idx);
-      return {
-        tabs: syncedTabs,
-        activeTabIdx: idx,
-      };
-    }),
-
-  setCursor: (idx, cursor) =>
-    set(state => ({
-      tabs: state.tabs.map(tab => ({ ...tab, cursor: tab.idx === idx ? cursor : tab.cursor })),
-    })),
-
-  setFileContent: (idx, fileContent) =>
-    set(state => ({
-      tabs: state.tabs.map(tab => ({
-        ...tab,
-        fileContent: tab.idx === idx ? fileContent : tab.fileContent,
-      })),
-    })),
-
-  clearTabs: () => set(() => ({ tabs: [], activeTabIdx: -1 })),
-
-  setIsModified: (idx, isModified) =>
-    set(state => ({
-      tabs: state.tabs.map(tab => ({
-        ...tab,
-        isModified: tab.idx === idx ? isModified : tab.isModified,
-      })),
-    })),
-
-  // Breakpoint 관련 함수들
-  addBreakpoint: (idx, lineNumber) =>
-    set(state => ({
-      tabs: state.tabs.map(tab => {
-        if (tab.idx === idx) {
-          const breakpoints = tab.breakpoints || [];
-          if (!breakpoints.includes(lineNumber)) {
-            return {
-              ...tab,
-              breakpoints: [...breakpoints, lineNumber].sort((a, b) => a - b),
-            };
+          // Another tab was closed: the active tab stays active at its new position.
+          const activeTab = state.tabs[state.activeTabIdx];
+          if (activeTab) {
+            newActiveIdx = remaining.findIndex(t => t.filePath === activeTab.filePath);
           }
         }
-        return tab;
-      }),
-    })),
+      }
+      return { tabs: withActive(remaining, newActiveIdx), activeTabIdx: newActiveIdx };
+    }),
 
-  removeBreakpoint: (idx, lineNumber) =>
-    set(state => ({
-      tabs: state.tabs.map(tab => {
-        if (tab.idx === idx) {
-          const breakpoints = tab.breakpoints || [];
-          return {
-            ...tab,
-            breakpoints: breakpoints.filter(bp => bp !== lineNumber),
-          };
+  closeAllListFileTabs: () =>
+    set(state => {
+      const activeTab = state.tabs[state.activeTabIdx];
+      const remaining = state.tabs.filter(tab => !isListingTab(tab));
+
+      let newActiveIdx = -1;
+      if (remaining.length > 0) {
+        if (activeTab && !isListingTab(activeTab)) {
+          const idx = remaining.findIndex(t => t.filePath === activeTab.filePath);
+          newActiveIdx = idx !== -1 ? idx : remaining.length - 1;
+        } else {
+          newActiveIdx = remaining.length - 1;
         }
-        return tab;
-      }),
-    })),
+      }
+      return { tabs: withActive(remaining, newActiveIdx), activeTabIdx: newActiveIdx };
+    }),
 
-  toggleBreakpoint: (idx, lineNumber) => {
-    const { tabs } = get();
-    const tab = tabs.find(t => t.idx === idx);
-    console.log(`${tab?.filePath}의 ${lineNumber}줄 에서 브레이크 포인트 클릭!`);
-    if (tab && tab.breakpoints && tab.breakpoints.includes(lineNumber)) {
-      get().removeBreakpoint(idx, lineNumber);
-    } else {
-      get().addBreakpoint(idx, lineNumber);
-    }
-  },
+  setActiveTab: idx => set(state => ({ tabs: withActive(state.tabs, idx), activeTabIdx: idx })),
 
-  clearBreakpoints: idx =>
-    set(state => ({
-      tabs: state.tabs.map(tab => {
-        if (tab.idx === idx) {
-          return {
-            ...tab,
-            breakpoints: [],
-          };
-        }
-        return tab;
-      }),
-    })),
+  setCursor: (idx, cursor) => set(state => ({ tabs: patchTab(state.tabs, idx, { cursor }) })),
+  setFileContent: (idx, fileContent) =>
+    set(state => ({ tabs: patchTab(state.tabs, idx, { fileContent }) })),
+  setIsModified: (idx, isModified) =>
+    set(state => ({ tabs: patchTab(state.tabs, idx, { isModified }) })),
+
+  toggleBreakpoint: (idx, lineNumber) =>
+    set(state => {
+      const tab = state.tabs.find(t => t.idx === idx);
+      if (!tab) return state;
+      const breakpoints = tab.breakpoints || [];
+      const next = breakpoints.includes(lineNumber)
+        ? breakpoints.filter(bp => bp !== lineNumber)
+        : [...breakpoints, lineNumber].sort((a, b) => a - b);
+      return { tabs: patchTab(state.tabs, idx, { breakpoints: next }) };
+    }),
+
   saveAllTabs: async () => {
-    const { tabs } = get();
     const { projectPath } = useProjectStore.getState();
-
-    const modifiedTabs = tabs.filter(
-      tab => tab.isModified && !tab.filePath.endsWith('.lst') && !tab.filePath.endsWith('.sic'),
+    const modifiedTabs = get().tabs.filter(
+      tab => tab.isModified && !isListingTab(tab) && !tab.filePath.endsWith('.sic'),
     );
-
     if (modifiedTabs.length === 0) {
-      console.log('저장할 수정된 탭이 없습니다.');
       return { success: true, savedCount: 0, totalCount: 0, failedCount: 0 };
     }
 
-    const savePromises = modifiedTabs.map(async tab => {
-      const fullPath = path.join(projectPath, tab.filePath);
-      try {
-        const res = await window.api.saveFile(fullPath, tab.fileContent);
-        if (res.success) {
-          // 개별 탭의 isModified만 false로 설정
-          set(state => ({
-            tabs: state.tabs.map(t => (t.idx === tab.idx ? { ...t, isModified: false } : t)),
-          }));
-          return { success: true, tabIdx: tab.idx };
-        } else {
-          console.error(`파일 저장 실패: ${fullPath}`, res.message);
-          return { success: false, tabIdx: tab.idx, error: res.message };
+    const results = await Promise.all(
+      modifiedTabs.map(async tab => {
+        const fullPath = path.join(projectPath, tab.filePath);
+        try {
+          const res = await window.api.saveFile(fullPath, tab.fileContent);
+          if (!res.success) {
+            console.error(`파일 저장 실패: ${fullPath}`, res.message);
+            return false;
+          }
+          get().setIsModified(tab.idx, false);
+          return true;
+        } catch (error) {
+          console.error(`파일 저장 중 오류 발생: ${fullPath}`, error);
+          return false;
         }
-      } catch (error) {
-        console.error(`파일 저장 중 오류 발생: ${fullPath}`, error);
-        return {
-          success: false,
-          tabIdx: tab.idx,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    });
-
-    const results = await Promise.allSettled(savePromises);
-    const successCount = results.filter(
-      result => result.status === 'fulfilled' && result.value.success,
-    ).length;
-
-    const failedResults = results.filter(
-      result =>
-        result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success),
+      }),
     );
 
-    if (failedResults.length > 0) {
-      console.warn(`${failedResults.length}개 파일 저장 실패:`, failedResults);
-    }
-
-    console.log(`${successCount}/${modifiedTabs.length}개 파일 저장 완료`);
+    const savedCount = results.filter(Boolean).length;
+    const failedCount = results.length - savedCount;
     return {
-      success: failedResults.length === 0,
-      savedCount: successCount,
+      success: failedCount === 0,
+      savedCount,
       totalCount: modifiedTabs.length,
-      failedCount: failedResults.length,
+      failedCount,
     };
   },
 }));

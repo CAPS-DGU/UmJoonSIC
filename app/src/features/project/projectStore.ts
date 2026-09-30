@@ -1,228 +1,164 @@
-// src/stores/ProjectStore.ts
 import { create } from 'zustand';
-import axios from 'axios';
-import { useRunningStore } from '@/features/debugger/runningStore';
+import type { IpcResult, ProjectInfo, ProjectSettings } from '@shared/ipc';
+import { simulator } from '@/api/simulator';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
-
-interface FileDevice {
-  index: number;
-  filename: string;
-}
+import { useRunningStore } from '@/features/debugger/runningStore';
 import type { FileStructure } from '@/features/fileTree/types';
 
+const EMPTY_SETTINGS: ProjectSettings = { asm: [], main: '', filedevices: [] };
+
+/** The file list is read again shortly after opening: the first read can miss files still being written. */
+const SECOND_REFRESH_DELAY_MS = 250;
+
 interface ProjectState {
+  /** Folder name of the open project; '' when no project is open. */
   projectName: string;
+  /** Absolute path of the project folder. */
   projectPath: string;
-  settings: { asm: string[]; main: string; filedevices: FileDevice[] };
+  /** Contents of project.sic. */
+  settings: ProjectSettings;
+  /** Flat list of the project's files and folders (folders end with '/'). */
   fileTree: FileStructure[];
   selectedFileOrFolder: FileStructure | null;
+
   setSelectedFileOrFolder: (item: FileStructure | null) => void;
-  getFolderFromSelectedFileOrFolder: () => string;
   refreshFileTree: () => void;
-  refreshSettings: () => void;
-  setProject: (project: ProjectState) => void;
   createNewProject: () => void;
   openProject: () => void;
   openProjectByPath: (sicPath: string) => void;
   closeProject: () => void;
-  getAsmAbsolutePaths: () => string[];
   addAsmFile: (file: FileStructure) => void;
   removeAsmFile: (relativePath: string) => void;
-  saveSettings: () => Promise<{ success: boolean; message?: string }>;
-  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) => void;
+  setSettings: (settings: ProjectSettings) => void;
+  /** Write project.sic, then restart the simulation so new file devices take effect. */
+  saveSettings: () => Promise<IpcResult>;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
-  projectName: '',
-  projectPath: '',
-  settings: { asm: [], main: '', filedevices: [] },
-  fileTree: [],
-  selectedFileOrFolder: null as FileStructure | null,
-  setSelectedFileOrFolder: (item: FileStructure | null) => set({ selectedFileOrFolder: item }),
-  getFolderFromSelectedFileOrFolder: () => {
-    const { selectedFileOrFolder } = get();
-    if (!selectedFileOrFolder) return '/';
+export const useProjectStore = create<ProjectState>((set, get) => {
+  /** Take over the project an IPC call returned, or log why it failed. */
+  const adoptProject = (request: Promise<IpcResult<ProjectInfo>>, action: string) => {
+    request
+      .then(res => {
+        if (res.success && res.data) {
+          set({
+            projectName: res.data.name,
+            projectPath: res.data.path,
+            settings: { ...res.data.settings },
+            fileTree: [],
+          });
+          get().refreshFileTree();
+          setTimeout(() => get().refreshFileTree(), SECOND_REFRESH_DELAY_MS);
+        } else {
+          console.error(`Failed to ${action}:`, res.message);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error(`Error while trying to ${action}:`, error);
+      });
+  };
 
-    if (selectedFileOrFolder.type === 'folder') {
-      return selectedFileOrFolder.relativePath;
-    } else {
-      const parts = selectedFileOrFolder.relativePath.split('/');
-      parts.pop();
-      return parts.length === 0 ? '/' : parts.join('/');
-    }
-  },
-  addAsmFile: (file: FileStructure) => {
-    const { settings, fileTree, saveSettings } = get();
-    if (file.type === 'file') {
+  return {
+    projectName: '',
+    projectPath: '',
+    settings: EMPTY_SETTINGS,
+    fileTree: [],
+    selectedFileOrFolder: null,
+
+    setSelectedFileOrFolder: item => set({ selectedFileOrFolder: item }),
+
+    refreshFileTree: () => {
+      const { projectPath } = get();
+      if (!projectPath) {
+        console.warn('Project path is empty');
+        return;
+      }
+
+      window.api
+        .getFileList(projectPath)
+        .then(res => {
+          if (res.success && res.data) {
+            // Folders are recognised later by their trailing '/' (see useFileTree).
+            const fileTree: FileStructure[] = res.data.map(entry => ({
+              type: 'file',
+              name: entry.split('/').pop() || entry,
+              relativePath: entry,
+            }));
+            set({ fileTree });
+          } else {
+            console.error('Failed to get file list:', res.message);
+            set({ fileTree: [] });
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('Error getting file list:', error);
+          set({ fileTree: [] });
+        });
+    },
+
+    createNewProject: () => adoptProject(window.api.createNewProject(), 'create new project'),
+    openProject: () => adoptProject(window.api.openProject(), 'open project'),
+    openProjectByPath: sicPath => {
+      if (!sicPath) {
+        console.error('Invalid project path received');
+        return;
+      }
+      adoptProject(window.api.openProjectByPath(sicPath), 'open project by path');
+    },
+
+    closeProject: () => {
       set({
-        settings: { ...settings, asm: [...settings.asm, file.relativePath] },
-        fileTree: [...fileTree, file],
+        projectName: '',
+        projectPath: '',
+        settings: EMPTY_SETTINGS,
+        fileTree: [],
+        selectedFileOrFolder: null,
+      });
+    },
+
+    addAsmFile: file => {
+      const { settings, fileTree, saveSettings } = get();
+      if (file.type === 'file') {
+        set({
+          settings: { ...settings, asm: [...settings.asm, file.relativePath] },
+          fileTree: [...fileTree, file],
+        });
+        saveSettings();
+      }
+    },
+
+    removeAsmFile: relativePath => {
+      const { settings, fileTree, saveSettings } = get();
+      set({
+        settings: { ...settings, asm: settings.asm.filter(p => p !== relativePath) },
+        fileTree: fileTree.filter(f => f.relativePath !== relativePath),
       });
       saveSettings();
-    }
-  },
-  removeAsmFile: (relativePath: string) => {
-    const { settings, fileTree, saveSettings } = get();
-    set({
-      settings: { ...settings, asm: settings.asm.filter(p => p !== relativePath) },
-      fileTree: fileTree.filter(f => f.relativePath !== relativePath),
-    });
-    saveSettings();
-  },
-  saveSettings: async () => {
-    const { settings, projectPath } = get();
-    const res = await window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
-    if (res.success) {
-      try {
-        // 실행 중이면 먼저 중지
-        const { isRunning, stopRunning } = useRunningStore.getState();
-        if (isRunning) {
-          await stopRunning();
+    },
+
+    setSettings: settings => set({ settings }),
+
+    saveSettings: async () => {
+      const { settings, projectPath } = get();
+      const res = await window.api.saveFile(projectPath + '/project.sic', JSON.stringify(settings));
+      if (res.success) {
+        try {
+          const { isRunning, stopRunning } = useRunningStore.getState();
+          if (isRunning) {
+            await stopRunning();
+          }
+          const { mode } = useMemoryViewStore.getState();
+          const hasDevices = settings.filedevices && settings.filedevices.length > 0;
+          await simulator.begin(
+            mode,
+            hasDevices
+              ? settings.filedevices.map(fd => ({ index: fd.index, filename: fd.filename }))
+              : undefined,
+          );
+        } catch (e) {
+          console.warn('Failed to call /begin after saving settings:', e);
         }
-        // 머신 모드에 맞춰 /begin 호출 (파일 디바이스 매핑 포함)
-        const { mode } = useMemoryViewStore.getState();
-        const payload: any = { type: mode.toLowerCase() };
-        if (settings.filedevices && settings.filedevices.length > 0) {
-          payload.filedevices = settings.filedevices.map(fd => ({
-            index: fd.index,
-            filename: fd.filename,
-          }));
-        }
-        await axios.post('http://localhost:9090/begin', payload);
-      } catch (e) {
-        console.warn('Failed to call /begin after saving settings:', e);
       }
-    }
-    return res;
-  },
-  refreshFileTree: () => {
-    const currentPath = get().projectPath;
-    if (!currentPath) {
-      console.warn('Project path is empty');
-      return;
-    }
-    window.api
-      .getFileList(currentPath)
-      .then(res => {
-        if (res.success && res.data) {
-          const fileTree: FileStructure[] = res.data.map(pathStr => ({
-            type: 'file', // 또는 folder인지 판단해서 동적으로
-            name: pathStr.split('/').pop() || pathStr,
-            relativePath: pathStr,
-          }));
-          set({ fileTree });
-        } else {
-          console.error('Failed to get file list:', res.message);
-          set({ fileTree: [] });
-        }
-      })
-      .catch((error: unknown) => {
-        console.error('Error getting file list:', error);
-        set({ fileTree: [] });
-      });
-  },
-
-  refreshSettings: () => set({ settings: { asm: [], main: '', filedevices: [] } }),
-
-  setProject: (project: ProjectState) =>
-    set({
-      projectName: project.projectName,
-      projectPath: project.projectPath,
-      settings: project.settings,
-    }),
-
-  createNewProject: () => {
-    window.api
-      .createNewProject()
-      .then(res => {
-        if (res.success && res.data) {
-          set({
-            projectName: res.data.name,
-            projectPath: res.data.path,
-            settings: { ...res.data.settings },
-            fileTree: [],
-          });
-          get().refreshFileTree();
-          setTimeout(() => get().refreshFileTree(), 250);
-        } else {
-          console.error('Failed to create new project:', res.message);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error('Error creating new project:', error);
-      });
-  },
-
-  openProject: () => {
-    window.api
-      .openProject()
-      .then(res => {
-        if (res.success && res.data) {
-          set({
-            projectName: res.data.name,
-            projectPath: res.data.path,
-            settings: { ...res.data.settings },
-            fileTree: [],
-          });
-          get().refreshFileTree();
-          setTimeout(() => get().refreshFileTree(), 250);
-        } else {
-          console.error('Failed to open project:', res.message);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error('Error opening project:', error);
-      });
-  },
-
-  openProjectByPath: (sicPath: string) => {
-    if (!sicPath) {
-      console.error('Invalid project path received');
-      return;
-    }
-
-    console.log('[UmJoonSIC] Attempting to open project by path:', sicPath);
-    window.api
-      .openProjectByPath(sicPath)
-      .then(res => {
-        if (res.success && res.data) {
-          console.log('[UmJoonSIC] Project opened successfully:', res.data.path);
-          set({
-            projectName: res.data.name,
-            projectPath: res.data.path,
-            settings: { ...res.data.settings },
-            fileTree: [],
-          });
-          get().refreshFileTree();
-          setTimeout(() => get().refreshFileTree(), 250);
-        } else {
-          console.error('Failed to open project by path:', res.message);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error('Error opening project by path:', error);
-      });
-  },
-
-  closeProject: () => {
-    set({
-      projectName: '',
-      projectPath: '',
-      settings: { asm: [], main: '', filedevices: [] },
-      fileTree: [],
-      selectedFileOrFolder: null,
-    });
-  },
-
-  getAsmAbsolutePaths: () => {
-    const { projectPath, settings } = get();
-    if (!projectPath) return [];
-    return (settings.asm || []).map(rel => {
-      const cleaned = rel.replace(/^\.?\//, '');
-      return `${projectPath}/${cleaned}`;
-    });
-  },
-
-  setSettings: (settings: { asm: string[]; main: string; filedevices: FileDevice[] }) =>
-    set({ settings }),
-}));
+      return res;
+    },
+  };
+});

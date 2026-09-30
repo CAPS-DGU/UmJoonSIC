@@ -1,29 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 
 interface ResizerProps {
+  /** Called with the new height of the area below the bar while dragging. */
   onResize: (newHeight: number) => void;
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Element whose bottom edge the height is measured from. */
+  containerRef: RefObject<HTMLDivElement | null>;
   statusBarHeight: number;
   onDragStart?: () => void;
   onDragEnd?: () => void;
 }
 
-const Resizer: React.FC<ResizerProps> = ({
+/** Horizontal bar that is dragged up and down to resize the panel below it. */
+export default function Resizer({
   onResize,
   containerRef,
   statusBarHeight,
   onDragStart,
   onDragEnd,
-}) => {
+}: ResizerProps) {
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragging || !containerRef.current) return;
-
       const appRect = containerRef.current.getBoundingClientRect();
       const newPanelHeight = appRect.bottom - statusBarHeight - e.clientY;
-
       onResize(Math.max(0, newPanelHeight));
     };
 
@@ -53,6 +54,4 @@ const Resizer: React.FC<ResizerProps> = ({
       }}
     />
   );
-};
-
-export default Resizer;
+}

@@ -1,20 +1,25 @@
 import { useEffect } from 'react';
-import useConsoleStore from '@/features/panel/consoleStore';
+import { AppEvent, type ServerLogPayload } from '@shared/ipc';
+import { useConsoleStore } from '@/features/panel/consoleStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 
-export default function Console() {
+/**
+ * Server tab: simulator output and a restart button.
+ * NOTE: output is collected only while this tab is mounted; earlier lines are not shown.
+ */
+export default function ConsolePanel() {
   const messages = useConsoleStore(s => s.messages);
   const addMessage = useConsoleStore(s => s.addMessage);
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ type: 'out' | 'error'; message: string }>).detail;
+      const detail = (e as CustomEvent<ServerLogPayload>).detail;
       if (!detail) return;
       addMessage({ type: detail.type, message: detail.message });
     };
-    window.addEventListener('server-log', handler as EventListener);
-    return () => window.removeEventListener('server-log', handler as EventListener);
-  }, [messages]);
+    window.addEventListener(AppEvent.serverLog, handler);
+    return () => window.removeEventListener(AppEvent.serverLog, handler);
+  }, [addMessage]);
 
   const handleRestart = async () => {
     useRunningStore.getState().stopRunning();
