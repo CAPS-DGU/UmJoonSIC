@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import SideBar from '@/components/common/SideBar';
-import UnderStatusBar from '@/components/common/UnderStatusBar';
-import Debug from '@/components/debug';
-import EditorContainer from './components/editor/EditorContainer';
-import ListContainer from './components/assembleList/ListContainer';
-import { useProjectStore } from './stores/ProjectStore';
-import { useEditorTabStore } from './stores/EditorTabStore';
+import SideBar from '@/features/fileTree/SideBar';
+import UnderStatusBar from '@/components/StatusBar';
+import Debug from '@/features/debugger/DebugPanel';
+import EditorContainer from '@/features/editor/EditorContainer';
+import ListContainer from '@/features/listing/ListingView';
+import { useProjectStore } from '@/features/project/projectStore';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
 
-import Pannel from './components/pannel/Pannel';
-import Resizer from './components/common/Resizer';
-import SicSettingContainer from './components/setting/SicSettingContainer';
+import Pannel from '@/features/panel/BottomPanel';
+import Resizer from '@/components/Resizer';
+import SicSettingContainer from '@/features/project/ProjectSettings';
 
-import { InfoModal } from '@/components/common/InfoModal';
+import { InfoModal } from '@/components/InfoModal';
 
 const STATUS_BAR_HEIGHT = 40;
 
