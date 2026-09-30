@@ -1,33 +1,26 @@
-import { app, BrowserWindow, shell } from 'electron';
-import path from 'path';
+import { BrowserWindow, shell, type MenuItemConstructorOptions } from 'electron';
+import { AppEvent } from '../shared/ipc';
+import { openAboutWindow } from './windows/aboutWindow';
+
+const HOW_TO_USE_URL =
+  'https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link';
 
 const isDevtoolsEnabled = process.env.SHOW_DEVTOOLS === 'true';
 
-export const menuList = [
+/** Project commands are carried out by the renderer; the menu only announces them. */
+function sendToAllWindows(event: string) {
+  BrowserWindow.getAllWindows().forEach(window => window.webContents.send(event));
+}
+
+const devToolsItems: MenuItemConstructorOptions[] = isDevtoolsEnabled
+  ? [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }, { type: 'separator' }]
+  : [];
+
+export const menuList: MenuItemConstructorOptions[] = [
   {
     label: 'Application',
     submenu: [
-      {
-        label: 'About UmJoonSIC',
-        click: () => {
-          const aboutWindow = new BrowserWindow({
-            width: 800,
-            height: 600,
-            resizable: false,
-            autoHideMenuBar: true,
-            title: 'About UmJoonSIC',
-            // modal: true,
-            parent: BrowserWindow.getFocusedWindow() ?? undefined,
-          });
-
-          aboutWindow.loadFile(path.join(app.getAppPath(), 'public/about.html'));
-
-          aboutWindow.webContents.on('will-navigate', (e, url) => {
-            e.preventDefault();
-            shell.openExternal(url);
-          });
-        },
-      },
+      { label: 'About UmJoonSIC', click: openAboutWindow },
       { type: 'separator' },
       { role: 'hide' },
       { role: 'hideOthers' },
@@ -40,37 +33,9 @@ export const menuList = [
   {
     label: 'File',
     submenu: [
-      {
-        label: 'New Project',
-        click: () => {
-          const { BrowserWindow } = require('electron');
-          const windows = BrowserWindow.getAllWindows();
-          windows.forEach(window => {
-            window.webContents.send('create-new-project');
-          });
-        },
-      },
-      {
-        label: 'Open Project',
-        click: () => {
-          const { BrowserWindow } = require('electron');
-          const windows = BrowserWindow.getAllWindows();
-          windows.forEach((window: any) => {
-            window.webContents.send('open-project');
-          });
-        },
-      },
-      {
-        label: 'Close Project',
-        click: () => {
-          console.log('Close Project');
-          const { BrowserWindow } = require('electron');
-          const windows = BrowserWindow.getAllWindows();
-          windows.forEach((window: any) => {
-            window.webContents.send('close-project');
-          });
-        },
-      },
+      { label: 'New Project', click: () => sendToAllWindows(AppEvent.createNewProject) },
+      { label: 'Open Project', click: () => sendToAllWindows(AppEvent.openProject) },
+      { label: 'Close Project', click: () => sendToAllWindows(AppEvent.closeProject) },
     ],
   },
   {
@@ -88,14 +53,7 @@ export const menuList = [
   {
     label: 'View',
     submenu: [
-      ...(isDevtoolsEnabled
-        ? [
-            { role: 'reload' },
-            { role: 'forceReload' },
-            { role: 'toggleDevTools' },
-            { type: 'separator' },
-          ]
-        : []),
+      ...devToolsItems,
       { type: 'separator' },
       { role: 'resetZoom' },
       { role: 'zoomIn' },
@@ -110,15 +68,6 @@ export const menuList = [
   },
   {
     label: 'Help',
-    submenu: [
-      {
-        label: 'How to use',
-        click: async () => {
-          await shell.openExternal(
-            'https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link',
-          );
-        },
-      },
-    ],
+    submenu: [{ label: 'How to use', click: () => shell.openExternal(HOW_TO_USE_URL) }],
   },
 ];
