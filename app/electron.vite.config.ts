@@ -33,14 +33,13 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: path.resolve(__dirname, 'index.html'),
-          splash: path.resolve(__dirname, 'src/splash.html'),
-          progress: path.resolve(__dirname, 'src/progress.html'),
         },
       },
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
+        '@shared': path.resolve(__dirname, 'shared'),
       },
     },
     plugins: [react(), tailwindcss()],

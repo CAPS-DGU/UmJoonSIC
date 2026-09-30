@@ -1,237 +1,122 @@
-import {
-  app,
-  shell,
-  BrowserWindow,
-  Menu,
-  type HandlerDetails,
-  type Event as ElectronEvent,
-  type MenuItemConstructorOptions,
-} from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { electronApp, optimizer, is } from '@electron-toolkit/utils';
-import { menuList } from './menu';
-import './ipc/file';
-import './ipc/server';
+// Main process entry: application lifecycle.
+import { app, BrowserWindow, Menu } from 'electron';
 import type { ChildProcess } from 'child_process';
+import { electronApp } from '@electron-toolkit/utils';
+import { checkUpdate } from './appUpdate';
+import { registerIpcHandlers } from './ipc';
+import { menuList } from './menu';
 import {
-  checkJreExists,
-  checkServerExists,
-  checkUpdate,
-  downloadJre,
-  downloadServer,
-  runServer,
-  checkJARUpdate,
-} from './setup';
+  cancelPendingDispatch,
+  findSicPathInArgs,
+  hasPendingProjectPath,
+  queueProjectOpen,
+  sendPendingProjectPath,
+  setInitialProjectPath,
+} from './project/openQueue';
+import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
+import { checkJreExists, downloadJre } from './simulator/jre';
+import { runServer } from './simulator/process';
+import { createMainWindow } from './windows/mainWindow';
+import { createSplashWindow, showSplashContent } from './windows/splashWindow';
 
+/** How long the splash stays up after the simulator has started. */
+const SPLASH_HOLD_MS = 3000;
+
+// The simulator started at launch. NOTE: a simulator restarted from the Server panel is
+// tracked in simulator/process.ts, not here, so quitting does not kill that one.
 let server: ChildProcess | null = null;
-let mainWindow: BrowserWindow | null = null;
-let pendingProjectSicPath: string | null = null;
-let dispatchRetryTimer: NodeJS.Timeout | null = null;
+
 app.setName('UmJoonSIC');
+registerIpcHandlers();
 
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+/** Make sure a JRE and simulator.jar are present and current, then start the simulator. */
+async function startSimulator(): Promise<ChildProcess> {
+  await checkUpdate();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  if (!checkJreExists()) {
+    await downloadJre().catch(error => {
+      console.error('JRE 다운로드 실패:', error);
+    });
+  }
+  if (!checkServerExists()) {
+    await downloadServer().catch(error => {
+      console.error('Server 다운로드 실패:', error);
+    });
+  }
+  await checkJARUpdate();
 
-function findSicPathInArgs(argv: string[]): string | null {
-  for (let i = 1; i < argv.length; i++) {
-    const rawArg = argv[i];
-    if (!rawArg) continue;
-    const cleaned = rawArg.replace(/^['"]|['"]$/g, '');
-    if (!cleaned.toLowerCase().endsWith('.sic')) continue;
-    const resolved = path.resolve(cleaned);
-    if (fs.existsSync(resolved)) {
-      console.log('[UmJoonSIC] Detected project.sic argument:', resolved);
-      return resolved;
-    }
-    console.warn('[UmJoonSIC] project.sic argument found but file missing:', resolved);
-  }
-  return null;
-}
-
-function sendPendingProjectPath() {
-  if (!mainWindow || !pendingProjectSicPath) return;
-  if (mainWindow.webContents.isLoadingMainFrame()) {
-    console.log('[UmJoonSIC] Renderer still loading, deferring project dispatch');
-    if (!dispatchRetryTimer) {
-      dispatchRetryTimer = setTimeout(() => {
-        dispatchRetryTimer = null;
-        sendPendingProjectPath();
-      }, 250);
-    }
-    return;
-  }
-  if (!fs.existsSync(pendingProjectSicPath)) {
-    console.warn('Requested project.sic file no longer exists:', pendingProjectSicPath);
-    pendingProjectSicPath = null;
-    return;
-  }
-  mainWindow.webContents.send('open-project-path', pendingProjectSicPath);
-  console.log('[UmJoonSIC] Dispatched project.sic path to renderer:', pendingProjectSicPath);
-  pendingProjectSicPath = null;
-  if (dispatchRetryTimer) {
-    clearTimeout(dispatchRetryTimer);
-    dispatchRetryTimer = null;
-  }
-}
-
-function queueProjectOpen(inputPath: string | null) {
-  if (!inputPath) return;
-  const resolved = path.resolve(inputPath);
-  if (!fs.existsSync(resolved)) {
-    console.warn('Requested project.sic file not found:', resolved);
-    return;
-  }
-  pendingProjectSicPath = resolved;
-  if (mainWindow) {
-    sendPendingProjectPath();
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.focus();
-  }
+  return runServer();
 }
 
 function createWindow(): void {
-  // Create the browser window.
-  const preloadPath = path.join(__dirname, '../preload/index.mjs');
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 640,
-    show: false,
-    autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? {} : {}), // app-icon
-    webPreferences: {
-      preload: preloadPath,
-      contextIsolation: true,
-      nodeIntegration: true,
-    },
-  });
-
-  const splash = new BrowserWindow({
-    width: 600,
-    height: 400,
-    autoHideMenuBar: true,
-    frame: false,
-    resizable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    fullscreenable: false,
-    maximizable: false,
-  });
+  const mainWindow = createMainWindow();
+  const splash = createSplashWindow();
 
   mainWindow.on('ready-to-show', async () => {
-    splash.loadFile(path.join(__dirname, '../renderer/splash.html'));
-    splash.center();
-
-    await checkUpdate();
-
-    if (!checkJreExists()) {
-      await downloadJre().catch(error => {
-        console.error('JRE 다운로드 실패:', error);
-      });
-      console.log('jre 다운로드');
-    }
-    if (!checkServerExists()) {
-      await downloadServer().catch(error => {
-        console.error('Server 다운로드 실패:', error);
-      });
-      console.log('server 다운로드');
-    }
-
-    await checkJARUpdate();
-
-    server = await runServer();
+    showSplashContent(splash);
+    server = await startSimulator();
 
     setTimeout(() => {
+      // The user may have closed the splash already.
       if (!splash.isDestroyed()) {
         splash.close();
       }
-      mainWindow?.show();
-    }, 3000);
-  });
-
-  mainWindow.webContents.setWindowOpenHandler((details: HandlerDetails) => {
-    shell.openExternal(details.url);
-    return { action: 'deny' };
+      if (!mainWindow.isDestroyed()) {
+        mainWindow.show();
+      }
+    }, SPLASH_HOLD_MS);
   });
 
   mainWindow.webContents.on('did-finish-load', sendPendingProjectPath);
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    if (dispatchRetryTimer) {
-      clearTimeout(dispatchRetryTimer);
-      dispatchRetryTimer = null;
-    }
-  });
-
-  // HMR for renderer based on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
-  }
+  mainWindow.on('closed', cancelPendingDispatch);
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-if (!gotSingleInstanceLock) {
+// Only one instance runs. A second start hands its project.sic (if any) to the first and exits.
+if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   const initialSicPath = findSicPathInArgs(process.argv);
   if (initialSicPath) {
-    pendingProjectSicPath = initialSicPath;
-    console.log('[UmJoonSIC] Queued initial project.sic path:', initialSicPath);
+    setInitialProjectPath(initialSicPath);
   }
 
-  app.on('second-instance', (_event: ElectronEvent, commandLine: string[]) => {
+  app.on('second-instance', (_event, commandLine) => {
     const sicPath = findSicPathInArgs(commandLine);
     if (sicPath) {
       queueProjectOpen(sicPath);
     }
   });
 
-  app.on('open-file', (event: ElectronEvent, filePath: string) => {
+  // macOS delivers opened files through this event, not through argv.
+  app.on('open-file', (event, filePath) => {
     event.preventDefault();
     queueProjectOpen(filePath);
-    console.log('[UmJoonSIC] Received open-file event for:', filePath);
   });
 
   app.whenReady().then(() => {
-    // Set app user model id for windows
+    // Windows: application user model id (taskbar grouping, notifications).
     electronApp.setAppUserModelId('com.electron');
 
-    Menu.setApplicationMenu(Menu.buildFromTemplate(menuList as MenuItemConstructorOptions[]));
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menuList));
 
-    // Default open or close DevTools by F12 in development
-    // and ignore CommandOrControl + R in production.
-    // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-    app.on('browser-window-created', (_event: ElectronEvent, _window: BrowserWindow) => {
-      // optimizer.watchWindowShortcuts(window); // 줌 단축키 문제로 임시 비활성화
-    });
+    // @electron-toolkit's optimizer.watchWindowShortcuts is deliberately not used:
+    // it interfered with the zoom shortcuts.
 
     createWindow();
 
-    if (pendingProjectSicPath) {
-      queueProjectOpen(pendingProjectSicPath);
+    if (hasPendingProjectPath()) {
+      queueProjectOpen();
     }
 
-    app.on('activate', function () {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
+    app.on('activate', () => {
+      // macOS: re-create the window when the dock icon is clicked and none is open.
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
 }
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Quit when all windows are closed, except on macOS, where applications stay
+// active until the user quits explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     if (server) {
