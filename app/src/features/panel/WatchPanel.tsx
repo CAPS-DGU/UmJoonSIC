@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useWatchStore } from '@/features/panel/watchStore';
 import type { WatchRow } from '@/features/panel/watchStore';
 import { ChevronDown, ChevronRight, Folder, FileText } from 'lucide-react';
@@ -28,7 +28,7 @@ interface ExpandedState {
   [key: string]: boolean;
 }
 
-export default function WatchPannel() {
+export default function WatchPanel() {
   const watch = useWatchStore(s => s.watch);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 

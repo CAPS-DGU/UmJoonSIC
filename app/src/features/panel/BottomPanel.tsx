@@ -1,22 +1,22 @@
 import { useState } from 'react';
-import WatchPannel from '@/features/panel/WatchPanel';
-import WarningPanel from '@/features/panel/ErrorPanel';
-import Console from '@/features/panel/ConsolePanel';
+import WatchPanel from '@/features/panel/WatchPanel';
+import ErrorPanel from '@/features/panel/ErrorPanel';
+import ConsolePanel from '@/features/panel/ConsolePanel';
 
 const TABS = [
   { key: 'watch', label: '관찰' },
-  { key: 'warnings', label: '오류' },
-  { key: 'console', label: '서버' },
+  { key: 'errors', label: '오류' },
+  { key: 'server', label: '서버' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
 
-export default function Pannel() {
-  const [activeTab, setActiveTab] = useState<TabKey>('warnings');
+/** The panel under the editor: Watch, Errors and Server tabs. */
+export default function BottomPanel() {
+  const [activeTab, setActiveTab] = useState<TabKey>('errors');
 
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 flex flex-col h-full overflow-hidden">
-      {/* 탭 헤더 */}
       <div className="flex border-b border-gray-300 dark:border-gray-700">
         {TABS.map(tab => (
           <button
@@ -33,12 +33,11 @@ export default function Pannel() {
         ))}
       </div>
 
-      {/* 탭 내용 */}
       <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent p-2">
         <div className={`flex-1 transition-opacity duration-200`}>
-          {activeTab === 'watch' && <WatchPannel />}
-          {activeTab === 'warnings' && <WarningPanel />}
-          {activeTab === 'console' && <Console />}
+          {activeTab === 'watch' && <WatchPanel />}
+          {activeTab === 'errors' && <ErrorPanel />}
+          {activeTab === 'server' && <ConsolePanel />}
         </div>
       </div>
     </div>

@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
-import { File, ChevronRight, AlertTriangle, Settings, List, CircleX } from 'lucide-react';
+import { File, ChevronRight, Settings, List, CircleX } from 'lucide-react';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { CompileError } from '@/features/panel/errorStore';
 
-// 경고 메시지 타입 정의
-interface WarningMessage {
+/** One error as a row of the panel. */
+interface ErrorItem {
   file: string;
   filePath: string;
   message: string;
@@ -25,9 +25,9 @@ const getFileIcon = (fileName: string) => {
   return <File className="text-gray-500 mr-2 w-4 h-4" />;
 };
 
-// 파일별 경고 그룹화
-const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => {
-  const grouped: Record<string, WarningMessage[]> = {};
+/** Panel rows per file, keyed by the file's project-relative path. */
+const groupErrorsByFile = (errors: { [fileName: string]: CompileError[] }) => {
+  const grouped: Record<string, ErrorItem[]> = {};
   Object.entries(errors).forEach(([file, errs]) => {
     grouped[file] = errs.map(err => ({
       file: getFileName(file),
@@ -40,18 +40,14 @@ const groupWarningsByFile = (errors: { [fileName: string]: CompileError[] }) => 
   return grouped;
 };
 
-export default function WarningPanel() {
+export default function ErrorPanel() {
   const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const errors = useErrorStore(state => state.errors);
-  const { tabs, addTab, setActiveTab, setCursor } = useEditorTabStore();
+  const { tabs, openTab, setActiveTab, setCursor } = useEditorTabStore();
 
-  // useMemo로 계산 최적화
-  const groupedWarnings = useMemo(() => groupWarningsByFile(errors), [errors]);
-  const fileNames = Object.keys(groupedWarnings);
-  const totalWarningCount = Object.values(groupedWarnings).reduce(
-    (sum, list) => sum + list.length,
-    0,
-  );
+  const errorsByFile = useMemo(() => groupErrorsByFile(errors), [errors]);
+  const fileNames = Object.keys(errorsByFile);
+  const totalErrorCount = Object.values(errorsByFile).reduce((sum, list) => sum + list.length, 0);
 
   const toggleFile = (fileName: string) => {
     setOpenFiles(prev => {
@@ -62,29 +58,17 @@ export default function WarningPanel() {
     });
   };
 
-  const handleErrorClick = (warning: WarningMessage) => {
-    const tabExists = tabs.find(t => t.filePath === warning.filePath);
-    if (!tabExists) {
-      addTab({
-        idx: tabs.length,
-        title: warning.file,
-        filePath: warning.filePath,
-        fileContent: '',
-        isModified: false,
-        isActive: true,
-        breakpoints: [],
-        cursor: { line: warning.line ?? 1, column: warning.col ?? 1 },
-      });
+  /** Open the file at the error's position. */
+  const handleErrorClick = (item: ErrorItem) => {
+    const cursor = { line: item.line ?? 1, column: item.col ?? 1 };
+    const tabIdx = tabs.findIndex(t => t.filePath === item.filePath);
+    if (tabIdx === -1) {
+      openTab({ title: item.file, filePath: item.filePath, cursor });
+      return;
     }
-
-    const tabIdx = tabs.findIndex(t => t.filePath === warning.filePath);
-    if (tabIdx !== -1) {
-      setActiveTab(tabIdx);
-      // 커서 이동은 탭 활성화 후 실행 (비동기 안전하게)
-      setTimeout(() => {
-        setCursor(tabIdx, { line: warning.line ?? 1, column: warning.col ?? 1 });
-      }, 0);
-    }
+    setActiveTab(tabIdx);
+    // Move the cursor after the tab has been activated.
+    setTimeout(() => setCursor(tabIdx, cursor), 0);
   };
 
   return (
@@ -97,18 +81,18 @@ export default function WarningPanel() {
         </div>
         <div className="ml-auto flex items-center">
           <CircleX className="text-red-500 mr-1 w-4 h-4" />
-          <span className="text-sm font-bold">{totalWarningCount}</span>
+          <span className="text-sm font-bold">{totalErrorCount}</span>
         </div>
       </div>
 
-      {/* Warning List */}
+      {/* errors, grouped by file */}
       <div className="flex-1 overflow-auto p-1">
         {fileNames.length === 0 ? (
           <p className="text-gray-400 text-sm mt-2 ml-2">No Error found.</p>
         ) : (
           fileNames.map(fileName => {
-            const warningsForFile = groupedWarnings[fileName] ?? [];
-            if (warningsForFile.length === 0) return null;
+            const fileErrors = errorsByFile[fileName] ?? [];
+            if (fileErrors.length === 0) return null;
 
             return (
               <div key={fileName} className="mb-1">
@@ -121,32 +105,32 @@ export default function WarningPanel() {
                       openFiles.has(fileName) ? 'transform rotate-90' : ''
                     }`}
                   />
-                  {getFileIcon(warningsForFile[0]?.file ?? 'Unknown')}
+                  {getFileIcon(fileErrors[0]?.file ?? 'Unknown')}
                   <p className="text-sm">
-                    <span className="font-semibold">{warningsForFile[0]?.file ?? 'Unknown'}</span>
+                    <span className="font-semibold">{fileErrors[0]?.file ?? 'Unknown'}</span>
                     <span className="text-gray-400 text-xs ml-1 italic">
-                      ({warningsForFile[0]?.filePath ?? 'Unknown'})
+                      ({fileErrors[0]?.filePath ?? 'Unknown'})
                     </span>
                   </p>
                   <div className="ml-auto flex items-center">
                     <CircleX className="text-red-500 mr-1 w-4 h-4" />
-                    <span className="text-sm">{warningsForFile.length}</span>
+                    <span className="text-sm">{fileErrors.length}</span>
                   </div>
                 </div>
 
                 {openFiles.has(fileName) && (
                   <div className="pl-8 text-sm">
-                    {warningsForFile.map((warning, index) => (
+                    {fileErrors.map((item, index) => (
                       <div
                         key={index}
                         className="p-1 flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                        onClick={() => handleErrorClick(warning)}
+                        onClick={() => handleErrorClick(item)}
                       >
                         <CircleX className="text-red-500 mr-2 flex-shrink-0 w-4 h-4" />
                         <span>
-                          {warning.message}
-                          {warning.line && (
-                            <span className="text-gray-500 ml-2">{`[Ln ${warning.line}] [Col ${warning.col}]`}</span>
+                          {item.message}
+                          {item.line && (
+                            <span className="text-gray-500 ml-2">{`[Ln ${item.line}] [Col ${item.col}]`}</span>
                           )}
                         </span>
                       </div>

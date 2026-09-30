@@ -1,28 +1,31 @@
 import { useState } from 'react';
 import { FilePlus, FolderPlus, RefreshCcw } from 'lucide-react';
-import { useProjectStore } from '@/features/project/projectStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
-
-import { useFileTree } from '@/features/fileTree/useFileTree';
-import { useProjectFiles } from '@/features/project/useProjectFiles';
-import type { FileStructure } from '@/features/fileTree/types';
-import { useFileTreeNavigation } from '@/features/fileTree/useFileTreeNavigation';
-
-import { FileTreeItem } from '@/features/fileTree/FileTreeItem';
 import { ContextMenu } from '@/features/fileTree/ContextMenu';
+import { FileTreeItem } from '@/features/fileTree/FileTreeItem';
 import { NewFileDialog } from '@/features/fileTree/NewFileDialog';
 import { NewFolderDialog } from '@/features/fileTree/NewFolderDialog';
+import type { FileStructure } from '@/features/fileTree/types';
+import { useFileTree } from '@/features/fileTree/useFileTree';
+import { useFileTreeNavigation } from '@/features/fileTree/useFileTreeNavigation';
+import { useProjectStore } from '@/features/project/projectStore';
+import { useProjectFiles } from '@/features/project/useProjectFiles';
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  item: FileStructure;
+}
+
+const ICON_SIZE = 16;
+
+/** Left column: project name, file actions and the file tree. */
 export default function SideBar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
-    show: boolean;
-    x: number;
-    y: number;
-    item: FileStructure | null;
-  }>({ show: false, x: 0, y: 0, item: null });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
   const {
     projectName,
     fileTree,
@@ -31,7 +34,7 @@ export default function SideBar() {
     setSelectedFileOrFolder,
     settings,
   } = useProjectStore();
-  const { tabs, addTab } = useEditorTabStore();
+  const { openTab } = useEditorTabStore();
   const { deleteFile, deleteFolder } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
@@ -40,16 +43,15 @@ export default function SideBar() {
 
   const handleOpenFile = (item: FileStructure) => {
     if (item.type === 'file') {
-      addTab({
-        idx: tabs.length,
-        title: item.name,
-        filePath: item.relativePath,
-        isModified: false,
-        fileContent: '',
-        isActive: true,
-        cursor: { line: 0, column: 0 },
-        breakpoints: [],
-      });
+      openTab({ title: item.name, filePath: item.relativePath });
+    }
+  };
+
+  const handleDelete = (item: FileStructure) => {
+    if (item.type === 'file') {
+      deleteFile(item);
+    } else if (item.type === 'folder') {
+      deleteFolder(item);
     }
   };
 
@@ -70,20 +72,21 @@ export default function SideBar() {
             onClick={() => setNewFileDialogOpen(true)}
             title="새 파일 생성"
           >
-            <FilePlus width={16} height={16} />
+            <FilePlus width={ICON_SIZE} height={ICON_SIZE} />
           </button>
           <button
             className="p-1 rounded hover:bg-gray-200"
             onClick={() => setNewFolderDialogOpen(true)}
             title="새 폴더 생성"
           >
-            <FolderPlus width={16} height={16} />
+            <FolderPlus width={ICON_SIZE} height={ICON_SIZE} />
           </button>
           <button className="p-1 rounded hover:bg-gray-200" onClick={refreshFileTree}>
-            <RefreshCcw width={16} height={16} />
+            <RefreshCcw width={ICON_SIZE} height={ICON_SIZE} />
           </button>
         </div>
       </div>
+
       <div className="flex-1 overflow-y-auto" tabIndex={0} onKeyDown={handleKeyDown}>
         {fileTreeStructure.map(item => (
           <FileTreeItem
@@ -94,47 +97,34 @@ export default function SideBar() {
             selected={selectedFileOrFolder}
             onSelect={setSelectedFileOrFolder}
             onOpenFile={handleOpenFile}
-            onContextMenu={(e, item) =>
-              setContextMenu({ show: true, x: e.clientX, y: e.clientY, item })
-            }
+            onContextMenu={(e, item) => setContextMenu({ x: e.clientX, y: e.clientY, item })}
             projectFiles={settings.asm}
             focusPath={focusPath}
           />
         ))}
       </div>
-      {contextMenu.show && contextMenu.item && (
+
+      {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
           item={contextMenu.item}
-          onDelete={item => {
-            if (item.type === 'file') {
-              deleteFile(item).then(() => {});
-            } else if (item.type === 'folder') {
-              deleteFolder(item).then(() => {});
-            }
-          }}
-          onClose={() => setContextMenu({ show: false, x: 0, y: 0, item: null })}
+          onDelete={handleDelete}
+          onClose={() => setContextMenu(null)}
         />
       )}
 
-      {/* 새 파일 다이얼로그 연결 */}
       <NewFileDialog
         open={newFileDialogOpen}
         onOpenChange={setNewFileDialogOpen}
         currentFolder={selectedFileOrFolder}
-        onFileCreated={() => {
-          refreshFileTree(); // 생성 후 파일 트리 갱신
-        }}
+        onFileCreated={refreshFileTree}
       />
-      {/* 새 폴더 다이얼로그 연결 */}
       <NewFolderDialog
         open={newFolderDialogOpen}
         onOpenChange={setNewFolderDialogOpen}
         currentFolder={selectedFileOrFolder}
-        onFolderCreated={() => {
-          refreshFileTree(); // 생성 후 파일 트리 갱신
-        }}
+        onFolderCreated={refreshFileTree}
       />
     </div>
   );

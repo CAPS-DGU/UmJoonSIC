@@ -1,19 +1,36 @@
-import { useProjectStore } from '@/features/project/projectStore';
-import TabBar from '@/features/editor/TabBar';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import type { ProjectSettings as Settings } from '@shared/ipc';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import TabBar from '@/features/editor/TabBar';
+import { useProjectStore } from '@/features/project/projectStore';
 
-export default function SicSettingContainer() {
+/** Device numbers 0x00-0xFF. */
+const DEVICE_INDEXES = Array.from({ length: 256 }, (_, i) => i);
+
+const toHexByte = (value: number) => `0x${value.toString(16).toUpperCase().padStart(2, '0')}`;
+
+/** Editor for project.sic, shown while its tab is active: entry module, asm files, file devices. */
+export default function ProjectSettings() {
   const { settings, setSettings, saveSettings } = useProjectStore();
   const { activeTabIdx, setIsModified } = useEditorTabStore();
   const [newAsm, setNewAsm] = useState('');
   const [deviceIndex, setDeviceIndex] = useState<number>(0);
+
+  const devices = settings.filedevices || [];
+
+  /** Apply a change to the settings and mark the tab as modified. */
+  const update = (changed: Partial<Settings>) => {
+    setSettings({ ...settings, ...changed });
+    setIsModified(activeTabIdx, true);
+  };
+
+  // Ctrl+S / Cmd+S saves the settings.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         e.stopPropagation();
-        saveSettings().then((res: { success: boolean; message?: string }) => {
+        saveSettings().then(res => {
           if (res.success) {
             setIsModified(activeTabIdx, false);
           }
@@ -23,6 +40,33 @@ export default function SicSettingContainer() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [saveSettings, activeTabIdx, setIsModified]);
+
+  const addAsm = () => {
+    setSettings({ ...settings, asm: [...settings.asm, newAsm] });
+    setNewAsm('');
+    setIsModified(activeTabIdx, true);
+  };
+
+  /** Map the selected device number to a file chosen in the native file picker. */
+  const pickDeviceFile = async () => {
+    const res = await window.api.pickFile();
+    if (res.success && res.data) {
+      const others = devices.filter(d => d.index !== deviceIndex);
+      update({ filedevices: others.concat([{ index: deviceIndex, filename: res.data }]) });
+    }
+  };
+
+  const save = () => {
+    saveSettings().then(res => {
+      if (res.success) {
+        setIsModified(activeTabIdx, false);
+        alert('Settings saved');
+      } else {
+        alert(res.message ?? 'Failed to save settings');
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
@@ -35,10 +79,7 @@ export default function SicSettingContainer() {
               type="text"
               className="border border-gray-300 rounded-md p-1"
               value={settings.main}
-              onChange={e => {
-                setSettings({ ...settings, main: e.target.value });
-                setIsModified(activeTabIdx, true);
-              }}
+              onChange={e => update({ main: e.target.value })}
             />
           </div>
 
@@ -50,10 +91,7 @@ export default function SicSettingContainer() {
                   {asm}{' '}
                   <span
                     className="text-gray-500 text-xs"
-                    onClick={() => {
-                      setSettings({ ...settings, asm: settings.asm.filter(a => a !== asm) });
-                      setIsModified(activeTabIdx, true);
-                    }}
+                    onClick={() => update({ asm: settings.asm.filter(a => a !== asm) })}
                   >
                     x
                   </span>
@@ -67,18 +105,9 @@ export default function SicSettingContainer() {
               type="text"
               className="border border-gray-300 rounded-md p-1"
               value={newAsm}
-              onChange={e => {
-                setNewAsm(e.target.value);
-              }}
+              onChange={e => setNewAsm(e.target.value)}
             />
-            <button
-              className="border border-gray-300 rounded-md p-1"
-              onClick={() => {
-                setSettings({ ...settings, asm: [...settings.asm, newAsm] });
-                setNewAsm('');
-                setIsModified(activeTabIdx, true);
-              }}
-            >
+            <button className="border border-gray-300 rounded-md p-1" onClick={addAsm}>
               Add
             </button>
           </div>
@@ -86,23 +115,21 @@ export default function SicSettingContainer() {
           <div className="flex flex-col gap-2 mt-4">
             <h2 className="font-bold">Device List</h2>
             <ul className="divide-y rounded border bg-white">
-              {(settings.filedevices || []).map(d => (
+              {devices.map(d => (
                 <li key={d.index} className="flex items-center justify-between px-2 py-1">
-                  <span className="font-mono text-xs">{`0x${d.index.toString(16).toUpperCase().padStart(2, '0')}`}</span>
+                  <span className="font-mono text-xs">{toHexByte(d.index)}</span>
                   <span className="flex-1 px-2 truncate font-mono text-sm">{d.filename}</span>
                   <button
                     className="text-xs text-gray-500"
-                    onClick={() => {
-                      const next = (settings.filedevices || []).filter(x => x.index !== d.index);
-                      setSettings({ ...settings, filedevices: next });
-                      setIsModified(activeTabIdx, true);
-                    }}
+                    onClick={() =>
+                      update({ filedevices: devices.filter(x => x.index !== d.index) })
+                    }
                   >
                     x
                   </button>
                 </li>
               ))}
-              {(settings.filedevices || []).length === 0 && (
+              {devices.length === 0 && (
                 <li className="px-2 py-1 text-xs text-gray-400">No device mapped</li>
               )}
             </ul>
@@ -113,54 +140,26 @@ export default function SicSettingContainer() {
                 value={deviceIndex}
                 onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
               >
-                {Array.from({ length: 256 }, (_, i) => i).map(i => (
-                  <option
-                    key={i}
-                    value={i.toString(16)}
-                  >{`0x${i.toString(16).toUpperCase().padStart(2, '0')}`}</option>
+                {DEVICE_INDEXES.map(i => (
+                  <option key={i} value={i.toString(16)}>
+                    {toHexByte(i)}
+                  </option>
                 ))}
               </select>
               <input
                 type="text"
                 className="border border-gray-300 rounded-md p-1 flex-1 bg-gray-100 cursor-not-allowed"
-                value={
-                  (settings.filedevices || []).find(d => d.index === deviceIndex)?.filename ?? ''
-                }
+                value={devices.find(d => d.index === deviceIndex)?.filename ?? ''}
                 placeholder="파일을 선택하세요"
                 disabled
               />
-              <button
-                className="border px-2 py-1 rounded"
-                onClick={async () => {
-                  const res = await window.api.pickFile();
-                  if (res.success && res.data) {
-                    const filename = res.data as string;
-                    const next = (settings.filedevices || [])
-                      .filter(d => d.index !== deviceIndex)
-                      .concat([{ index: deviceIndex, filename }]);
-                    setSettings({ ...settings, filedevices: next });
-                    setIsModified(activeTabIdx, true);
-                  }
-                }}
-              >
+              <button className="border px-2 py-1 rounded" onClick={pickDeviceFile}>
                 …
               </button>
             </div>
           </div>
         </div>
-        <button
-          className="border border-gray-300 rounded-md p-1 mt-2"
-          onClick={() => {
-            saveSettings().then((res: { success: boolean; message?: string }) => {
-              if (res.success) {
-                setIsModified(activeTabIdx, false);
-                alert('Settings saved');
-              } else {
-                alert(res.message ?? 'Failed to save settings');
-              }
-            });
-          }}
-        >
+        <button className="border border-gray-300 rounded-md p-1 mt-2" onClick={save}>
           Save
         </button>
       </div>
