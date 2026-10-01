@@ -12,7 +12,7 @@ import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import '@/features/debugger/memory/searchAnimation.css';
 
-/** Bytes loaded above and below the visible (or requested) address. */
+/** Bytes loaded above and below the on-screen (or requested) address. */
 const BUFFER_SIZE = 512;
 /** How long a changed or searched byte stays highlighted; matches the CSS animation. */
 const FLASH_MS = 600;
@@ -23,7 +23,7 @@ function bufferAround(address: number, totalMemorySize: number): [number, number
   return [Math.max(0, address - BUFFER_SIZE), Math.min(totalMemorySize, address + BUFFER_SIZE)];
 }
 
-/** Address ranges of the watched variables, to underline them in the grid. */
+/** Address ranges of the watched variables, to mark them with a line in the grid. */
 function watchLabels(): MemoryLabel[] {
   // Read without subscribing, as before: the labels follow the viewer's own re-renders.
   const { watch } = useWatchStore.getState();
@@ -37,7 +37,7 @@ function watchLabels(): MemoryLabel[] {
 }
 
 interface MemoryViewerProps {
-  /** A program is running: load memory around the PC and scroll to it once. */
+  /** During a run: load memory around the PC and scroll to it once. */
   isExecuting: boolean;
 }
 
@@ -89,7 +89,7 @@ export default function MemoryViewer({ isExecuting }: MemoryViewerProps) {
     loadMemoryRange(0, BUFFER_SIZE * 2);
   }, [loadMemoryRange]);
 
-  // On scroll (debounced): recompute the visible rows and load memory around them.
+  // On scroll (debounced): recompute the rows on screen and load memory around them.
   const handleScroll = useCallback(() => {
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
@@ -125,7 +125,7 @@ export default function MemoryViewer({ isExecuting }: MemoryViewerProps) {
     }
   }, [handleScroll]);
 
-  // While running, keep memory around the PC loaded.
+  // During a run, keep memory around the PC loaded.
   useEffect(() => {
     if (isExecuting && pc >= 0 && pc < totalMemorySize) {
       loadMemoryRange(...bufferAround(pc, totalMemorySize));

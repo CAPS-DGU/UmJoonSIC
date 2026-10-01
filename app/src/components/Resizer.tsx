@@ -10,7 +10,7 @@ interface ResizerProps {
   onDragEnd?: () => void;
 }
 
-/** Horizontal bar that is dragged up and down to resize the panel below it. */
+/** Horizontal bar that is dragged up and down to change the height of the panel below it. */
 export default function Resizer({
   onResize,
   containerRef,

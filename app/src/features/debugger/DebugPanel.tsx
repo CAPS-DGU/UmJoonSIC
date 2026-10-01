@@ -56,7 +56,7 @@ export default function DebugPanel() {
   };
 
   /**
-   * Auto-play: execute one instruction every `delayMs` until paused or stopped.
+   * Auto-play: execute one instruction every `delayMs` until the user pauses or stops it.
    * `load` is false when resuming a program that is already loaded.
    */
   const runWithDelay = async (delayMs: number, load: boolean = true) => {

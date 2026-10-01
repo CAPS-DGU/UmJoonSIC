@@ -143,7 +143,7 @@ export function ValueColumn({
                 );
               })}
 
-              {/* underline beneath each labelled range */}
+              {/* a line beneath each labelled range */}
               {rowLabels.map((label, idx) => {
                 const originalLabel = labels.find(l => l.name === label.name);
                 if (!originalLabel) return null;
