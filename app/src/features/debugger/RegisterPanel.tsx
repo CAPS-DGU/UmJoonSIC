@@ -55,7 +55,8 @@ export default function RegisterPanel() {
           const isChanged = changedRegisters.has(name);
           // F is a 48-bit float and gets the full width; the others are 24-bit words.
           const isFloat = name === 'F';
-          const hex = isFloat ? toSicFloatHex(F) : toHexWord(value as number);
+          // Hex text is computed only in hex mode; decimal mode shows the raw value.
+          const shown = isHex ? (isFloat ? toSicFloatHex(F) : toHexWord(value as number)) : value;
           return (
             <div
               key={name}
@@ -67,7 +68,7 @@ export default function RegisterPanel() {
                   isChanged ? 'register-flash' : ''
                 }`}
               >
-                <p className="font-mono text-sm whitespace-nowrap">{isHex ? hex : value}</p>
+                <p className="font-mono text-sm whitespace-nowrap">{shown}</p>
               </div>
             </div>
           );
