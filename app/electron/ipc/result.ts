@@ -5,12 +5,14 @@ export function toErrorMessage(error: unknown) {
 }
 
 /**
- * Run an IPC handler body. A returned value becomes `{ success: true, data }`;
- * a thrown error becomes `{ success: false, message }`. Handlers never reject.
+ * Run an IPC handler body. A returned value becomes `{ success: true, data }` (no `data`
+ * key when the body returns nothing); a thrown error becomes `{ success: false, message }`.
+ * Handlers never reject.
  */
 export async function ipcResult<T>(body: () => T | Promise<T>): Promise<IpcResult<T>> {
   try {
-    return { success: true, data: await body() };
+    const data = await body();
+    return data === undefined ? { success: true } : { success: true, data };
   } catch (error) {
     return { success: false, message: toErrorMessage(error) };
   }

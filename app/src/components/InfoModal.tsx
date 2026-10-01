@@ -1,7 +1,7 @@
-import { useModalStore } from '@/stores/modalStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 export function InfoModal() {
-  const { isOpen, title, message, close } = useModalStore();
+  const { isOpen, title, message, close } = useInfoModalStore();
 
   if (!isOpen) return null;
 

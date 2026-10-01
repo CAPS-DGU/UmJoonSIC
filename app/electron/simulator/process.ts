@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 import { type ChildProcess, spawn } from 'child_process';
 import net from 'node:net';
+import { AppEvent } from '../../shared/ipc';
 import { checkJARUpdate } from './jar';
 import { getJavaPath, getServerPath, SIMULATOR_PORT } from './paths';
 
@@ -66,7 +67,7 @@ export async function runServer(): Promise<ChildProcess> {
       const windows = BrowserWindow.getAllWindows();
       for (const win of windows) {
         try {
-          win.webContents.send('server-log', { type, message });
+          win.webContents.send(AppEvent.serverLog, { type, message });
         } catch {
           // the window is being destroyed; nothing to deliver to
         }

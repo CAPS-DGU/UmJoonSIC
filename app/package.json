@@ -17,6 +17,7 @@
     "prepackage": "electron-vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "package": "cross-env SHOW_DEVTOOLS=false electron-forge package",
     "make": "cross-env SHOW_DEVTOOLS=false electron-forge make"
   },

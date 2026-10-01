@@ -16,7 +16,7 @@ import {
 import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
 import { checkJreExists, downloadJre } from './simulator/jre';
 import { runServer } from './simulator/process';
-import { createMainWindow } from './windows/mainWindow';
+import { createMainWindow, getMainWindow } from './windows/mainWindow';
 import { createSplashWindow, showSplashContent } from './windows/splashWindow';
 
 /** How long the splash stays up after the simulator has started. */
@@ -61,9 +61,7 @@ function createWindow(): void {
       if (!splash.isDestroyed()) {
         splash.close();
       }
-      if (!mainWindow.isDestroyed()) {
-        mainWindow.show();
-      }
+      getMainWindow()?.show();
     }, SPLASH_HOLD_MS);
   });
 

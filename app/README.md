@@ -9,12 +9,16 @@ pnpm install          # 의존성 설치
 pnpm dev              # 개발 실행 (HMR, DevTools)
 pnpm typecheck        # 타입 검사 (src, electron, shared)
 pnpm lint             # ESLint
-pnpm format           # Prettier
+pnpm format           # Prettier 로 파일 정리 (format:check 는 검사만)
 pnpm build            # 타입 검사 + 빌드 (dist/)
-pnpm make             # 설치 파일 생성 (electron-forge)
+pnpm package          # 실행 파일 묶음 (out/UmJoonSIC-<플랫폼>-<arch>/)
+pnpm make             # electron-forge 설치 파일
 ```
 
 Node.js 22, pnpm 10 기준입니다.
+
+- `pnpm dev` 의 스플래시·다운로드 진행 창은 `dist/renderer/` 의 html 을 읽습니다. 처음 받은 저장소에서는 `pnpm build` 를 한 번 실행한 뒤 `pnpm dev` 를 쓰세요.
+- Windows 설치 파일은 `pnpm package` 결과를 `../win-installer/inno-setup.iss` (Inno Setup) 로 묶어 만듭니다. `.sic` 파일 연결은 이 설치 파일이 등록합니다. `pnpm make` 의 Squirrel 설치 파일은 연결을 등록하지 않습니다.
 
 ## 실행 구조
 
@@ -68,10 +72,10 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 ## 규칙
 
 - 파일 이름: 컴포넌트 `PascalCase.tsx`, 훅 `useXxx.ts`, 그 외 `camelCase.ts`.
-- import 는 `@/…`(src), `@shared/…`(shared) 별칭을 씁니다.
+- 렌더러(`src/`)의 import 는 `@/…`(src), `@shared/…`(shared) 별칭을 씁니다. `electron/` 에는 별칭이 없으므로 상대 경로(`../shared/ipc`)를 씁니다.
 - 기능 폴더 안에 그 기능의 컴포넌트·스토어·훅을 함께 둡니다.
 - 시뮬레이터 호출은 `src/api/simulator.ts`, 파일 작업은 `window.api`만 사용합니다.
-- 커밋 전에 `pnpm typecheck && pnpm lint && pnpm format` 이 통과해야 합니다.
+- 커밋 전에 `pnpm typecheck && pnpm lint && pnpm format:check` 가 통과해야 합니다.
 
 ## 알아 둘 점
 

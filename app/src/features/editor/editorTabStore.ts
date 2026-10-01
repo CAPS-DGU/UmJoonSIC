@@ -137,7 +137,8 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
   toggleBreakpoint: (idx, lineNumber) =>
     set(state => {
       const tab = state.tabs.find(t => t.idx === idx);
-      if (!tab) return state;
+      // a new (unchanged) array, so subscribers are notified as before
+      if (!tab) return { tabs: [...state.tabs] };
       const breakpoints = tab.breakpoints || [];
       const next = breakpoints.includes(lineNumber)
         ? breakpoints.filter(bp => bp !== lineNumber)
@@ -154,7 +155,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
       return { success: true, savedCount: 0, totalCount: 0, failedCount: 0 };
     }
 
-    const results = await Promise.all(
+    const results = await Promise.allSettled(
       modifiedTabs.map(async tab => {
         const fullPath = path.join(projectPath, tab.filePath);
         try {
@@ -172,7 +173,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => ({
       }),
     );
 
-    const savedCount = results.filter(Boolean).length;
+    const savedCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
     const failedCount = results.length - savedCount;
     return {
       success: failedCount === 0,

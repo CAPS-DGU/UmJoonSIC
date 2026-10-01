@@ -83,8 +83,12 @@ export function useAutoIndentation(
     (e: monaco_editor.IKeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      // NOTE: `monaco` is not checked here. @monaco-editor/react keeps the onMount from the
+      // editor's first render, so this handler can run with monaco === null if a file was
+      // opened before Monaco finished loading. Tab is then swallowed and Backspace throws,
+      // exactly as before the cleanup.
       const editor = editorRef.current;
-      if (!editor || !monaco) return;
+      if (!editor) return;
       const model = editor.getModel();
       if (!model) return;
       const pos = editor.getPosition();
@@ -116,7 +120,7 @@ export function useAutoIndentation(
           const hasSelection =
             sel && (sel.startLineNumber !== sel.endLineNumber || sel.startColumn !== sel.endColumn);
           const readRange = (sl: number, sc: number, el: number, ec: number) =>
-            model.getValueInRange(new monaco.Range(sl, sc, el, ec));
+            model.getValueInRange(new monaco!.Range(sl, sc, el, ec));
 
           let erased = '';
           if (hasSelection && sel) {

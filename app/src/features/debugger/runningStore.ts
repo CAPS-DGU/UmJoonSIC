@@ -10,7 +10,7 @@ import { useErrorStore } from '@/features/panel/errorStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import { toProjectRelativePath } from '@/lib/projectPath';
-import { useModalStore } from '@/stores/modalStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 const DEFAULT_DELAY_MS = 1000;
 
@@ -37,8 +37,11 @@ function beginSimulation() {
   return simulator.begin(mode, settings.filedevices);
 }
 
-/** Open a List tab for every loaded file and register its listing and watch variables. */
-function publishLoadedFiles(files: LoadedFile[]) {
+/**
+ * Open a List tab for every loaded file and register its listing and watch variables.
+ * Async and not awaited, as before: an error here does not abort the run.
+ */
+async function publishLoadedFiles(files: LoadedFile[]) {
   const { addWatch, fetchVarMemoryValue } = useWatchStore.getState();
   const { addListing } = useListingStore.getState();
   const { openTab } = useEditorTabStore.getState();
@@ -71,7 +74,7 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
       );
     }
     if (file.linkerError) {
-      useModalStore
+      useInfoModalStore
         .getState()
         .show('링커 에러', `[에러 발생 단계: ${file.linkerError.phase}]\n${file.linkerError.msg}`);
     }
@@ -120,7 +123,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
         start: data.registers.PC,
         end: data.registers.PC + 256,
       });
-      publishLoadedFiles(data.files);
+      void publishLoadedFiles(data.files);
     } else {
       try {
         publishLoadErrors(data.files, projectPath);
