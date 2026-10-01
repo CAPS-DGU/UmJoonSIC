@@ -14,13 +14,20 @@ import type {
 
 const BASE_URL = 'http://localhost:9090';
 
-async function post<T>(route: string, body: unknown): Promise<T> {
+/**
+ * POST JSON and parse the JSON answer. By default an HTTP error status throws, as the
+ * axios calls did before; `rejectHttpErrors: false` keeps the old fetch behaviour of
+ * reading the body anyway (the simulator answers errors with a JSON `{ ok: false }`).
+ */
+async function post<T>(route: string, body: unknown, rejectHttpErrors = true): Promise<T> {
   const res = await fetch(`${BASE_URL}${route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Simulator request ${route} failed with HTTP ${res.status}`);
+  if (rejectHttpErrors && !res.ok) {
+    throw new Error(`Simulator request ${route} failed with HTTP ${res.status}`);
+  }
   return (await res.json()) as T;
 }
 
@@ -33,7 +40,7 @@ export const simulator = {
   load: (request: LoadRequest) => post<LoadResponse>('/load', request),
 
   /** Execute one instruction. */
-  step: () => post<StepResponse>('/step', {}),
+  step: () => post<StepResponse>('/step', {}, false),
 
   /** Read memory from `start` to `end`. */
   memory: (start: number, end: number) => post<MemoryResponse>('/memory', { start, end }),

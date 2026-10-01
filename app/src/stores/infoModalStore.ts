@@ -9,7 +9,7 @@ interface ModalState {
   close: () => void;
 }
 
-export const useModalStore = create<ModalState>(set => ({
+export const useInfoModalStore = create<ModalState>(set => ({
   isOpen: false,
   title: undefined,
   message: undefined,
