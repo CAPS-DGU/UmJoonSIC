@@ -3,6 +3,7 @@ import type { ProjectSettings as Settings } from '@shared/ipc';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
 import { useProjectStore } from '@/features/project/projectStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 /** Device numbers 0x00-0xFF. */
 const DEVICE_INDEXES = Array.from({ length: 256 }, (_, i) => i);
@@ -41,6 +42,8 @@ export default function ProjectSettings() {
         saveSettings().then(res => {
           if (res.success) {
             setIsModified(false);
+          } else {
+            useInfoModalStore.getState().show('저장 실패', res.message ?? 'project.sic');
           }
         });
       }

@@ -2,7 +2,7 @@
 import path from 'path';
 import fs from 'fs';
 import { BrowserWindow } from 'electron';
-import { rendererFile } from '../paths';
+import { staticPage } from '../paths';
 import { getSimulatorDataDir } from './paths';
 
 /** Download `url` to `relativePath` in the simulator data directory. Throws if it fails. */
@@ -28,7 +28,7 @@ export async function downloadFile(relativePath: string, url: string) {
   });
 
   // 프로그레스 다이얼로그 HTML 로드
-  const progressHtmlPath = rendererFile('progress.html');
+  const progressHtmlPath = staticPage('progress.html');
   progressWindow.loadFile(progressHtmlPath);
 
   // 창 로드 완료 대기 후 표시
@@ -66,8 +66,9 @@ export async function downloadFile(relativePath: string, url: string) {
     // 실제 다운로드 시작
     const response = await fetch(url);
 
-    if (!response.body) {
-      throw new Error('Response body is null');
+    // An error page (404, 403, rate limit) must not be saved as the file.
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status} (${url})`);
     }
 
     const reader = response.body.getReader();

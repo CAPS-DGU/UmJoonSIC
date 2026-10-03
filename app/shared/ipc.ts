@@ -55,6 +55,7 @@ export const IpcChannel = {
   setHasUnsavedChanges: 'setHasUnsavedChanges',
   confirmUnsavedChanges: 'confirmUnsavedChanges',
   closeWindow: 'closeWindow',
+  abortClose: 'abortClose',
 } as const;
 
 /**
@@ -99,4 +100,6 @@ export interface RendererApi {
   confirmUnsavedChanges(fileNames: string[]): Promise<IpcResult<UnsavedChangesChoice>>;
   /** Close the window after its unsaved changes have been dealt with. */
   closeWindow(): Promise<IpcResult>;
+  /** The window stays open after all (the user cancelled, or saving failed). */
+  abortClose(): void;
 }

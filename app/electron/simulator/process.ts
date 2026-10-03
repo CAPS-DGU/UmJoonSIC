@@ -79,18 +79,31 @@ async function beginSimulation() {
 function deferred() {
   let resolve!: () => void;
   let reject!: (error: Error) => void;
+  const state = { settled: false };
   const promise = new Promise<void>((res, rej) => {
-    resolve = res;
-    reject = rej;
+    resolve = () => {
+      state.settled = true;
+      res();
+    };
+    reject = error => {
+      state.settled = true;
+      rej(error);
+    };
   });
   // Nobody may be waiting when it fails; that is not an unhandled rejection.
   promise.catch(() => {});
-  return { promise, resolve, reject };
+  return { promise, resolve, reject, state };
 }
 
+const toError = (error: unknown) => (error instanceof Error ? error : new Error(String(error)));
+
 class SimulatorProcess {
+  /** The process this app started; null when none runs (or one started elsewhere is used). */
   private child: ChildProcess | null = null;
+  /** Settles when the simulator of the current start is ready, or failed to start. */
   private readiness = deferred();
+  /** Start, stop and restart run one at a time, in the order they were asked for. */
+  private queue: Promise<unknown> = Promise.resolve();
 
   /**
    * Resolves once the simulator accepts requests. While it is (re)starting, this waits for
@@ -100,34 +113,18 @@ class SimulatorProcess {
     return this.readiness.promise;
   }
 
-  /** Start the simulator and wait until it is ready. Throws if it cannot be started. */
-  async start(): Promise<void> {
-    try {
-      await this.launch();
-      this.readiness.resolve();
-    } catch (error) {
-      this.kill();
-      const reason = error instanceof Error ? error : new Error(String(error));
-      this.readiness.reject(reason);
-      throw reason;
-    }
+  /** Start the simulator (unless it runs) and wait until it is ready. Throws if it cannot start. */
+  start(): Promise<void> {
+    return this.serially(() => this.startNow());
   }
 
   /** Stop the simulator, bring simulator.jar up to date and start it again. */
-  async restart(): Promise<void> {
-    await this.stop();
-    await checkJARUpdate();
-    await this.start();
-  }
-
-  /** Stop the simulator and wait (up to a few seconds) for it to exit. */
-  async stop(): Promise<void> {
-    const child = this.child;
-    this.readiness = deferred();
-    if (!child) return;
-    const exited = new Promise<void>(resolve => child.once('close', () => resolve()));
-    this.kill();
-    await Promise.race([exited, sleep(STOP_TIMEOUT_MS)]);
+  restart(): Promise<void> {
+    return this.serially(async () => {
+      await this.stopNow();
+      await checkJARUpdate();
+      await this.startNow();
+    });
   }
 
   /** Ask the current process to exit, without waiting. Used when the app quits. */
@@ -136,14 +133,64 @@ class SimulatorProcess {
     this.child = null;
   }
 
+  private serially<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(operation);
+    this.queue = result.catch(() => {});
+    return result;
+  }
+
+  private isRunning() {
+    return this.child !== null && this.child.exitCode === null && this.child.signalCode === null;
+  }
+
+  private async startNow() {
+    // macOS re-creates the window from the dock while the app (and the simulator) live on.
+    if (this.isRunning() && this.readiness.state.settled) return;
+    if (this.readiness.state.settled) this.readiness = deferred();
+    const readiness = this.readiness;
+    try {
+      await this.launch();
+      readiness.resolve();
+    } catch (error) {
+      this.kill();
+      readiness.reject(toError(error));
+      throw toError(error);
+    }
+  }
+
+  /** Stop the simulator and wait (up to a few seconds) for it to exit. */
+  private async stopNow() {
+    const child = this.child;
+    // Requests made from now on wait for the next start.
+    if (this.readiness.state.settled) this.readiness = deferred();
+    if (!child) return;
+    const exited = new Promise<void>(resolve => child.once('close', () => resolve()));
+    this.kill();
+    await Promise.race([exited, sleep(STOP_TIMEOUT_MS)]);
+  }
+
   private async launch() {
     const javaPath = getJavaPath();
     if (!javaPath) {
       throw new Error('Java 경로를 찾을 수 없습니다.');
     }
     await waitForPortRelease(SIMULATOR_PORT, PORT_RELEASE_TIMEOUT_MS);
+    if (await isListening(SIMULATOR_PORT)) {
+      // Most likely the simulator of an earlier session that ended abnormally. A second one
+      // could not open the port; use that one if it answers (it is not ours to stop).
+      console.warn(`Port ${SIMULATOR_PORT} is in use; using the simulator that answers there.`);
+      await beginSimulation().catch(error => {
+        throw new Error(
+          `포트 ${SIMULATOR_PORT} 을(를) 다른 프로그램이 쓰고 있어 시뮬레이터를 시작할 수 없습니다 (${String(error)}).`,
+        );
+      });
+      return;
+    }
 
-    const child = spawn(javaPath, ['-jar', getServerPath(), String(SIMULATOR_PORT)]);
+    // windowsHide: no console window for java.exe on Windows.
+    const child = spawn(javaPath, ['-jar', getServerPath(), String(SIMULATOR_PORT)], {
+      windowsHide: true,
+    });
     this.child = child;
 
     child.stdout.on('data', data => {

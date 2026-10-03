@@ -18,21 +18,27 @@ export default function ListingView() {
   const toggleBreakpoint = useListingStore(state => state.toggleBreakpoint);
   const PC = useRegisterStore(state => state.PC);
 
-  // Follow the PC across files: when it enters another file's code, switch to that file's List tab.
+  const listingCount = listings.length;
+
+  // Follow the PC across files: when it enters another file's code, switch to that file's
+  // List tab. Only when the PC moves (or a program is loaded): the user may look at another
+  // file's listing meanwhile, and set breakpoints there.
   useEffect(() => {
-    const matches = listings.filter(listing =>
-      listing.rows.some(row => rowAddress(row) === PC && hasObjectCode(row)),
-    );
+    const { activePath, tabs, activateTab } = useEditorTabStore.getState();
+    const matches = useListingStore
+      .getState()
+      .listings.filter(listing =>
+        listing.rows.some(row => rowAddress(row) === PC && hasObjectCode(row)),
+      );
     if (matches.length === 0) return;
     // The tab already showing a matching listing stays.
     if (matches.some(listing => listingTabPath(listing.filePath) === activePath)) return;
 
-    const { tabs, activateTab } = useEditorTabStore.getState();
     const target = listingTabPath(matches[0].filePath);
     if (tabs.some(tab => tab.filePath === target)) {
       activateTab(target);
     }
-  }, [PC, listings, activePath]);
+  }, [PC, listingCount]);
 
   const listing = listingOfTab(listings, activePath);
 

@@ -2,6 +2,7 @@ import { useEffect, type MutableRefObject } from 'react';
 import type * as monaco from 'monaco-editor';
 import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 /**
  * Delay between Ctrl+S and saving. It gives an input-method composition in progress
@@ -29,7 +30,13 @@ export function useEditorShortcuts(
         if (isProjectAsmFile(filePath)) {
           checkSyntax([tab.content], [filePath]);
         }
-        void saveTab(filePath);
+        void saveTab(filePath).then(saved => {
+          if (!saved) {
+            useInfoModalStore
+              .getState()
+              .show('저장 실패', `${tab.title} 을(를) 저장하지 못했습니다.`);
+          }
+        });
       }, SAVE_DELAY_MS);
     };
 

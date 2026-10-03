@@ -13,10 +13,23 @@ export interface ListingFile {
 
 interface ListingState {
   listings: ListingFile[];
+  /**
+   * Breakpoints by file, kept when a run ends so that the next run (Restart, or Stop and
+   * Run) has them again. A breakpoint belongs to a row's address and text, so it is dropped
+   * when that row no longer exists after an edit.
+   */
+  savedBreakpoints: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Add a file's listing, with the breakpoints it had in an earlier run. */
   addListing: (filePath: string, rows: ListingRow[]) => void;
   toggleBreakpoint: (filePath: string, rowIndex: number) => void;
+  /** End of a run: the listings go, their breakpoints are kept. */
   clearListings: () => void;
+  /** Another project: forget the breakpoints too. */
+  forgetBreakpoints: () => void;
 }
+
+/** What identifies a row across runs. */
+const rowKey = (row: ListingRow) => [row.addressHex, row.label, row.instr, row.operand].join('|');
 
 export const rowAddress = (row: ListingRow) => parseInt(row.addressHex, 16);
 
@@ -38,17 +51,37 @@ export const listingOfTab = (listings: ListingFile[], tabPath: string | null) =>
 
 export const useListingStore = create<ListingState>(set => ({
   listings: [],
+  savedBreakpoints: new Map(),
+
   addListing: (filePath, rows) =>
-    set(state => ({ listings: [...state.listings, { filePath, rows, breakpoints: [] }] })),
+    set(state => {
+      const saved = state.savedBreakpoints.get(filePath);
+      const breakpoints = saved
+        ? rows.flatMap((row, index) => (!row.isCommentRow && saved.has(rowKey(row)) ? [index] : []))
+        : [];
+      return { listings: [...state.listings, { filePath, rows, breakpoints }] };
+    }),
+
   toggleBreakpoint: (filePath, rowIndex) =>
-    set(state => ({
-      listings: state.listings.map(listing => {
+    set(state => {
+      const listings = state.listings.map(listing => {
         if (listing.filePath !== filePath) return listing;
         const breakpoints = listing.breakpoints.includes(rowIndex)
           ? listing.breakpoints.filter(index => index !== rowIndex)
           : [...listing.breakpoints, rowIndex].sort((a, b) => a - b);
         return { ...listing, breakpoints };
-      }),
-    })),
+      });
+      const listing = listings.find(l => l.filePath === filePath);
+      const savedBreakpoints = new Map(state.savedBreakpoints);
+      if (listing) {
+        savedBreakpoints.set(
+          filePath,
+          new Set(listing.breakpoints.map(i => rowKey(listing.rows[i]))),
+        );
+      }
+      return { listings, savedBreakpoints };
+    }),
+
   clearListings: () => set({ listings: [] }),
+  forgetBreakpoints: () => set({ listings: [], savedBreakpoints: new Map() }),
 }));

@@ -13,25 +13,35 @@ export interface CompileError {
 }
 
 interface ErrorStore {
+  /** Errors by project-relative file path; a file without errors has no entry. */
   errors: { [fileName: string]: CompileError[] };
-  addErrors: (fileName: string, errors: CompileError[]) => void;
+  /**
+   * Replace a file's errors of one kind: a syntax check replaces the syntax errors, a load
+   * the load errors. `fileName` may be absolute; it is stored relative to the project.
+   */
+  setErrors: (
+    fileName: string,
+    type: CompileErrorType,
+    errors: Omit<CompileError, 'type'>[],
+  ) => void;
   /** Clear the errors of one file, or of every file; only those of `type` if given. */
   clearErrors: (fileName?: string, type?: CompileErrorType) => void;
 }
 
 export const useErrorStore = create<ErrorStore>(set => ({
   errors: {},
-  addErrors: (fileName, errors) => {
-    const projectPath = useProjectStore.getState().projectPath;
-    const relativeFileName = toProjectRelativePath(projectPath, fileName);
-    fileName = relativeFileName; // 프로젝트 루트 기준 상대경로로 저장
-    // The file's errors are replaced; a file without errors has no entry.
+
+  setErrors: (fileName, type, errors) => {
+    const file = toProjectRelativePath(useProjectStore.getState().projectPath, fileName);
     set(state => {
-      const next = { ...state.errors, [fileName]: errors };
-      if (errors.length === 0) delete next[fileName];
+      const kept = (state.errors[file] ?? []).filter(err => err.type !== type);
+      const all = [...kept, ...errors.map(err => ({ ...err, type }))];
+      const next = { ...state.errors, [file]: all };
+      if (all.length === 0) delete next[file];
       return { errors: next };
     });
   },
+
   clearErrors: (fileName, type) =>
     set(state => {
       const files = fileName ? [fileName] : Object.keys(state.errors);

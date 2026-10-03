@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron';
-import { rendererFile } from '../paths';
+import { staticPage } from '../paths';
 
 export function createSplashWindow(): BrowserWindow {
   return new BrowserWindow({
@@ -16,6 +16,6 @@ export function createSplashWindow(): BrowserWindow {
 }
 
 export function showSplashContent(splash: BrowserWindow) {
-  splash.loadFile(rendererFile('splash.html'));
+  splash.loadFile(staticPage('splash.html'));
   splash.center();
 }
