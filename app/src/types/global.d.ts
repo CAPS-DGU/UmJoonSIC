@@ -13,6 +13,14 @@ interface Window {
       data?: { name: string; path: string; settings: { asm: string[]; main: string; filedevices: FileDevice[] } };
       message?: string;
     }>;
+    openProjectByPath: (
+      sicPath: string,
+    ) => Promise<{
+      success: boolean;
+      data?: { name: string; path: string; settings: { asm: string[]; main: string; filedevices: FileDevice[] } };
+      message?: string;
+    }>;
+    consumeQueuedProjectPath: () => string | null;
     createNewFile: (
       folderPath: string,
       fileName: string,

@@ -13,6 +13,8 @@ interface FileDevice {
   filename: string;
 }
 
+let queuedProjectPath: string | null = null;
+
 // Custom APIs for renderer
 const api = {
   getFileList: (path: string): IpcApiResponse<string[]> => {
@@ -42,6 +44,13 @@ const api = {
   }> => {
     return ipcRenderer.invoke('openProject');
   },
+  openProjectByPath: (sicPath: string): IpcApiResponse<{
+    name: string;
+    path: string;
+    settings: { asm: string[]; main: string; filedevices: FileDevice[] };
+  }> => {
+    return ipcRenderer.invoke('openProjectByPath', sicPath);
+  },
   loadAsm: (
     port: number,
     filePath: string,
@@ -69,6 +78,16 @@ const api = {
   restartServer: (): IpcApiResponse<void> => {
     return ipcRenderer.invoke('restartServer');
   },
+  consumeQueuedProjectPath: (): string | null => {
+    const current = queuedProjectPath;
+    queuedProjectPath = null;
+    if (current) {
+      console.log('[UmJoonSIC] consumeQueuedProjectPath returning', current);
+    } else {
+      console.log('[UmJoonSIC] consumeQueuedProjectPath called with no queued path');
+    }
+    return current;
+  },
 };
 
 // 서버 로그 브릿지: IPC -> DOM 이벤트
@@ -85,6 +104,13 @@ ipcRenderer.on('create-new-project', () => {
 // 프로젝트 열기 이벤트 리스너
 ipcRenderer.on('open-project', () => {
   window.dispatchEvent(new CustomEvent('open-project'));
+});
+
+// 경로 기반 프로젝트 열기 이벤트 리스너
+ipcRenderer.on('open-project-path', (_event, sicPath: string) => {
+  queuedProjectPath = sicPath;
+  console.log('[UmJoonSIC] Queued project path in preload:', sicPath);
+  window.dispatchEvent(new CustomEvent('open-project-path', { detail: sicPath }));
 });
 
 // 프로젝트 닫기 이벤트 리스너

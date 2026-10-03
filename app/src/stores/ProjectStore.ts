@@ -23,6 +23,7 @@ interface ProjectState {
   setProject: (project: ProjectState) => void;
   createNewProject: () => void;
   openProject: () => void;
+  openProjectByPath: (sicPath: string) => void;
   closeProject: () => void;
   getAsmAbsolutePaths: () => string[];
   addAsmFile: (file: FileStructure) => void;
@@ -168,6 +169,35 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       })
       .catch((error: unknown) => {
         console.error('Error opening project:', error);
+      });
+  },
+
+  openProjectByPath: (sicPath: string) => {
+    if (!sicPath) {
+      console.error('Invalid project path received');
+      return;
+    }
+
+    console.log('[UmJoonSIC] Attempting to open project by path:', sicPath);
+    window.api
+      .openProjectByPath(sicPath)
+      .then(res => {
+        if (res.success && res.data) {
+          console.log('[UmJoonSIC] Project opened successfully:', res.data.path);
+          set({
+            projectName: res.data.name,
+            projectPath: res.data.path,
+            settings: { ...res.data.settings },
+            fileTree: [],
+          });
+          get().refreshFileTree();
+          setTimeout(() => get().refreshFileTree(), 250);
+        } else {
+          console.error('Failed to open project by path:', res.message);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Error opening project by path:', error);
       });
   },
 
