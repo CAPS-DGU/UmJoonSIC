@@ -20,4 +20,14 @@ export default tseslint.config([
       globals: globals.browser,
     },
   },
+  {
+    // Main process and build configuration run in Node.
+    files: ['electron/**/*.ts', '*.config.{ts,js}'],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // shadcn/ui primitives export their variant helpers next to the component.
+    files: ['src/components/ui/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ]);

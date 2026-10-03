@@ -26,10 +26,11 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@shared/*": ["shared/*"]
     },
 
     "esModuleInterop": true
   },
-  "include": ["src"]
+  "include": ["src", "shared"]
 }
