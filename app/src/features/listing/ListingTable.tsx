@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ListingRow } from '@/api/types';
 import { useRegisterStore } from '@/features/debugger/registerStore';
-import { useRunningStore } from '@/features/debugger/runningStore';
 import { hasObjectCode, rowAddress } from '@/features/listing/listingStore';
 
 const COLUMNS: { title: string; className: string }[] = [
@@ -47,14 +46,6 @@ export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: 
       });
     }
   }, [PC, rows]);
-
-  // Pause auto-play when the PC reaches a row with a breakpoint.
-  useEffect(() => {
-    const pcIndex = rows.findIndex(row => rowAddress(row) === PC);
-    if (pcIndex !== -1 && breakpoints.includes(pcIndex)) {
-      useRunningStore.getState().setIsPaused(true);
-    }
-  }, [PC, rows, breakpoints]);
 
   return (
     <div ref={containerRef} className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">

@@ -23,6 +23,12 @@ export const rowAddress = (row: ListingRow) => parseInt(row.addressHex, 16);
 /** Rows that generate no object code (directives such as START or BASE) are never executed. */
 export const hasObjectCode = (row: ListingRow) => row.rawCodeHex.replaceAll(' ', '') !== '';
 
+/** True if a row at `address` has a breakpoint, in any file's listing. */
+export const breakpointAt = (listings: ListingFile[], address: number) =>
+  listings.some(listing =>
+    listing.breakpoints.some(index => rowAddress(listing.rows[index]) === address),
+  );
+
 /** The path of the tab that shows a file's listing. */
 export const listingTabPath = (filePath: string) => path.join(filePath + '.lst');
 

@@ -10,7 +10,7 @@ interface DelayModalProps {
 
 /** Dialog for the delay between instructions of the "run with delay" button. */
 export function DelayModal({ delayTime, onCancel, onSave, onSaveAndRun }: DelayModalProps) {
-  const [input, setInput] = useState(String(delayTime || 1000));
+  const [input, setInput] = useState(String(delayTime));
 
   /** Call `action` with the entered delay, unless it is not a non-negative number. */
   const submit = (action: (delayTime: number) => void) => {
