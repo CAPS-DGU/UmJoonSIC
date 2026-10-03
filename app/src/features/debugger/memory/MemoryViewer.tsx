@@ -9,6 +9,7 @@ import {
 } from '@/features/debugger/memory/MemoryGrid';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
+import { useRunningStore } from '@/features/debugger/runningStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import '@/features/debugger/memory/searchAnimation.css';
 
@@ -36,12 +37,9 @@ function watchLabels(): MemoryLabel[] {
   return labels;
 }
 
-interface MemoryViewerProps {
+export default function MemoryViewer() {
   /** During a run: load memory around the PC and scroll to it once. */
-  isExecuting: boolean;
-}
-
-export default function MemoryViewer({ isExecuting }: MemoryViewerProps) {
+  const isExecuting = useRunningStore(state => state.isRunning);
   const memoryValues = useMemoryViewStore(state => state.memoryValues);
   const changedNodes = useMemoryViewStore(state => state.changedNodes);
   const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
