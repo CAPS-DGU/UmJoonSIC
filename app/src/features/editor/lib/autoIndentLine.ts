@@ -1,384 +1,371 @@
-// -------------------------------------------------------------
-// Column layout (Leland SIC/XE style)
-// -------------------------------------------------------------
-const COL_OPCODE_START = 10; // Command starts in col 10 (1-based)
-const COL_OPERAND_START = 18; // Operand starts in col 18 (1-based)
-const COL_COMMENT_START = 36; // Comment starts in col 36 (1-based)
+// Column alignment of one line of SIC/XE assembly (label / opcode / operand / comment), as
+// the user types. Called after the editor has applied a key; returns the realigned line and
+// where the cursor goes. useAutoIndentation decides when to call it.
+//
+// Layout (1-based columns): label from 1, opcode from 10, operand from 18, comment from 36.
+// A field that does not fit pushes the next one right by at least one space.
 
-// Derived field lengths
-const LEN_LABEL_FIELD = COL_OPCODE_START - 1; // 9
-const LEN_INSTR_FIELD = COL_OPERAND_START - COL_OPCODE_START; // 8
-const LEN_OPERAND_FIELD = COL_COMMENT_START - COL_OPERAND_START; // 18
+const OPCODE_COLUMN = 10;
+const OPERAND_COLUMN = 18;
+const COMMENT_COLUMN = 36;
 
-// -------------------------------------------------------------
-// Helpers
-// -------------------------------------------------------------
-function isSpace(ch: string): boolean {
-  return ch === ' ' || ch === '\t';
-}
-function replaceTabsWithSpaces(s: string): string {
-  return s.replace(/\t/g, ' ');
-}
-function spanSpaces(s: string, i: number): number {
+const LABEL_WIDTH = OPCODE_COLUMN - 1; // 9
+const OPCODE_WIDTH = OPERAND_COLUMN - OPCODE_COLUMN; // 8
+const OPERAND_WIDTH = COMMENT_COLUMN - OPERAND_COLUMN; // 18
+
+// ---------------------------------------------------------------------------------------
+// Scanning
+// ---------------------------------------------------------------------------------------
+
+const isSpace = (ch: string) => ch === ' ' || ch === '\t';
+
+/** Number of spaces (or tabs) starting at `i`. */
+function spacesAt(s: string, i: number): number {
   let j = i;
   while (j < s.length && isSpace(s[j])) j++;
   return j - i;
 }
-function spanToken(s: string, i: number): [string, number] {
+
+/** End of the run of non-spaces starting at `i`. */
+function tokenEnd(s: string, i: number): number {
   let j = i;
   while (j < s.length && !isSpace(s[j])) j++;
-  return [s.slice(i, j), j];
+  return j;
 }
-// operand can include spaces while quotes are open (outermost only)
-// CHANGE: additionally allow exactly one "comma + single space" sequence to be part of operand.
-function spanOperand(s: string, i: number): [string, number] {
+
+/**
+ * End of the operand starting at `i`. An operand may contain spaces inside quotes
+ * (C'A B'), and one space right after a comma (BUFFER, X).
+ */
+function operandEnd(s: string, i: number): number {
   let j = i;
-  let q: "'" | '"' | null = null;
-  let allowPostCommaSpace = false; // allow one space right after a comma
-  while (j < s.length) {
+  let quote: string | null = null;
+  // Set by a comma; cleared by any character other than a quote or another comma.
+  let spaceAllowed = false;
+  for (; j < s.length; j++) {
     const ch = s[j];
-    if (q) {
-      if (ch === q) q = null;
-      j++;
-      continue;
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === ',') {
+      spaceAllowed = true;
+    } else if (isSpace(ch)) {
+      if (!spaceAllowed) break;
+      spaceAllowed = false;
+    } else {
+      spaceAllowed = false;
     }
-    if (ch === "'" || ch === '"') {
-      q = ch as "'" | '"';
-      j++;
-      continue;
-    }
-    if (ch === ',') {
-      allowPostCommaSpace = true;
-      j++;
-      continue;
-    }
-    if (isSpace(ch)) {
-      if (allowPostCommaSpace) {
-        // consume exactly one space after a comma as part of operand
-        j++;
-        allowPostCommaSpace = false;
-        continue;
-      }
-      break; // only splits on space when not inside quotes and not the single post-comma space
-    }
-    allowPostCommaSpace = false; // reset when a non-space, non-comma char appears
-    j++;
   }
-  return [s.slice(i, j), j];
+  return j;
 }
-function firstNonSpaceIndex(s: string): number {
-  let i = 0;
-  while (i < s.length && isSpace(s[i])) i++;
+
+function firstNonSpace(s: string): number {
+  const i = spacesAt(s, 0);
   return i === s.length ? -1 : i;
 }
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
-function quotesClosed(text: string): boolean {
-  const singles = (text.match(/'/g) || []).length;
-  const doubles = (text.match(/"/g) || []).length;
-  return singles % 2 === 0 && doubles % 2 === 0;
-}
 
-type SectionName = 'label' | 'command' | 'operand' | 'comment' | 'space' | 'none';
-type MaybeStr = string | null;
-interface Range {
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+const quotesClosed = (text: string) =>
+  (text.match(/'/g) || []).length % 2 === 0 && (text.match(/"/g) || []).length % 2 === 0;
+
+// ---------------------------------------------------------------------------------------
+// Parsing a line into fields
+// ---------------------------------------------------------------------------------------
+
+/** [start, end) */
+interface Span {
   start: number;
   end: number;
-} // [start,end)
-
-interface Parsed {
-  line: string;
-  codePart: string;
-  commentPart: MaybeStr;
-  commentStartIndex: number; // -1 if none
-  label: MaybeStr; // null: absent
-  command: MaybeStr; // null: absent, "": present-but-empty
-  operand: MaybeStr; // null: absent, "": present-but-empty
-  leadingSpaces: Range;
-  sp1: Range | null; // spaces label→command
-  sp2: Range | null; // spaces command→operand
-  sp3: Range | null; // spaces operand→(comment|EOL)
-  labelR: Range | null;
-  commandR: Range | null;
-  operandR: Range | null;
-  isCommentLine: boolean; // leading '.' after spaces
-  orderValid: boolean;
 }
 
-function parseLineStructure(s: string): Parsed {
-  // Inline comment is determined by structure, not by '.'
-  // We DO NOT pre-slice by column; we preserve the entire original line.
-  const fns = firstNonSpaceIndex(s);
-  const isCommentLine = fns >= 0 && s[fns] === '.';
+/** Where each part of a line is. A field is null when absent, '' when only its spaces are there. */
+interface Fields {
+  label: string | null;
+  opcode: string | null;
+  operand: string | null;
+  /** Everything after the operand and its spaces; null when there is nothing. */
+  comment: string | null;
+  labelSpan: Span | null;
+  opcodeSpan: Span | null;
+  operandSpan: Span | null;
+  commentStart: number; // -1 when there is no comment
+  /** The spaces before the label/opcode, and after the label, opcode and operand. */
+  leadingSpaces: Span;
+  afterLabel: Span | null;
+  afterOpcode: Span | null;
+  afterOperand: Span | null;
+  /** The line up to the comment. */
+  codeEnd: number;
+  /** A comment line: the first non-space character is '.'. */
+  isCommentLine: boolean;
+}
 
-  let i = 0;
-  const lead = spanSpaces(s, i);
-  const leadingSpaces: Range = { start: 0, end: lead };
-  i += lead;
-
-  let label: MaybeStr = null;
-  let command: MaybeStr = null;
-  let operand: MaybeStr = null;
-
-  let labelR: Range | null = null;
-  let commandR: Range | null = null;
-  let operandR: Range | null = null;
-
-  let sp1: Range | null = null;
-  let sp2: Range | null = null;
-  let sp3: Range | null = null;
-
-  // Start with no comment split
-  let commentStartIndex = -1;
-  let codePartEnd = s.length;
-
-  if (!isCommentLine) {
-    if (lead === 0) {
-      if (i < s.length) {
-        // LABEL
-        const [tokL, nextL] = spanToken(s, i);
-        label = tokL;
-        labelR = { start: i, end: nextL };
-        i = nextL;
-
-        const s1 = spanSpaces(s, i);
-        sp1 = { start: i, end: i + s1 };
-        i += s1;
-
-        // COMMAND
-        if (i < s.length) {
-          const [tokC, nextC] = spanToken(s, i);
-          command = tokC;
-          commandR = { start: i, end: nextC };
-          i = nextC;
-
-          const s2 = spanSpaces(s, i);
-          sp2 = { start: i, end: i + s2 };
-          i += s2;
-
-          // OPERAND
-          if (i < s.length) {
-            const [tokO, nextO] = spanOperand(s, i);
-            operand = tokO;
-            operandR = { start: i, end: nextO };
-            i = nextO;
-
-            const s3 = spanSpaces(s, i);
-            sp3 = { start: i, end: i + s3 };
-            i += s3;
-
-            // If there is any non-space left after operand + spaces, that tail is comment
-            if (i < s.length) {
-              commentStartIndex = i;
-              codePartEnd = i;
-            } else {
-              codePartEnd = s.length;
-            }
-          } else if (sp2 && sp2.end > sp2.start) {
-            // spaces after command but no operand token → operand present-but-empty
-            operand = '';
-            const s3 = spanSpaces(s, i);
-            sp3 = { start: i, end: i + s3 };
-            i += s3;
-            if (i < s.length) {
-              commentStartIndex = i;
-              codePartEnd = i;
-            } else {
-              codePartEnd = s.length;
-            }
-          }
-        } else if (sp1 && sp1.end > sp1.start) {
-          // spaces after label but no command token → command present-but-empty
-          command = '';
-          const s3 = spanSpaces(s, i);
-          sp3 = { start: i, end: i + s3 };
-          i += s3;
-          if (i < s.length) {
-            commentStartIndex = i;
-            codePartEnd = i;
-          } else {
-            codePartEnd = s.length;
-          }
-        }
-      }
-    } else {
-      // no label → COMMAND first
-      if (i < s.length) {
-        const [tokC, nextC] = spanToken(s, i);
-        command = tokC;
-        commandR = { start: i, end: nextC };
-        i = nextC;
-
-        const s2 = spanSpaces(s, i);
-        sp2 = { start: i, end: i + s2 };
-        i += s2;
-
-        if (i < s.length) {
-          const [tokO, nextO] = spanOperand(s, i);
-          operand = tokO;
-          operandR = { start: i, end: nextO };
-          i = nextO;
-
-          const s3 = spanSpaces(s, i);
-          sp3 = { start: i, end: i + s3 };
-          i += s3;
-
-          if (i < s.length) {
-            commentStartIndex = i;
-            codePartEnd = i;
-          } else {
-            codePartEnd = s.length;
-          }
-        } else if (sp2 && sp2.end > sp2.start) {
-          operand = '';
-          const s3 = spanSpaces(s, i);
-          sp3 = { start: i, end: i + s3 };
-          i += s3;
-          if (i < s.length) {
-            commentStartIndex = i;
-            codePartEnd = i;
-          } else {
-            codePartEnd = s.length;
-          }
-        }
-      }
-    }
-  }
-
-  const codePart = s.slice(0, codePartEnd);
-  const commentPart: MaybeStr = commentStartIndex >= 0 ? s.slice(commentStartIndex) : null;
-
-  // validity: allow comment lines or any line that could be [label]? spaces command? spaces operand?
-  let orderValid = true;
-  if (!isCommentLine) {
-    if (leadingSpaces.end > 0 && label !== null) orderValid = false;
-  }
-
-  return {
-    line: s,
-    codePart,
-    commentPart,
-    commentStartIndex,
-    label,
-    command,
-    operand,
-    leadingSpaces,
-    sp1,
-    sp2,
-    sp3,
-    labelR,
-    commandR,
-    operandR,
-    isCommentLine,
-    orderValid,
+/**
+ * Split a line into fields. A line that starts with a space has no label. Whatever follows
+ * the operand (after its spaces) is the comment: the comment is found by position, not by '.'.
+ */
+function parseFields(s: string): Fields {
+  const lead = spacesAt(s, 0);
+  const fns = firstNonSpace(s);
+  const f: Fields = {
+    label: null,
+    opcode: null,
+    operand: null,
+    comment: null,
+    labelSpan: null,
+    opcodeSpan: null,
+    operandSpan: null,
+    commentStart: -1,
+    leadingSpaces: { start: 0, end: lead },
+    afterLabel: null,
+    afterOpcode: null,
+    afterOperand: null,
+    codeEnd: s.length,
+    isCommentLine: fns >= 0 && s[fns] === '.',
   };
+  if (f.isCommentLine) return f;
+
+  let i = lead;
+  const spacesFrom = (start: number): Span => {
+    const end = start + spacesAt(s, start);
+    i = end;
+    return { start, end };
+  };
+  /** The line ends after spaces that open an (empty) field. */
+  const emptyFieldAtEnd = () => {
+    f.afterOperand = { start: s.length, end: s.length };
+  };
+
+  if (i >= s.length) return f;
+  if (lead === 0) {
+    const end = tokenEnd(s, i);
+    f.labelSpan = { start: i, end };
+    f.label = s.slice(i, end);
+    f.afterLabel = spacesFrom(end);
+    if (i >= s.length) {
+      if (f.afterLabel.end > f.afterLabel.start) {
+        f.opcode = '';
+        emptyFieldAtEnd();
+      }
+      return f;
+    }
+  }
+
+  const opcodeEnd = tokenEnd(s, i);
+  f.opcodeSpan = { start: i, end: opcodeEnd };
+  f.opcode = s.slice(i, opcodeEnd);
+  f.afterOpcode = spacesFrom(opcodeEnd);
+  if (i >= s.length) {
+    if (f.afterOpcode.end > f.afterOpcode.start) {
+      f.operand = '';
+      emptyFieldAtEnd();
+    }
+    return f;
+  }
+
+  const end = operandEnd(s, i);
+  f.operandSpan = { start: i, end };
+  f.operand = s.slice(i, end);
+  f.afterOperand = spacesFrom(end);
+  if (i < s.length) {
+    f.commentStart = i;
+    f.codeEnd = i;
+    f.comment = s.slice(i);
+  }
+  return f;
 }
 
-function classifyCursor(
-  p: Parsed,
-  cp: number,
-): { section: SectionName; whichSpace: 0 | 1 | 2 | 3 | 9 | null; rel: number } {
-  const { codePart, leadingSpaces, sp1, sp2, sp3, labelR, commandR, operandR, commentStartIndex } =
-    p;
+// ---------------------------------------------------------------------------------------
+// Where the cursor is
+// ---------------------------------------------------------------------------------------
 
-  if (commentStartIndex >= 0 && cp >= commentStartIndex) {
-    return { section: 'comment', whichSpace: null, rel: cp - commentStartIndex };
-  }
+type CursorPlace =
+  | { in: 'label' | 'opcode' | 'operand' | 'comment'; offset: number }
+  /** In the spaces before the line's first field, or after the label, opcode or operand. */
+  | { in: 'spaces'; after: 'start' | 'label' | 'opcode' | 'operand' }
+  /** At the end of the code, after its last field. */
+  | { in: 'end' }
+  | { in: 'nowhere' };
 
-  if (cp <= codePart.length) {
-    // half-open checks [start,end)
-    if (labelR && cp >= labelR.start && cp < labelR.end) {
-      return { section: 'label', whichSpace: null, rel: cp - labelR.start };
-    }
-    if (commandR && cp >= commandR.start && cp < commandR.end) {
-      return { section: 'command', whichSpace: null, rel: cp - commandR.start };
-    }
-    if (operandR && cp >= operandR.start && cp < operandR.end) {
-      return { section: 'operand', whichSpace: null, rel: cp - operandR.start };
-    }
-    if (cp >= leadingSpaces.start && cp < leadingSpaces.end) {
-      return { section: 'space', whichSpace: 0, rel: cp - leadingSpaces.start };
-    }
-    if (sp1 && cp >= sp1.start && cp < sp1.end) {
-      return { section: 'space', whichSpace: 1, rel: cp - sp1.start };
-    }
-    if (sp2 && cp >= sp2.start && cp < sp2.end) {
-      return { section: 'space', whichSpace: 2, rel: cp - sp2.start };
-    }
-    if (sp3 && cp >= sp3.start && cp < sp3.end) {
-      return { section: 'space', whichSpace: 3, rel: cp - sp3.start };
-    }
-    if (cp === codePart.length) {
-      if (p.command === '' && p.sp1) return { section: 'command', whichSpace: null, rel: 0 };
-      if (p.operand === '' && p.sp2) return { section: 'operand', whichSpace: null, rel: 0 };
-      return { section: 'space', whichSpace: 9, rel: 0 };
-    }
+const within = (span: Span | null, i: number) => !!span && i >= span.start && i < span.end;
+
+function cursorPlace(f: Fields, cp: number): CursorPlace {
+  if (f.commentStart >= 0 && cp >= f.commentStart) {
+    return { in: 'comment', offset: cp - f.commentStart };
   }
-  return { section: 'none', whichSpace: null, rel: 0 };
+  if (cp > f.codeEnd) return { in: 'nowhere' };
+  if (within(f.labelSpan, cp)) return { in: 'label', offset: cp - f.labelSpan!.start };
+  if (within(f.opcodeSpan, cp)) return { in: 'opcode', offset: cp - f.opcodeSpan!.start };
+  if (within(f.operandSpan, cp)) return { in: 'operand', offset: cp - f.operandSpan!.start };
+  if (within(f.leadingSpaces, cp)) return { in: 'spaces', after: 'start' };
+  if (within(f.afterLabel, cp)) return { in: 'spaces', after: 'label' };
+  if (within(f.afterOpcode, cp)) return { in: 'spaces', after: 'opcode' };
+  if (within(f.afterOperand, cp)) return { in: 'spaces', after: 'operand' };
+  if (cp === f.codeEnd) {
+    // Spaces typed after a field open the next one, which is still empty.
+    if (f.opcode === '' && f.afterLabel) return { in: 'opcode', offset: 0 };
+    if (f.operand === '' && f.afterOpcode) return { in: 'operand', offset: 0 };
+    return { in: 'end' };
+  }
+  return { in: 'nowhere' };
 }
 
-function buildAlignedLine(
-  label: MaybeStr,
-  command: MaybeStr,
-  operand: MaybeStr,
-  commentPart: MaybeStr,
-  engageCommentColumn: boolean,
-): { out: string; starts: Record<'label' | 'command' | 'operand' | 'comment', number> } {
-  const L = label ?? '';
-  const C = command ?? null; // null = absent, '' = present-but-empty
-  const O = operand ?? null; // null = absent, '' = present-but-empty
+// ---------------------------------------------------------------------------------------
+// Aligning
+// ---------------------------------------------------------------------------------------
 
-  const starts = { label: 0, command: 0, operand: 0, comment: 0 };
+interface Aligned {
+  line: string;
+  /** Where each field starts in `line`. */
+  starts: { label: number; opcode: number; operand: number; comment: number };
+}
 
-  // label → command start
-  let line = '';
-  if (L.length > 0) {
-    const gap1 = Math.max(1, LEN_LABEL_FIELD - L.length);
-    line = L + ' '.repeat(gap1);
-    starts.label = 0;
-    starts.command = line.length;
-  } else {
-    const needed = Math.max(0, COL_OPCODE_START - 1);
-    line = ' '.repeat(needed);
-    starts.command = line.length;
-    starts.label = 0;
-  }
+/**
+ * Lay the fields out in their columns. The operand is padded to the comment column only
+ * with `toCommentColumn`; otherwise the comment (if any) follows the operand directly.
+ */
+function align(f: Fields, toCommentColumn: boolean): Aligned {
+  const label = f.label ?? '';
+  let line =
+    label.length > 0
+      ? label + ' '.repeat(Math.max(1, LABEL_WIDTH - label.length))
+      : ' '.repeat(OPCODE_COLUMN - 1);
+  const starts = { label: 0, opcode: line.length, operand: 0, comment: 0 };
 
-  // command
-  if (C !== null) {
-    line += C;
-    const gap2 = C.length > 0 ? Math.max(1, LEN_INSTR_FIELD - C.length) : 0; // no push when empty
-    line += ' '.repeat(gap2);
+  if (f.opcode !== null) {
+    // An empty opcode adds no padding.
+    line += f.opcode + (f.opcode ? ' '.repeat(Math.max(1, OPCODE_WIDTH - f.opcode.length)) : '');
   }
   starts.operand = line.length;
 
-  // operand
-  if (O !== null) {
-    line += O;
-    const gap3 = engageCommentColumn ? Math.max(1, LEN_OPERAND_FIELD - O.length) : 0;
-    line += ' '.repeat(gap3);
+  if (f.operand !== null) {
+    line += f.operand;
+    if (toCommentColumn) line += ' '.repeat(Math.max(1, OPERAND_WIDTH - f.operand.length));
   }
   starts.comment = line.length;
 
-  const out = line + (commentPart ?? '');
-  return { out, starts };
+  return { line: line + (f.comment ?? ''), starts };
 }
 
-// -------------------------------------------------------------
-// Public API
-// -------------------------------------------------------------
+/** Where the cursor goes in the aligned line: the same place in the same field. */
+function mapCursor(
+  f: Fields,
+  place: CursorPlace,
+  a: Aligned,
+  toCommentColumn: boolean,
+  cp: number,
+) {
+  switch (place.in) {
+    case 'label':
+      return a.starts.label + clamp(place.offset, 0, (f.label ?? '').length);
+    case 'opcode':
+      return a.starts.opcode + clamp(place.offset, 0, (f.opcode ?? '').length);
+    case 'operand':
+      return a.starts.operand + clamp(place.offset, 0, (f.operand ?? '').length);
+    case 'comment':
+      return a.starts.comment + clamp(place.offset, 0, (f.comment ?? '').length);
+    case 'spaces':
+      if (place.after === 'start' || place.after === 'label') return a.starts.opcode;
+      if (place.after === 'opcode') return a.starts.operand;
+      return toCommentColumn ? a.starts.comment : a.line.length;
+    case 'end':
+      return toCommentColumn ? a.starts.comment : a.line.length;
+    case 'nowhere':
+      return cp;
+  }
+}
+
+// ---------------------------------------------------------------------------------------
+// The three kinds of edit
+// ---------------------------------------------------------------------------------------
+
+interface Result {
+  line: string;
+  cursor: number;
+}
+
 /**
- * Auto-indent a single line of assembly-like code (called AFTER a keystroke).
+ * After Backspace: deleting a space collapses the whole run of spaces left of the cursor,
+ * unless a space follows (then the run is column padding and stays). Deleting anything
+ * else leaves the spacing alone.
+ */
+function afterBackspace(s: string, cp: number, erased: string | null): Result {
+  const erasedSpaces = !!erased && /^[ \t]+$/.test(erased);
+  const spaceFollows = cp < s.length && s[cp] === ' ';
+  if (erasedSpaces && !spaceFollows && cp > 0 && s[cp - 1] === ' ') {
+    let start = cp - 1;
+    while (start > 0 && s[start - 1] === ' ') start--;
+    return { line: s.slice(0, start) + s.slice(cp), cursor: start };
+  }
+  return { line: s, cursor: cp };
+}
+
+/**
+ * After Space (or Tab): step to the next column. The first space after the opcode goes to
+ * the operand column, the first space after the operand to the comment column.
+ */
+function afterSpace(s: string, cp: number, f: Fields, place: CursorPlace): Result {
+  // Moving on from the operand needs the operand to be finished: the cursor at the end of
+  // the line and its quotes closed (a space inside C'A B' is text). Unless there is already
+  // a comment, a space typed anywhere else around the operand changes nothing.
+  const hasCommentText = f.commentStart >= 0 && /[^ \t]/.test(f.comment ?? '');
+  const aroundOperand =
+    place.in === 'operand' ||
+    (place.in === 'spaces' && place.after === 'operand') ||
+    cp === f.codeEnd;
+  const operandText = f.operandSpan ? s.slice(f.operandSpan.start, f.operandSpan.end) : '';
+  if (!hasCommentText && aroundOperand && !(cp === s.length && quotesClosed(operandText))) {
+    return { line: s, cursor: cp };
+  }
+
+  // The character before the space just typed (when exactly one was typed).
+  const typedAfter = cp > 1 && s[cp - 1] === ' ' && !isSpace(s[cp - 2]) ? cp - 2 : -1;
+  const typedAfterOpcode = typedAfter !== -1 && within(f.opcodeSpan, typedAfter);
+  // ...but the space after a comma belongs to the operand (BUFFER, X).
+  const typedAfterOperand =
+    typedAfter !== -1 && within(f.operandSpan, typedAfter) && s[typedAfter] !== ',';
+
+  let stepTo: 'operand' | 'comment' | null = null;
+  if (typedAfterOpcode) stepTo = 'operand';
+  else if (typedAfterOperand) stepTo = 'comment';
+  else if (place.in === 'spaces' && place.after === 'opcode') stepTo = 'comment';
+  else if (place.in === 'spaces' && place.after === 'label') stepTo = 'operand';
+  else if (f.operand === '' && cp >= align(f, false).starts.operand) stepTo = 'comment';
+
+  const toCommentColumn = !!f.comment || stepTo === 'comment';
+  const aligned = align(f, toCommentColumn);
+  const cursor =
+    stepTo === 'operand'
+      ? aligned.starts.operand
+      : stepTo === 'comment'
+        ? aligned.starts.comment
+        : mapCursor(f, place, aligned, toCommentColumn, cp);
+  return { line: aligned.line, cursor };
+}
+
+/** After Enter or a paste: lay the line out again, keeping the cursor in its field. */
+function reflow(f: Fields, place: CursorPlace, cp: number): Result {
+  const toCommentColumn = !!f.comment;
+  const aligned = align(f, toCommentColumn);
+  return { line: aligned.line, cursor: mapCursor(f, place, aligned, toCommentColumn, cp) };
+}
+
+// ---------------------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Realign one line after a key has been applied.
  *
- * @param line         Current line (may end with '\n')
- * @param backspace    True if the last action was Backspace (already applied by editor)
- * @param space        True if the last action was Space (already applied by editor)
- * @param cursorPos    Cursor index into the CURRENT line (AFTER the edit)
- * @param selStart     (optional) selection start in CURRENT line
- * @param selEnd       (optional) selection end in CURRENT line
- * @param erased       (optional) text that was erased by the edit; null if none
- * @returns            { line, cursor } — adjusted line and where the cursor should go
+ * @param line       the line, possibly ending with '\n' (kept)
+ * @param backspace  the key was Backspace
+ * @param space      the key was Space or Tab
+ * @param cursorPos  cursor index in the line, after the edit
+ * @param selStart   selection start; with a selection, the line is left as it is
+ * @param selEnd     selection end
+ * @param erased     what Backspace removed
  */
 export function autoIndentLine(
   line: string,
@@ -388,257 +375,48 @@ export function autoIndentLine(
   selStart?: number,
   selEnd?: number,
   erased: string | null = null,
-): { line: string; cursor: number } {
-  let hadNewline = false;
-  let raw = line;
-  if (raw.endsWith('\n')) {
-    hadNewline = true;
-    raw = raw.slice(0, -1);
-  }
-
-  // 1) SELECTION short-circuit (if provided and non-empty)
+): Result {
   if (typeof selStart === 'number' && typeof selEnd === 'number' && selStart !== selEnd) {
     return { line, cursor: cursorPos };
   }
 
-  let cp = clamp(cursorPos, 0, raw.length);
+  const newline = line.endsWith('\n') ? '\n' : '';
+  const raw = newline ? line.slice(0, -1) : line;
+  const cp = clamp(cursorPos, 0, raw.length);
+  const s = raw.replace(/\t/g, ' ');
+  const withNewline = (r: Result): Result => ({ line: r.line + newline, cursor: r.cursor });
 
-  // normalize tabs early
-  let s = replaceTabsWithSpaces(raw);
+  if (backspace) return withNewline(afterBackspace(s, cp, erased));
 
-  // ---------------------------------------------------------
-  // 0) BACKSPACE handling (post-edit)
-  // ---------------------------------------------------------
-  if (backspace) {
-    const erasedIsSpaces = !!erased && /^[ \t]+$/.test(erased);
-
-    // Deleting spaces collapses the whole run of spaces left of the cursor, unless a space
-    // follows: then the run is structural (column padding) and is kept. Deleting anything
-    // else leaves the spacing alone.
-    const nextCharIsSpace = cp < s.length && s[cp] === ' ';
-    if (erasedIsSpaces && !nextCharIsSpace) {
-      let k = cp - 1;
-      if (k >= 0 && s[k] === ' ') {
-        while (k >= 0 && s[k] === ' ') k--;
-        const start = k + 1;
-        s = s.slice(0, start) + s.slice(cp);
-        cp = start;
-      }
+  const isBlank = firstNonSpace(s) === -1;
+  if (isBlank) {
+    // The first space on an empty line jumps to the opcode column.
+    const typedOneSpace = space && cp > 0 && s[cp - 1] === ' ' && (cp < 2 || !isSpace(s[cp - 2]));
+    if (typedOneSpace) {
+      return withNewline({ line: ' '.repeat(OPCODE_COLUMN - 1), cursor: OPCODE_COLUMN - 1 });
     }
-
-    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
+    if (!space) return withNewline({ line: s, cursor: cp });
   }
 
-  // ---------------------------------------------------------
-  // SPACE / general handling (post-edit)
-  // ---------------------------------------------------------
+  const f = parseFields(s);
+  const place = cursorPlace(f, cp);
 
-  // Compute once
-  const isBlank = firstNonSpaceIndex(s) === -1;
+  // Spaces inside a comment are text.
+  if (space && f.comment !== null && place.in === 'comment')
+    return withNewline({ line: s, cursor: cp });
 
-  // (A) Blank/empty line + Space → jump to command column
-  const justInsertedSingleSpace =
-    space && cp > 0 && s[cp - 1] === ' ' && (cp - 2 < 0 || !isSpace(s[cp - 2]));
-  if (isBlank && justInsertedSingleSpace) {
-    const toOpcode = ' '.repeat(COL_OPCODE_START - 1); // col 10 → index 9
-    const out = toOpcode + (hadNewline ? '\n' : '');
-    return { line: out, cursor: toOpcode.length };
+  // A comment line starts at column 1.
+  if (f.isCommentLine) {
+    const dot = s.indexOf('.', firstNonSpace(s));
+    return withNewline({ line: s.slice(dot), cursor: Math.max(0, cp - dot) });
   }
 
-  // If not space/backspace and blank line (enter/paste), do nothing
-  if (!space && !backspace && isBlank) {
-    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
-  }
-
-  // Parse for the rest
-  const parsed = parseLineStructure(s);
-
-  const cur = classifyCursor(parsed, cp);
-
-  /* If a space was typed inside the comment section, skip all logic */
-  if (space && parsed.commentPart !== null && cur.section === 'comment') {
-    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
-  }
-
-  // (B) Comment line → strip spaces before first '.'
-  if (parsed.isCommentLine) {
-    const dot = s.indexOf('.', firstNonSpaceIndex(s));
-    const out = s.slice(dot) + (hadNewline ? '\n' : '');
-    return { line: out, cursor: Math.max(0, cp - dot) };
-  }
-
-  // (C) If invalid order, don’t reflow
-  if (!parsed.orderValid) {
-    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
-  }
-
-  // Bail if any section exceeds its field width
+  // A field wider than its column is left as typed.
   const tooWide =
-    (parsed.label !== null && parsed.label.length > LEN_LABEL_FIELD) ||
-    (parsed.command !== null && parsed.command.length > LEN_INSTR_FIELD) ||
-    (parsed.operand !== null && parsed.operand.length > LEN_OPERAND_FIELD);
-  if (tooWide) {
-    return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
-  }
+    (f.label !== null && f.label.length > LABEL_WIDTH) ||
+    (f.opcode !== null && f.opcode.length > OPCODE_WIDTH) ||
+    (f.operand !== null && f.operand.length > OPERAND_WIDTH);
+  if (tooWide) return withNewline({ line: s, cursor: cp });
 
-  // Guard: only allow stepping to comment when (a) EOL and (b) operand quotes are closed.
-  // Otherwise, when there is no real inline comment content, do not correct.
-  if (space) {
-    const inlineCommentExists = parsed.commentStartIndex >= 0;
-    const inlineCommentHasNonspace = inlineCommentExists && /[^ \t]/.test(parsed.commentPart ?? '');
-
-    const inOperand = cur.section === 'operand';
-    const afterOperandSpace = cur.section === 'space' && cur.whichSpace === 3;
-    const atCodeEnd = cp === s.length;
-
-    const operandText = parsed.operandR ? s.slice(parsed.operandR.start, parsed.operandR.end) : '';
-    const opQuotesClosed = quotesClosed(operandText);
-
-    if (
-      (!inlineCommentExists || !inlineCommentHasNonspace) &&
-      (inOperand || afterOperandSpace || cp === parsed.codePart.length) &&
-      !(atCodeEnd && opQuotesClosed)
-    ) {
-      return { line: s + (hadNewline ? '\n' : ''), cursor: cp };
-    }
-  }
-
-  // ---------------------------------------------------------
-  // D) SPACE → column stepper logic (command → operand → comment)
-  // ---------------------------------------------------------
-  if (space) {
-    // Build a baseline (no comment engagement) so we know exact starts.* positions
-    const baseline = buildAlignedLine(
-      parsed.label,
-      parsed.command,
-      parsed.operand,
-      parsed.commentPart,
-      false, // no comment engagement for baseline
-    );
-
-    // Decide step target
-    let stepTo: 'operand' | 'comment' | null = null;
-    const hasComment = !!parsed.commentPart && parsed.commentPart.length > 0;
-
-    // Always boolean
-    let engageComment = false;
-
-    // Helper: previous *non-space* index for this event (only reliable when a single space was inserted)
-    const prevNonSpaceIdx = cp > 1 && s[cp - 1] === ' ' && !isSpace(s[cp - 2]) ? cp - 2 : -1;
-
-    // 1) If just typed first space right after COMMAND token → go to OPERAND
-    if (
-      prevNonSpaceIdx !== -1 &&
-      parsed.commandR &&
-      prevNonSpaceIdx >= parsed.commandR.start &&
-      prevNonSpaceIdx < parsed.commandR.end
-    ) {
-      stepTo = 'operand';
-    }
-    // 2) If just typed first space right after OPERAND token → go to COMMENT
-    //    BUT ignore the single space immediately following a comma inside operand.
-    else if (
-      prevNonSpaceIdx !== -1 &&
-      parsed.operandR &&
-      prevNonSpaceIdx >= parsed.operandR.start &&
-      prevNonSpaceIdx < parsed.operandR.end &&
-      s[prevNonSpaceIdx] !== ','
-    ) {
-      stepTo = 'comment';
-    }
-    // 3) If cursor is in the space block between COMMAND and OPERAND (sp2) → go to COMMENT
-    else if (cur.section === 'space' && cur.whichSpace === 2) {
-      stepTo = 'comment';
-    }
-    // 4) If cursor is in the space block between LABEL and COMMAND (sp1) → go to OPERAND
-    else if (cur.section === 'space' && cur.whichSpace === 1) {
-      stepTo = 'operand';
-    }
-    // 5) operand is empty and caret is at/after operand start → go to COMMENT
-    else if (parsed.operand === '' && cp >= baseline.starts.operand) {
-      stepTo = 'comment';
-    }
-
-    // Engage comment column?
-    if (
-      hasComment ||
-      stepTo === 'comment' ||
-      (prevNonSpaceIdx !== -1 &&
-        parsed.operandR &&
-        prevNonSpaceIdx >= parsed.operandR.start &&
-        prevNonSpaceIdx < parsed.operandR.end &&
-        s[prevNonSpaceIdx] !== ',')
-    ) {
-      engageComment = true;
-    }
-
-    const { out, starts } = buildAlignedLine(
-      parsed.label,
-      parsed.command, // '' allowed
-      parsed.operand, // '' allowed
-      parsed.commentPart,
-      engageComment,
-    );
-
-    // Cursor mapping: snap when we chose a step
-    let newCursor = cp;
-    if (stepTo === 'operand') newCursor = starts.operand;
-    else if (stepTo === 'comment') newCursor = starts.comment;
-    else {
-      // best-effort default
-      if (cur.section === 'label') {
-        newCursor = starts.label + clamp(cur.rel, 0, (parsed.label ?? '').length);
-      } else if (cur.section === 'command') {
-        newCursor = starts.command + clamp(cur.rel, 0, (parsed.command ?? '').length);
-      } else if (cur.section === 'operand') {
-        newCursor = starts.operand + clamp(cur.rel, 0, (parsed.operand ?? '').length);
-      } else if (cur.section === 'comment') {
-        newCursor = starts.comment + clamp(cur.rel, 0, (parsed.commentPart ?? '').length);
-      } else if (cur.section === 'space') {
-        if (cur.whichSpace === 0 || cur.whichSpace === 1) newCursor = starts.command;
-        else if (cur.whichSpace === 2) newCursor = starts.operand;
-        else if (cur.whichSpace === 3 || cur.whichSpace === 9) {
-          newCursor = engageComment ? starts.comment : out.length;
-        }
-      }
-    }
-
-    return { line: out + (hadNewline ? '\n' : ''), cursor: newCursor };
-  }
-
-  // ---------------------------------------------------------
-  // (E) Full re-spacing for non-space & non-backspace (enter/paste)
-  // ---------------------------------------------------------
-  {
-    // Engage comment column if we actually have a comment tail; this preserves all nonspace chars.
-    const engageComment = !!(parsed.commentPart && parsed.commentPart.length > 0);
-
-    const { out, starts } = buildAlignedLine(
-      parsed.label,
-      parsed.command,
-      parsed.operand,
-      parsed.commentPart,
-      engageComment,
-    );
-
-    // best-effort cursor remap
-    let newCursor = cp;
-    if (cur.section === 'label') {
-      newCursor = starts.label + clamp(cur.rel, 0, (parsed.label ?? '').length);
-    } else if (cur.section === 'command') {
-      newCursor = starts.command + clamp(cur.rel, 0, (parsed.command ?? '').length);
-    } else if (cur.section === 'operand') {
-      newCursor = starts.operand + clamp(cur.rel, 0, (parsed.operand ?? '').length);
-    } else if (cur.section === 'comment') {
-      newCursor = starts.comment + clamp(cur.rel, 0, (parsed.commentPart ?? '').length);
-    } else if (cur.section === 'space') {
-      if (cur.whichSpace === 0 || cur.whichSpace === 1) newCursor = starts.command;
-      else if (cur.whichSpace === 2) newCursor = starts.operand;
-      else if (cur.whichSpace === 3 || cur.whichSpace === 9) {
-        newCursor = engageComment ? starts.comment : out.length;
-      }
-    }
-
-    return { line: out + (hadNewline ? '\n' : ''), cursor: newCursor };
-  }
+  return withNewline(space ? afterSpace(s, cp, f, place) : reflow(f, place, cp));
 }

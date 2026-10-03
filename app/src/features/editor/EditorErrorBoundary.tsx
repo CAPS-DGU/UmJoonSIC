@@ -19,12 +19,12 @@ export default class EditorErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error) {
-    // 상태를 바꿔서 fallback UI 렌더링
+    // The next render shows the fallback.
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // 로깅
+    // Log what failed.
     console.error('CodeEditor crashed:', error, errorInfo);
   }
 

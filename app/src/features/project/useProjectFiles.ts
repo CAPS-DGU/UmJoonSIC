@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { FileStructure } from '@/features/fileTree/types';
 import { useProjectStore } from '@/features/project/projectStore';
@@ -18,7 +19,15 @@ const joinRelative = (folder: string, name: string) => (folder ? `${folder}/${na
 /** Create and delete files and folders of the open project, keeping project.sic and the tree in sync. */
 export function useProjectFiles() {
   const { projectPath, addAsmFile, removeAsmFiles, refreshFileTree, setSelectedFileOrFolder } =
-    useProjectStore();
+    useProjectStore(
+      useShallow(s => ({
+        projectPath: s.projectPath,
+        addAsmFile: s.addAsmFile,
+        removeAsmFiles: s.removeAsmFiles,
+        refreshFileTree: s.refreshFileTree,
+        setSelectedFileOrFolder: s.setSelectedFileOrFolder,
+      })),
+    );
 
   const absolute = (relativePath: string) => `${projectPath}/${relativePath}`.replace(/\/+/g, '/');
 

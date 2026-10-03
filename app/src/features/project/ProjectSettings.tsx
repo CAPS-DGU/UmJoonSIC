@@ -12,7 +12,9 @@ const toHexByte = (value: number) => `0x${value.toString(16).toUpperCase().padSt
 
 /** Editor for project.sic, shown while its tab is active: entry module, asm files, file devices. */
 export default function ProjectSettings() {
-  const { settings, setSettings, saveSettings } = useProjectStore();
+  const settings = useProjectStore(s => s.settings);
+  const setSettings = useProjectStore(s => s.setSettings);
+  const saveSettings = useProjectStore(s => s.saveSettings);
   // This view shows the active tab, which is the settings tab.
   const settingsTabPath = useEditorTabStore(state => state.activePath);
   const setModified = useEditorTabStore(state => state.setModified);

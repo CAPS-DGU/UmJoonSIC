@@ -1,10 +1,10 @@
+// A simple message box inside the page (InfoModal), for messages such as a linker error.
 import { create } from 'zustand';
 
 interface ModalState {
   isOpen: boolean;
   title?: string;
   message?: string;
-  // 상태 변경용 메서드
   show: (title: string, message: string) => void;
   close: () => void;
 }
