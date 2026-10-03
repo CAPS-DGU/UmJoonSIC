@@ -16,8 +16,9 @@ interface ErrorStore {
   /** Errors by project-relative file path; a file without errors has no entry. */
   errors: { [fileName: string]: CompileError[] };
   /**
-   * Replace a file's errors of one kind: a syntax check replaces the syntax errors, a load
-   * the load errors. `fileName` may be absolute; it is stored relative to the project.
+   * Replace a file's errors with the result of its latest check (a syntax check, or a load
+   * of the program); `type` says which. `fileName` may be absolute; it is stored relative
+   * to the project.
    */
   setErrors: (
     fileName: string,
@@ -34,10 +35,8 @@ export const useErrorStore = create<ErrorStore>(set => ({
   setErrors: (fileName, type, errors) => {
     const file = toProjectRelativePath(useProjectStore.getState().projectPath, fileName);
     set(state => {
-      const kept = (state.errors[file] ?? []).filter(err => err.type !== type);
-      const all = [...kept, ...errors.map(err => ({ ...err, type }))];
-      const next = { ...state.errors, [file]: all };
-      if (all.length === 0) delete next[file];
+      const next = { ...state.errors, [file]: errors.map(err => ({ ...err, type })) };
+      if (errors.length === 0) delete next[file];
       return { errors: next };
     });
   },

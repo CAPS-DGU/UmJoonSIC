@@ -6,6 +6,7 @@ import {
   isProjectAsmFile,
 } from '@/features/editor/lib/syntaxCheck';
 import { disposeModel, modelPath } from '@/features/editor/monaco/models';
+import { useErrorStore } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useInfoModalStore } from '@/stores/infoModalStore';
 
@@ -174,7 +175,11 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
             cursor: cursor ?? { line: 1, column: 1 },
           };
           set(state => ({ tabs: [...state.tabs, tab] }));
-          if (content && isProjectAsmFile(filePath)) {
+          // A file the last load reported errors for already has them (and its error lines).
+          const hasLoadErrors = useErrorStore
+            .getState()
+            .errors[filePath]?.some(err => err.type === 'load');
+          if (content && isProjectAsmFile(filePath) && !hasLoadErrors) {
             checkSyntax([content], [filePath]);
           }
         }
