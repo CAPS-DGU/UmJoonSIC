@@ -28,7 +28,7 @@ export function useFileTreeNavigation(
     (e: React.KeyboardEvent) => {
       if (!flatList.length) return;
       const item = flatList[focusIndex];
-      if (!item) return; // 안전 체크
+      if (!item) return;
 
       switch (e.key) {
         case 'ArrowDown':

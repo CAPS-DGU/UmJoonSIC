@@ -18,6 +18,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "vitest run",
     "package": "cross-env SHOW_DEVTOOLS=false electron-forge package",
     "make": "cross-env SHOW_DEVTOOLS=false electron-forge make"
   },
@@ -71,6 +72,7 @@
     "typescript-eslint": "^8.39.0",
     "uuid": "^11.1.0",
     "vite": "^7.1.0",
+    "vitest": "^3.2.7",
     "zustand": "^5.0.7"
   },
   "pnpm": {

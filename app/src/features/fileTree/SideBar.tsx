@@ -26,15 +26,13 @@ export default function SideBar() {
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  const {
-    projectName,
-    fileTree,
-    refreshFileTree,
-    selectedFileOrFolder,
-    setSelectedFileOrFolder,
-    settings,
-  } = useProjectStore();
-  const { openTab } = useEditorTabStore();
+  const projectName = useProjectStore(s => s.projectName);
+  const fileTree = useProjectStore(s => s.fileTree);
+  const refreshFileTree = useProjectStore(s => s.refreshFileTree);
+  const selectedFileOrFolder = useProjectStore(s => s.selectedFileOrFolder);
+  const setSelectedFileOrFolder = useProjectStore(s => s.setSelectedFileOrFolder);
+  const projectFiles = useProjectStore(s => s.settings.asm);
+  const openTab = useEditorTabStore(s => s.openTab);
   const { deleteFile, deleteFolder } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
@@ -99,7 +97,7 @@ export default function SideBar() {
             onSelect={setSelectedFileOrFolder}
             onOpenFile={handleOpenFile}
             onContextMenu={(e, item) => setContextMenu({ x: e.clientX, y: e.clientY, item })}
-            projectFiles={settings.asm}
+            projectFiles={projectFiles}
             focusPath={focusPath}
           />
         ))}
