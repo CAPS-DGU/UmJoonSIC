@@ -24,9 +24,9 @@ function FileIcon({ fileName }: { fileName: string }) {
 
 interface FileTreeItemProps {
   item: FileStructure;
-  /** Expanded folders, by name. */
+  /** Expanded folders, by project-relative path. */
   expanded: Record<string, boolean>;
-  toggleFolder: (name: string) => void;
+  toggleFolder: (relativePath: string) => void;
   selected: FileStructure | null;
   onSelect: (item: FileStructure) => void;
   onOpenFile: (item: FileStructure) => void;
@@ -49,7 +49,7 @@ export function FileTreeItem(props: FileTreeItemProps) {
           `;
 
   if (item.type === 'folder') {
-    const isOpen = expanded[item.name];
+    const isOpen = expanded[item.relativePath];
     const Chevron = isOpen ? ChevronDown : ChevronRight;
     return (
       <div>
@@ -59,7 +59,7 @@ export function FileTreeItem(props: FileTreeItemProps) {
           tabIndex={0}
           onClick={() => {
             onSelect(item);
-            toggleFolder(item.name);
+            toggleFolder(item.relativePath);
           }}
           onContextMenu={e => onContextMenu(e, item)}
         >

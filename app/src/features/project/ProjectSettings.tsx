@@ -148,7 +148,7 @@ export default function ProjectSettings() {
               <span className="font-bold text-sm">Add Device :</span>
               <select
                 className="border border-gray-300 rounded-md px-2 py-1 text-sm font-mono"
-                value={deviceIndex}
+                value={deviceIndex.toString(16)}
                 onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
               >
                 {DEVICE_INDEXES.map(i => (
