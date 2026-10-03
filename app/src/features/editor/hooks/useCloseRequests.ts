@@ -19,6 +19,8 @@ export function useCloseRequests() {
     const onCloseWindow = async () => {
       if (await resolveUnsavedChanges()) {
         await window.api.closeWindow();
+      } else {
+        window.api.abortClose();
       }
     };
     const onCloseTab = () => {

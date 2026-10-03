@@ -46,7 +46,7 @@ export function useProjectFiles() {
     }
 
     const newFile: FileStructure = { type: 'file', name: `${trimmed}${fileExt}`, relativePath };
-    if (fileExt === '.asm') addAsmFile(newFile);
+    if (fileExt === '.asm') await addAsmFile(newFile);
     refreshFileTree();
     return newFile;
   };
@@ -58,7 +58,7 @@ export function useProjectFiles() {
       throw new Error(res.message);
     }
 
-    removeAsmFiles([file.relativePath]);
+    await removeAsmFiles([file.relativePath]);
     useEditorTabStore.getState().closeTabsUnder(file.relativePath);
     refreshFileTree();
     deselectIfSelected(file);
@@ -92,7 +92,7 @@ export function useProjectFiles() {
     }
 
     const inFolder = (p: string) => p.startsWith(`${folder.relativePath}/`);
-    removeAsmFiles(useProjectStore.getState().settings.asm.filter(inFolder));
+    await removeAsmFiles(useProjectStore.getState().savedSettings.asm.filter(inFolder));
     useEditorTabStore.getState().closeTabsUnder(folder.relativePath);
     refreshFileTree();
     deselectIfSelected(folder);

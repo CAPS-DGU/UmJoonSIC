@@ -47,7 +47,7 @@ export default function DebugPanel() {
               onToggleModeMenu={() => setShowModeMenu(!showModeMenu)}
             />
           )}
-          {showModeMenu && <ModeMenu mode={mode} onChange={setMode} />}
+          {showModeMenu && !isRunning && <ModeMenu mode={mode} onChange={setMode} />}
         </div>
       </section>
 

@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import path from 'path-browserify';
-import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
-import { disposeModel } from '@/features/editor/monaco/models';
+import {
+  cancelScheduledCheck,
+  checkSyntax,
+  isProjectAsmFile,
+} from '@/features/editor/lib/syntaxCheck';
+import { disposeModel, modelPath } from '@/features/editor/monaco/models';
 import { useProjectStore } from '@/features/project/projectStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 export interface CursorPosition {
   line: number;
@@ -50,12 +55,14 @@ interface EditorTabState {
   tabs: EditorTab[];
   /** `filePath` of the active tab; null when no tab is open. */
   activePath: string | null;
+  /** Where the editor is asked to put the cursor; cleared once it has done so. */
   revealRequest: RevealRequest | null;
   /**
    * Open a tab for the file, or activate the one already open. A source file is read
-   * from disk first, so a tab always has its content.
+   * from disk first, so a tab always has its content; if it cannot be read, no tab opens.
    */
   openTab: (tab: NewTab) => Promise<void>;
+  clearRevealRequest: (id: number) => void;
   activateTab: (filePath: string) => void;
   /** Close a tab, unsaved changes included (ask first: see unsavedChanges.ts). */
   closeTab: (filePath: string) => void;
@@ -74,19 +81,34 @@ interface EditorTabState {
 }
 
 export function tabKind(filePath: string): TabKind {
-  const lower = filePath.toLowerCase();
-  if (lower.endsWith('.lst')) return 'listing';
-  if (lower.endsWith('project.sic')) return 'settings';
+  if (filePath.toLowerCase().endsWith('.lst')) return 'listing';
+  // Only the project's own project.sic, at its root.
+  if (filePath === 'project.sic') return 'settings';
   return 'source';
 }
 
 export const selectActiveTab = (state: EditorTabState) =>
   state.tabs.find(tab => tab.filePath === state.activePath);
 
+/** The open source tab whose Monaco model this is (see monaco/models.ts). */
+export function tabPathOfModel(modelUri: string) {
+  const { projectPath } = useProjectStore.getState();
+  return useEditorTabStore
+    .getState()
+    .tabs.find(
+      tab =>
+        tabKind(tab.filePath) === 'source' && modelPath(projectPath, tab.filePath) === modelUri,
+    )?.filePath;
+}
+
 const absolutePath = (filePath: string) =>
   path.join(useProjectStore.getState().projectPath, filePath);
 
 let nextRevealId = 0;
+/** Counts openTab calls: when two overlap, the one asked for last is activated. */
+let lastOpenRequest = 0;
+/** Changes when all tabs are closed (another project), so that a late file read is dropped. */
+let tabsEpoch = 0;
 
 export const useEditorTabStore = create<EditorTabState>((set, get) => {
   const patchTab = (filePath: string, patch: (tab: EditorTab) => Partial<EditorTab>) =>
@@ -94,16 +116,18 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
       tabs: state.tabs.map(tab => (tab.filePath === filePath ? { ...tab, ...patch(tab) } : tab)),
     }));
 
-  /** The content of a source file on disk ('' if it cannot be read). */
+  /** The content of a source file on disk, or null (after telling the user) if it cannot be read. */
   const readContent = async (filePath: string) => {
+    let message: string;
     try {
       const res = await window.api.readFile(absolutePath(filePath));
       if (res.success) return res.data ?? '';
-      console.error('Failed to load file:', res.message);
+      message = res.message ?? '';
     } catch (error) {
-      console.error('Failed to load file:', error);
+      message = String(error);
     }
-    return '';
+    useInfoModalStore.getState().show('파일 열기 실패', `${filePath}\n${message}`);
+    return null;
   };
 
   /** Remove tabs; when the active one goes, the last remaining tab takes over. */
@@ -120,7 +144,10 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
     const { projectPath } = useProjectStore.getState();
     closing
       .filter(tab => tabKind(tab.filePath) === 'source')
-      .forEach(tab => disposeModel(projectPath, tab.filePath));
+      .forEach(tab => {
+        cancelScheduledCheck(tab.filePath);
+        disposeModel(projectPath, tab.filePath);
+      });
   };
 
   return {
@@ -129,13 +156,14 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
     revealRequest: null,
 
     openTab: async ({ title, filePath, cursor }) => {
+      const request = ++lastOpenRequest;
       const isOpen = () => get().tabs.some(tab => tab.filePath === filePath);
       if (!isOpen()) {
-        const { projectPath } = useProjectStore.getState();
-        const isSource = tabKind(filePath) === 'source';
-        const content = isSource ? await readContent(filePath) : '';
-        // While the file was read, the project may have changed, or the tab been opened.
-        if (useProjectStore.getState().projectPath !== projectPath) return;
+        const epoch = tabsEpoch;
+        const content = tabKind(filePath) === 'source' ? await readContent(filePath) : '';
+        // The file could not be read, or the project was closed while it was read.
+        if (content === null || epoch !== tabsEpoch) return;
+        // The tab may have been opened meanwhile (a second click).
         if (!isOpen()) {
           const tab: EditorTab = {
             title,
@@ -151,17 +179,33 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
           }
         }
       }
+      // A later request (another file clicked while this one was read) wins.
+      if (request !== lastOpenRequest) return;
       set({
         activePath: filePath,
         ...(cursor && { revealRequest: { filePath, ...cursor, id: nextRevealId++ } }),
       });
     },
 
+    clearRevealRequest: id =>
+      set(state => (state.revealRequest?.id === id ? { revealRequest: null } : {})),
+
     activateTab: filePath => set({ activePath: filePath }),
 
-    closeTab: filePath => removeTabs(tab => tab.filePath === filePath),
+    closeTab: filePath => {
+      const tab = get().tabs.find(t => t.filePath === filePath);
+      removeTabs(t => t.filePath === filePath);
+      // Its unsaved edits are gone: errors from them would no longer match the file.
+      if (tab && tab.content !== tab.savedContent && isProjectAsmFile(filePath)) {
+        checkSyntax([tab.savedContent], [filePath]);
+      }
+    },
     closeListingTabs: () => removeTabs(tab => tabKind(tab.filePath) === 'listing'),
-    closeAllTabs: () => removeTabs(() => true),
+    closeAllTabs: () => {
+      tabsEpoch++;
+      removeTabs(() => true);
+      set({ revealRequest: null });
+    },
     closeTabsUnder: relativePath =>
       removeTabs(
         tab => tab.filePath === relativePath || tab.filePath.startsWith(`${relativePath}/`),

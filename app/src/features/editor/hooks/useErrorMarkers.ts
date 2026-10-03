@@ -1,18 +1,10 @@
 import { useEffect, useRef } from 'react';
 import * as monaco from 'monaco-editor';
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import { tabPathOfModel } from '@/features/editor/editorTabStore';
 import { clampLine } from '@/features/editor/lib/clampLine';
-import { modelPath } from '@/features/editor/monaco/models';
 import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 import { useErrorStore, type CompileError } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
-
-/** The open tab whose model this is, if any. */
-function filePathOf(model: monaco.editor.ITextModel, projectPath: string) {
-  const uri = model.uri.toString();
-  return useEditorTabStore.getState().tabs.find(tab => modelPath(projectPath, tab.filePath) === uri)
-    ?.filePath;
-}
 
 /**
  * Show each open file's errors in its editor model: a squiggle under each error, and a
@@ -62,12 +54,12 @@ export function useErrorMarkers() {
     };
 
     for (const model of monaco.editor.getModels()) {
-      const filePath = filePathOf(model, projectPath);
+      const filePath = tabPathOfModel(model.uri.toString());
       if (filePath) apply(model, errors[filePath] ?? []);
     }
 
     const created = monaco.editor.onDidCreateModel(model => {
-      const filePath = filePathOf(model, projectPath);
+      const filePath = tabPathOfModel(model.uri.toString());
       if (filePath) apply(model, useErrorStore.getState().errors[filePath] ?? []);
     });
     const disposed = monaco.editor.onWillDisposeModel(model => {

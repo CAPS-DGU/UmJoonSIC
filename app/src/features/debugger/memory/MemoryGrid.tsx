@@ -110,9 +110,11 @@ export function ValueColumn({
         const rowLabels = labels
           .filter(l => l.end >= rowStartAddr && l.start <= rowEndAddr)
           .map(l => ({
-            ...l,
+            name: l.name,
             start: Math.max(l.start, rowStartAddr) - rowStartAddr,
             end: Math.min(l.end, rowEndAddr) - rowStartAddr,
+            /** The range begins on this row (its name is shown here). */
+            beginsHere: l.start >= rowStartAddr,
           }));
 
         return (
@@ -140,32 +142,20 @@ export function ValueColumn({
               })}
 
               {/* a line beneath each labelled range */}
-              {rowLabels.map((label, idx) => {
-                const originalLabel = labels.find(l => l.name === label.name);
-                if (!originalLabel) return null;
-
-                const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
-                const width =
-                  (Math.min(originalLabel.end, rowEndAddr) - rowStartAddr - relativeStart + 1) *
-                    CELL_WIDTH -
-                  8;
-
-                return (
-                  <div
-                    key={`line-${idx}`}
-                    className="absolute -bottom-0.5 border-t-2 border-orange-500"
-                    style={{ left: relativeStart * CELL_WIDTH + 4, width }}
-                  />
-                );
-              })}
+              {rowLabels.map((label, idx) => (
+                <div
+                  key={`line-${idx}`}
+                  className="absolute -bottom-0.5 border-t-2 border-orange-500"
+                  style={{
+                    left: label.start * CELL_WIDTH + 4,
+                    width: (label.end - label.start + 1) * CELL_WIDTH - 8,
+                  }}
+                />
+              ))}
 
               {/* the name, only on the row where the range starts */}
               {rowLabels
-                .filter(label => {
-                  const originalLabel = labels.find(l => l.name === label.name);
-                  if (!originalLabel) return false;
-                  return Math.floor(originalLabel.start / ROW_SIZE) === rowIndex;
-                })
+                .filter(label => label.beginsHere)
                 .map((label, idx) => (
                   <div
                     key={`name-${idx}`}

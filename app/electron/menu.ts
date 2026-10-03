@@ -1,6 +1,7 @@
 import { BrowserWindow, shell, type MenuItemConstructorOptions } from 'electron';
 import { AppEvent } from '../shared/ipc';
 import { openAboutWindow } from './windows/aboutWindow';
+import { getMainWindow } from './windows/mainWindow';
 
 const HOW_TO_USE_URL =
   'https://radical-potential-27c.notion.site/How-to-use-UmJoonSIC-267b7ce7932f80d799f0f6b0a11c0bd9?source=copy_link';
@@ -40,7 +41,15 @@ export const menuList: MenuItemConstructorOptions[] = [
       {
         label: 'Close Tab',
         accelerator: 'CmdOrCtrl+W',
-        click: () => sendToAllWindows(AppEvent.closeActiveTab),
+        // In another window (About), the shortcut closes that window.
+        click: (_item, focusedWindow) => {
+          const mainWindow = getMainWindow();
+          if (focusedWindow && focusedWindow !== mainWindow) {
+            focusedWindow.close();
+          } else {
+            mainWindow?.webContents.send(AppEvent.closeActiveTab);
+          }
+        },
       },
     ],
   },

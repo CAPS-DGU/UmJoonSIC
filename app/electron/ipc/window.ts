@@ -1,7 +1,12 @@
 // IPC: closing the main window with unsaved changes, and the question asked about them.
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { IpcChannel, type UnsavedChangesChoice } from '../../shared/ipc';
-import { allowMainWindowClose, setHasUnsavedChanges } from '../windows/mainWindow';
+import {
+  allowMainWindowClose,
+  cancelMainWindowClose,
+  noteAsking,
+  setHasUnsavedChanges,
+} from '../windows/mainWindow';
 import { ipcResult } from './result';
 
 const CHOICES: UnsavedChangesChoice[] = ['save', 'discard', 'cancel'];
@@ -27,12 +32,20 @@ export function registerWindowHandlers() {
         cancelId: 2,
         noLink: true,
       };
-      const { response } = window
-        ? await dialog.showMessageBox(window, options)
-        : await dialog.showMessageBox(options);
-      return CHOICES[response] ?? 'cancel';
+      noteAsking(true);
+      try {
+        const { response } = window
+          ? await dialog.showMessageBox(window, options)
+          : await dialog.showMessageBox(options);
+        return CHOICES[response] ?? 'cancel';
+      } finally {
+        noteAsking(false);
+      }
     }),
   );
+
+  // The user cancelled closing (or a save failed): the window stays.
+  ipcMain.on(IpcChannel.abortClose, () => cancelMainWindowClose());
 
   // The renderer has dealt with the unsaved changes: close for real (and finish a quit).
   ipcMain.handle(IpcChannel.closeWindow, () =>

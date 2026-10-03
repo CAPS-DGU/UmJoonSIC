@@ -1,9 +1,15 @@
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import { is } from '@electron-toolkit/utils';
 import { AppEvent } from '../../shared/ipc';
 import { PRELOAD_PATH, rendererFile } from '../paths';
 
 let mainWindow: BrowserWindow | null = null;
+
+// Closing with unsaved changes: the window's close is held back and the page asks the user
+// (save / don't save / cancel), then closes the window through allowMainWindowClose().
+
+/** How long the page has to start asking before the window closes anyway (page broken). */
+const CLOSE_ANSWER_TIMEOUT_MS = 3000;
 
 /** Reported by the renderer: closing now would lose changes. */
 let hasUnsavedChanges = false;
@@ -13,6 +19,16 @@ let closeAllowed = false;
 let quitRequested = false;
 /** The close that was held back was part of a quit, to be finished afterwards. */
 let quitPending = false;
+/** The page hangs: it could not answer, so a close is not held back meanwhile. */
+let isUnresponsive = false;
+/** The page is asking the user (its dialog is open). */
+let isAsking = false;
+let closeFallbackTimer: NodeJS.Timeout | null = null;
+
+const clearCloseFallback = () => {
+  if (closeFallbackTimer) clearTimeout(closeFallbackTimer);
+  closeFallbackTimer = null;
+};
 
 export function setHasUnsavedChanges(value: boolean) {
   hasUnsavedChanges = value;
@@ -24,8 +40,20 @@ export function noteQuitRequested() {
   quitRequested = true;
 }
 
+export function noteAsking(asking: boolean) {
+  isAsking = asking;
+  if (asking) clearCloseFallback();
+}
+
+/** The user cancelled: the window stays, and a quit that was under way is off. */
+export function cancelMainWindowClose() {
+  clearCloseFallback();
+  quitPending = false;
+}
+
 /** Close the main window without asking again. Returns true if a quit should follow. */
 export function allowMainWindowClose(): boolean {
+  clearCloseFallback();
   closeAllowed = true;
   mainWindow?.close();
   const quit = quitPending;
@@ -58,21 +86,25 @@ export function createMainWindow(): BrowserWindow {
   hasUnsavedChanges = false;
   closeAllowed = false;
 
-  // With unsaved changes, the renderer asks the user first (save / don't save / cancel)
-  // and then closes the window through allowMainWindowClose().
   window.on('close', event => {
-    if (!hasUnsavedChanges || closeAllowed) return;
+    if (!hasUnsavedChanges || closeAllowed || isUnresponsive) return;
     event.preventDefault();
     quitPending = quitRequested;
     quitRequested = false;
     window.webContents.send(AppEvent.closeRequested);
+    // A page that lost its handlers (a crashed React tree) never asks: do not keep the
+    // window (and the app) from closing for good.
+    clearCloseFallback();
+    closeFallbackTimer = setTimeout(() => {
+      if (!isAsking && allowMainWindowClose()) app.quit();
+    }, CLOSE_ANSWER_TIMEOUT_MS);
   });
-  // A page that crashed, hangs or reloads cannot answer, and its changes are gone anyway:
-  // do not hold the window open for it.
+  // A crashed or reloaded page has lost its changes; a hanging one cannot answer for now.
   const forgetChanges = () => setHasUnsavedChanges(false);
   window.webContents.on('render-process-gone', forgetChanges);
-  window.on('unresponsive', forgetChanges);
   window.webContents.on('did-start-loading', forgetChanges);
+  window.on('unresponsive', () => (isUnresponsive = true));
+  window.on('responsive', () => (isUnresponsive = false));
 
   // Links open in the system browser, never in a new app window.
   window.webContents.setWindowOpenHandler(details => {

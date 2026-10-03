@@ -37,6 +37,7 @@ const api: RendererApi = {
   confirmUnsavedChanges: fileNames =>
     ipcRenderer.invoke(IpcChannel.confirmUnsavedChanges, fileNames),
   closeWindow: () => ipcRenderer.invoke(IpcChannel.closeWindow),
+  abortClose: () => ipcRenderer.send(IpcChannel.abortClose),
 };
 
 // main -> renderer messages become DOM events of the same name.

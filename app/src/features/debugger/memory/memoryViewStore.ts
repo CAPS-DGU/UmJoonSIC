@@ -82,10 +82,10 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
       values.forEach((value, i) => {
         const address = start + i;
         const known = bytes.get(address);
+        failed.delete(address);
         if (known !== undefined && keepKnown) return;
         if (known !== undefined && known !== value) changed.add(address);
         bytes.set(address, value);
-        failed.delete(address);
       });
       return { bytes, failed };
     });

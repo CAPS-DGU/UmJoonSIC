@@ -66,17 +66,17 @@ function publishLoadedFiles(files: LoadedFile[]) {
 
 /** Record the assembler errors, show a linker error if any, and open the first failing file. */
 function publishLoadErrors(files: LoadedFile[], projectPath: string) {
-  const { addErrors } = useErrorStore.getState();
+  const { setErrors } = useErrorStore.getState();
   files.forEach(file => {
     if (file.assemblerErrors?.length) {
-      addErrors(
+      setErrors(
         file.fileName,
+        'load',
         file.assemblerErrors.map(err => ({
           row: err.row,
           col: err.col,
           length: err.length,
           message: err.message,
-          type: 'load',
         })),
       );
     }
@@ -99,39 +99,47 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
   }
 }
 
-/** Read the memory the views show (the memory viewer and the watch list) again. */
-function refreshMemoryViews() {
+/**
+ * Read the memory the views show (the memory viewer and the watch list) again. With
+ * `markChanges`, the memory viewer flashes the bytes that changed (after a step).
+ */
+function refreshMemoryViews({ markChanges }: { markChanges: boolean }) {
+  const memory = useMemoryViewStore.getState();
   return Promise.all([
-    useMemoryViewStore.getState().refresh(),
+    markChanges ? memory.refresh() : memory.setViewRange(memory.viewRange),
     useWatchStore.getState().fetchVarMemoryValue(),
   ]);
 }
 
 /**
- * Auto-play runs as a loop; starting, pausing or stopping it makes the current loop
- * outdated, and it ends at its next check.
+ * Identifies the current run. Starting or stopping a run changes it, so that work begun for
+ * an earlier run (a step, a load, an auto-play loop) ends without touching the new one.
  */
-let playGeneration = 0;
+let runId = 0;
 
 /** Steps run one after another, also when Step is clicked faster than the simulator answers. */
 let lastStep: Promise<unknown> = Promise.resolve();
 
+/** A program being loaded; Run clicked again meanwhile waits for it instead of loading twice. */
+let starting: Promise<boolean> | null = null;
+
 export const useRunningStore = create<RunningState>((set, get) => {
   /**
-   * Execute one instruction and refresh the views. When the program has halted (the PC
-   * did not move), the run is stopped. Resolves to false if the run cannot go on.
+   * Execute one instruction of the run `forRun` and refresh the views. When the program has
+   * halted (the PC did not move), the run is stopped. Resolves to false if the run cannot go on.
    */
-  const executeStep = (): Promise<boolean> => {
+  const executeStep = (forRun: number): Promise<boolean> => {
     const step = lastStep.then(async () => {
-      if (!get().isRunning) return false;
+      if (forRun !== runId || !get().isRunning) return false;
       const result = await useRegisterStore.getState().step();
+      if (forRun !== runId) return false;
       if (result === 'failed') return false;
       if (result === 'halted') {
         await get().stopRunning();
         return false;
       }
-      await refreshMemoryViews();
-      return true;
+      await refreshMemoryViews({ markChanges: true });
+      return forRun === runId;
     });
     lastStep = step.catch(() => {});
     return step;
@@ -142,8 +150,8 @@ export const useRunningStore = create<RunningState>((set, get) => {
    * when the PC reaches a row with a breakpoint, before that row is executed.
    */
   const autoPlay = async (delayMs: number) => {
-    const generation = ++playGeneration;
-    const isCurrent = () => generation === playGeneration && get().isRunning && !get().isPaused;
+    const forRun = ++runId;
+    const isCurrent = () => forRun === runId && get().isRunning && !get().isPaused;
     set({ isPaused: false });
     try {
       // The delay is counted from the start of one step to the start of the next.
@@ -152,7 +160,13 @@ export const useRunningStore = create<RunningState>((set, get) => {
         await sleep(Math.max(0, nextStepAt - Date.now()));
         if (!isCurrent()) return;
         nextStepAt = Date.now() + delayMs;
-        if (!(await executeStep()) || !isCurrent()) return;
+        const stepped = await executeStep(forRun);
+        if (!isCurrent()) return;
+        if (!stepped) {
+          // The step failed (the run itself goes on): stop auto-playing.
+          set({ isPaused: true });
+          return;
+        }
         if (breakpointAt(useListingStore.getState().listings, useRegisterStore.getState().PC)) {
           set({ isPaused: true });
           return;
@@ -160,17 +174,25 @@ export const useRunningStore = create<RunningState>((set, get) => {
       }
     } catch (error) {
       console.error('Auto-play stopped:', error);
-      set({ isPaused: true });
+      if (forRun === runId) set({ isPaused: true });
     }
   };
 
-  /** Load the program and show it, stopped at its first instruction. */
-  const start = async () => {
-    playGeneration++;
-    if (!(await get().loadProgram())) return false;
-    set({ isRunning: true, isPaused: true });
-    await refreshMemoryViews();
-    return true;
+  /** Load the program and show it, stopped at its first instruction. False if that failed. */
+  const start = () => {
+    starting ??= (async () => {
+      try {
+        const forRun = ++runId;
+        if (!(await get().loadProgram())) return false;
+        if (forRun !== runId) return false;
+        set({ isRunning: true, isPaused: true });
+        await refreshMemoryViews({ markChanges: false });
+        return true;
+      } finally {
+        starting = null;
+      }
+    })();
+    return starting;
   };
 
   return {
@@ -181,9 +203,17 @@ export const useRunningStore = create<RunningState>((set, get) => {
     setDelayTime: delayTime => set({ delayTime }),
 
     loadProgram: async () => {
+      const forRun = runId;
       const { projectPath, settings } = useProjectStore.getState();
 
-      await beginSimulation();
+      const begun = await beginSimulation();
+      if (!begun.ok) {
+        // For example a file device that cannot be opened (project.sic edited by hand).
+        useInfoModalStore
+          .getState()
+          .show('시뮬레이터 오류', begun.message ?? '시뮬레이션을 시작하지 못했습니다.');
+        return false;
+      }
       // The memory of an earlier run is gone from the simulator; stop showing it.
       await useMemoryViewStore.getState().reload();
       const { success } = await useEditorTabStore.getState().saveAllTabs();
@@ -194,13 +224,16 @@ export const useRunningStore = create<RunningState>((set, get) => {
         outputDir: path.join(projectPath, '.out'),
         main: settings.main == '' ? undefined : settings.main,
       });
+      // The run was stopped, or the project changed, while the program was assembled.
+      if (forRun !== runId) return false;
 
+      // This load's errors replace those of the last one.
+      useErrorStore.getState().clearErrors(undefined, 'load');
       if (!data.ok) {
         publishLoadErrors(data.files, projectPath);
         await get().stopRunning();
         return false;
       }
-      useErrorStore.getState().clearErrors(undefined, 'load');
       useRegisterStore.getState().setAll(data.registers);
       publishLoadedFiles(data.files);
       return true;
@@ -223,13 +256,13 @@ export const useRunningStore = create<RunningState>((set, get) => {
     },
 
     pause: () => {
-      playGeneration++;
+      runId++;
       set({ isPaused: true });
     },
 
     stepOnce: async () => {
       if (get().isRunning && get().isPaused) {
-        await executeStep();
+        await executeStep(runId);
       }
     },
 
@@ -239,16 +272,18 @@ export const useRunningStore = create<RunningState>((set, get) => {
     },
 
     stopRunning: async () => {
-      playGeneration++;
-      const data = await beginSimulation();
-      if (!data.ok) {
-        console.error('Failed to stop');
-        return;
-      }
+      runId++;
+      // Whatever the simulator answers, the run is over for the user.
       useListingStore.getState().clearListings();
       useEditorTabStore.getState().closeListingTabs();
       useWatchStore.getState().clearWatch();
       set({ isPaused: true, isRunning: false });
+      try {
+        const data = await beginSimulation();
+        if (!data.ok) console.error('Failed to reset the simulation:', data.message);
+      } catch (error) {
+        console.error('Failed to reset the simulation:', error);
+      }
     },
   };
 });

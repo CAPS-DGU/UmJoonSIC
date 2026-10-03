@@ -59,6 +59,8 @@ function createWindow(): void {
       await prepareSimulator();
       await Promise.all([simulatorProcess.start(), sleep(SPLASH_HOLD_MS)]);
     } catch (error) {
+      // The splash stays on top of other windows; the error box would end up behind it.
+      if (!splash.isDestroyed()) splash.destroy();
       dialog.showErrorBox(
         '시뮬레이터 오류',
         `시뮬레이터를 시작하지 못해 앱을 종료합니다.\n${error instanceof Error ? error.message : String(error)}`,

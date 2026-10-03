@@ -1,4 +1,5 @@
 import { useConsoleStore } from '@/features/panel/consoleStore';
+import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 
 /** Server tab: simulator output (collected by useServerLog) and a restart button. */
@@ -7,8 +8,14 @@ export default function ConsolePanel() {
 
   // The main process reports the outcome in the output, and in a dialog.
   const handleRestart = async () => {
+    // Ends a run; if the simulator is down, that only resets the screen, which is fine here.
     await useRunningStore.getState().stopRunning();
-    await window.api.restartServer();
+    const res = await window.api.restartServer();
+    if (res.success) {
+      // A new simulator starts in SIC mode without file devices: set up the current ones.
+      const { mode, setMode } = useMemoryViewStore.getState();
+      setMode(mode);
+    }
   };
 
   return (
