@@ -12,20 +12,25 @@ import type {
   SyntaxCheckResult,
 } from '@/api/types';
 
-const BASE_URL = 'http://localhost:9090';
+// 127.0.0.1, as the simulator binds IPv4 only ('localhost' may try IPv6 first).
+const BASE_URL = 'http://127.0.0.1:9090';
 
 /**
- * POST JSON and parse the JSON answer. By default an HTTP error status throws, as the
- * axios calls did before; `rejectHttpErrors: false` keeps the old fetch behaviour of
- * reading the body anyway (the simulator answers errors with a JSON `{ ok: false }`).
+ * POST JSON and parse the JSON answer. Waits while the simulator is still starting (or
+ * restarting from the Server panel), so an early request does not fail. An HTTP error
+ * status throws; the simulator reports its own errors as `{ ok: false }` with status 200.
  */
-async function post<T>(route: string, body: unknown, rejectHttpErrors = true): Promise<T> {
+async function post<T>(route: string, body: unknown): Promise<T> {
+  const ready = await window.api.waitForSimulator();
+  if (!ready.success) {
+    throw new Error(`Simulator is not available: ${ready.message ?? 'unknown error'}`);
+  }
   const res = await fetch(`${BASE_URL}${route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (rejectHttpErrors && !res.ok) {
+  if (!res.ok) {
     throw new Error(`Simulator request ${route} failed with HTTP ${res.status}`);
   }
   return (await res.json()) as T;
@@ -40,9 +45,9 @@ export const simulator = {
   load: (request: LoadRequest) => post<LoadResponse>('/load', request),
 
   /** Execute one instruction. */
-  step: () => post<StepResponse>('/step', {}, false),
+  step: () => post<StepResponse>('/step', {}),
 
-  /** Read memory from `start` to `end`. */
+  /** Read memory from `start` to `end`, both inclusive. */
   memory: (start: number, end: number) => post<MemoryResponse>('/memory', { start, end }),
 
   /** Assemble the given texts without loading them; returns the errors per file. */

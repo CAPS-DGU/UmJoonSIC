@@ -1,22 +1,25 @@
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
 import type { ServerLogPayload } from '@shared/ipc';
 
-/** One line of simulator output shown in the Server tab. */
-export interface ConsoleMessage extends ServerLogPayload {
-  id: string;
-  timestamp: number;
-}
+/** The Server tab keeps this many chunks of output; older ones are dropped. */
+const MAX_MESSAGES = 1000;
 
 interface ConsoleState {
-  messages: ConsoleMessage[];
-  addMessage: (message: ServerLogPayload) => void;
+  /** Simulator output, ordered by `seq`. */
+  messages: ServerLogPayload[];
+  /** Add output, ignoring chunks that are already there (the same `seq`). */
+  addMessages: (messages: ServerLogPayload[]) => void;
 }
 
 export const useConsoleStore = create<ConsoleState>(set => ({
   messages: [],
-  addMessage: message =>
-    set(state => ({
-      messages: [...state.messages, { ...message, id: uuidv4(), timestamp: Date.now() }],
-    })),
+  addMessages: incoming =>
+    set(state => {
+      const bySeq = new Map(state.messages.map(message => [message.seq, message]));
+      for (const message of incoming) {
+        bySeq.set(message.seq, message);
+      }
+      const messages = [...bySeq.values()].sort((a, b) => a.seq - b.seq);
+      return { messages: messages.slice(-MAX_MESSAGES) };
+    }),
 }));

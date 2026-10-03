@@ -2,6 +2,7 @@
 import path from 'path';
 import fs from 'fs';
 import { createReadStream } from 'fs';
+import { pipeline } from 'stream/promises';
 import * as tar from 'tar';
 import AdmZip from 'adm-zip';
 import { downloadFile } from './download';
@@ -108,16 +109,8 @@ async function extractZip(zipPath: string, extractPath: string): Promise<void> {
  * TAR.GZ 파일 압축 해제
  */
 async function extractTarGz(tarGzPath: string, extractPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const readStream = createReadStream(tarGzPath);
-
-    readStream
-      .pipe(tar.extract({ cwd: extractPath }))
-      .on('end', () => {
-        resolve();
-      })
-      .on('error', reject);
-  });
+  // pipeline also rejects when the archive cannot be read (a missing file used to hang here).
+  await pipeline(createReadStream(tarGzPath), tar.extract({ cwd: extractPath }));
 }
 
 /**

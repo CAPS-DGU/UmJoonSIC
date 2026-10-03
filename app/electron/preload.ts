@@ -2,7 +2,6 @@
 // It exposes `window.api` (see shared/ipc.ts) and re-dispatches main-process
 // messages as DOM events on `window`.
 import { contextBridge, ipcRenderer } from 'electron';
-import { electronAPI } from '@electron-toolkit/preload';
 import { AppEvent, IpcChannel, type RendererApi, type ServerLogPayload } from '../shared/ipc';
 
 // A project path can arrive before React has mounted its listener; keep it until asked for.
@@ -30,6 +29,8 @@ const api: RendererApi = {
     ipcRenderer.invoke(IpcChannel.deleteFolder, { projectPath, relativePath }),
   pickFile: () => ipcRenderer.invoke(IpcChannel.pickFile),
   restartServer: () => ipcRenderer.invoke(IpcChannel.restartServer),
+  waitForSimulator: () => ipcRenderer.invoke(IpcChannel.waitForSimulator),
+  getServerLog: () => ipcRenderer.invoke(IpcChannel.getServerLog),
 };
 
 // main -> renderer messages become DOM events of the same name.
@@ -48,16 +49,5 @@ ipcRenderer.on(AppEvent.openProjectPath, (_event, sicPath: string) => {
   window.dispatchEvent(new CustomEvent(AppEvent.openProjectPath, { detail: sicPath }));
 });
 
-// With context isolation the API must go through contextBridge; without it, plain globals work.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI);
-    contextBridge.exposeInMainWorld('api', api);
-  } catch (error) {
-    console.error('Failed to expose Electron API in the renderer:', error);
-  }
-} else {
-  const globals = window as unknown as { electron: typeof electronAPI; api: RendererApi };
-  globals.electron = electronAPI;
-  globals.api = api;
-}
+// The renderer runs with context isolation, so the API goes through contextBridge.
+contextBridge.exposeInMainWorld('api', api);

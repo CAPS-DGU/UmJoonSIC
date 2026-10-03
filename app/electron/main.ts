@@ -1,6 +1,5 @@
 // Main process entry: application lifecycle.
-import { app, BrowserWindow, Menu } from 'electron';
-import type { ChildProcess } from 'child_process';
+import { app, BrowserWindow, dialog, Menu } from 'electron';
 import { electronApp } from '@electron-toolkit/utils';
 import { checkUpdate } from './appUpdate';
 import { registerIpcHandlers } from './ipc';
@@ -15,22 +14,20 @@ import {
 } from './project/openQueue';
 import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
 import { checkJreExists, downloadJre } from './simulator/jre';
-import { runServer } from './simulator/process';
+import { simulatorProcess } from './simulator/process';
 import { createMainWindow, getMainWindow } from './windows/mainWindow';
 import { createSplashWindow, showSplashContent } from './windows/splashWindow';
 
-/** How long the splash stays up after the simulator has started. */
+/** The splash stays up at least this long once the simulator is being started. */
 const SPLASH_HOLD_MS = 3000;
 
-// The simulator started at launch. NOTE: a simulator restarted from the Server panel is
-// tracked in simulator/process.ts, not here, so quitting does not kill that one.
-let server: ChildProcess | null = null;
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.setName('UmJoonSIC');
 registerIpcHandlers();
 
-/** Make sure a JRE and simulator.jar are present and current, then start the simulator. */
-async function startSimulator(): Promise<ChildProcess> {
+/** Make sure a JRE and simulator.jar are present and current. Throws if either is missing. */
+async function prepareSimulator() {
   await checkUpdate();
 
   if (!checkJreExists()) {
@@ -45,7 +42,11 @@ async function startSimulator(): Promise<ChildProcess> {
   }
   await checkJARUpdate();
 
-  return runServer();
+  if (!checkJreExists() || !checkServerExists()) {
+    throw new Error(
+      'Java 실행 환경 또는 simulator.jar 를 준비하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 실행하세요.',
+    );
+  }
 }
 
 function createWindow(): void {
@@ -54,15 +55,22 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', async () => {
     showSplashContent(splash);
-    server = await startSimulator();
-
-    setTimeout(() => {
-      // The user may have closed the splash already.
-      if (!splash.isDestroyed()) {
-        splash.close();
-      }
-      getMainWindow()?.show();
-    }, SPLASH_HOLD_MS);
+    try {
+      await prepareSimulator();
+      await Promise.all([simulatorProcess.start(), sleep(SPLASH_HOLD_MS)]);
+    } catch (error) {
+      dialog.showErrorBox(
+        '시뮬레이터 오류',
+        `시뮬레이터를 시작하지 못해 앱을 종료합니다.\n${error instanceof Error ? error.message : String(error)}`,
+      );
+      app.quit();
+      return;
+    }
+    // The user may have closed the splash already.
+    if (!splash.isDestroyed()) {
+      splash.close();
+    }
+    getMainWindow()?.show();
   });
 
   mainWindow.webContents.on('did-finish-load', sendPendingProjectPath);
@@ -117,15 +125,11 @@ if (!app.requestSingleInstanceLock()) {
 // active until the user quits explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (server) {
-      server.kill();
-    }
     app.quit();
   }
 });
 
+// Stop the current simulator, including one restarted from the Server panel.
 app.on('will-quit', () => {
-  if (server) {
-    server.kill();
-  }
+  simulatorProcess.kill();
 });

@@ -1,7 +1,7 @@
 // simulator.jar: presence check, download, and keeping it in sync with the GitHub release.
 import fs from 'fs';
 import { createReadStream } from 'fs';
-import { app, dialog } from 'electron';
+import { app } from 'electron';
 import { createHash } from 'crypto';
 import { downloadFile } from './download';
 import { getServerPath } from './paths';
@@ -25,21 +25,10 @@ export async function checkJARUpdate() {
     // 네트워크/릴리즈 정보 조회 시도
     const assets = await resolveJarAndHashFromReleases();
 
-    // 네트워크 접근 불가 또는 API 실패의 명확한 신호로 null 반환
+    // 네트워크 접근 불가 또는 API 실패: 있는 simulator.jar 를 그대로 쓴다.
+    // (없으면 시작하는 쪽에서 오류를 알리고 종료한다.)
     if (assets === null) {
-      const exists = fs.existsSync(getServerPath());
-      if (exists) {
-        // 조용히 통과 (요구사항)
-        return;
-      } else {
-        // 오류 안내 후 종료 (요구사항)
-        dialog.showErrorBox(
-          '네트워크 오류',
-          '서버에 연결할 수 없고 simulator.jar 파일이 없습니다. 애플리케이션을 종료합니다.',
-        );
-        app.quit();
-        return;
-      }
+      return;
     }
 
     const { jarUrl, hashUrl } = assets;
@@ -72,15 +61,8 @@ export async function checkJARUpdate() {
       await downloadFile('simulator.jar', jarUrl);
     }
   } catch (e) {
+    // 있는 simulator.jar 를 그대로 쓴다. (없으면 시작하는 쪽에서 오류를 알리고 종료한다.)
     console.warn('checkJARUpdate 실패:', e);
-    const exists = fs.existsSync(getServerPath());
-    if (!exists) {
-      dialog.showErrorBox(
-        '오류',
-        '예기치 못한 오류로 simulator.jar을 준비하지 못했습니다. 애플리케이션을 종료합니다.',
-      );
-      app.quit();
-    }
   }
 }
 

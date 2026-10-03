@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { simulator } from '@/api/simulator';
 import type { MachineMode } from '@/api/types';
+import { recheckOpenProjectFiles } from '@/features/editor/lib/syntaxCheck';
 import { useProjectStore } from '@/features/project/projectStore';
 
 export type { MachineMode };
@@ -67,8 +68,9 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       changedNodes: new Set(),
     });
 
-    // Same request as when a run starts; not awaited.
-    (async () => {
+    // Restart the simulation in the new mode, then check the open files again: what is
+    // valid depends on the mode, and the simulator checks in the mode it is in.
+    void (async () => {
       try {
         const { settings } = useProjectStore.getState();
         const data = await simulator.begin(newMode, settings.filedevices);
@@ -78,6 +80,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
       } catch (e) {
         console.error('Begin request failed after mode change:', e);
       }
+      recheckOpenProjectFiles();
     })();
   },
 

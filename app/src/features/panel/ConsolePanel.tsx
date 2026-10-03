@@ -1,34 +1,14 @@
-import { useEffect } from 'react';
-import { AppEvent, type ServerLogPayload } from '@shared/ipc';
 import { useConsoleStore } from '@/features/panel/consoleStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 
-/**
- * Server tab: simulator output and a restart button.
- * NOTE: output is collected only while this tab is mounted; earlier lines are not shown.
- */
+/** Server tab: simulator output (collected by useServerLog) and a restart button. */
 export default function ConsolePanel() {
   const messages = useConsoleStore(s => s.messages);
-  const addMessage = useConsoleStore(s => s.addMessage);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<ServerLogPayload>).detail;
-      if (!detail) return;
-      addMessage({ type: detail.type, message: detail.message });
-    };
-    window.addEventListener(AppEvent.serverLog, handler);
-    return () => window.removeEventListener(AppEvent.serverLog, handler);
-  }, [addMessage]);
-
+  // The main process reports the outcome in the output, and in a dialog.
   const handleRestart = async () => {
-    useRunningStore.getState().stopRunning();
-    const res = await window.api.restartServer();
-    if (res.success) {
-      addMessage({ type: 'out', message: 'Server restarted.' });
-    } else {
-      addMessage({ type: 'error', message: `Restart failed: ${res.message || ''}` });
-    }
+    await useRunningStore.getState().stopRunning();
+    await window.api.restartServer();
   };
 
   return (
@@ -49,7 +29,7 @@ export default function ConsolePanel() {
           <ul className=" p-2 space-y-1 bg-gray-50 dark:bg-gray-800 rounded-md">
             {messages.map(msg => (
               <li
-                key={msg.id}
+                key={msg.seq}
                 className={`text-sm ${msg.type === 'error' ? 'text-red-500' : 'text-gray-900 dark:text-gray-200'}`}
               >
                 {msg.message}

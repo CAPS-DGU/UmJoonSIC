@@ -5,7 +5,11 @@ import { BrowserWindow } from 'electron';
 import { rendererFile } from '../paths';
 import { getSimulatorDataDir } from './paths';
 
+/** Download `url` to `relativePath` in the simulator data directory. Throws if it fails. */
 export async function downloadFile(relativePath: string, url: string) {
+  // The directory does not exist on a first start on Linux (on Windows and macOS it is
+  // Electron's own userData directory, whose name differs only in case).
+  fs.mkdirSync(getSimulatorDataDir(), { recursive: true });
   const filePath = path.join(getSimulatorDataDir(), relativePath);
 
   // 프로그레스 다이얼로그 생성
@@ -21,11 +25,6 @@ export async function downloadFile(relativePath: string, url: string) {
     alwaysOnTop: true,
     autoHideMenuBar: true,
     frame: false,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
-    },
   });
 
   // 프로그레스 다이얼로그 HTML 로드
@@ -167,5 +166,6 @@ export async function downloadFile(relativePath: string, url: string) {
     setTimeout(() => {
       progressWindow.close();
     }, 3000);
+    throw error;
   }
 }

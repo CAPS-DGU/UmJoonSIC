@@ -26,7 +26,9 @@ export interface IpcResult<T = void> {
   message?: string;
 }
 
+/** One chunk of simulator output, numbered in the order the main process received it. */
 export interface ServerLogPayload {
+  seq: number;
   type: 'out' | 'error';
   message: string;
 }
@@ -45,6 +47,8 @@ export const IpcChannel = {
   deleteFile: 'deleteFile',
   deleteFolder: 'deleteFolder',
   restartServer: 'restartServer',
+  waitForSimulator: 'waitForSimulator',
+  getServerLog: 'getServerLog',
 } as const;
 
 /**
@@ -75,4 +79,8 @@ export interface RendererApi {
   deleteFolder(projectPath: string, relativePath: string): Promise<IpcResult>;
   pickFile(): Promise<IpcResult<string>>;
   restartServer(): Promise<IpcResult>;
+  /** Resolves once the simulator accepts requests (waits while it starts or restarts). */
+  waitForSimulator(): Promise<IpcResult>;
+  /** The simulator output so far (the most recent lines), oldest first. */
+  getServerLog(): Promise<IpcResult<ServerLogPayload[]>>;
 }
