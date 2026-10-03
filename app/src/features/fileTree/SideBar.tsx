@@ -39,7 +39,8 @@ export default function SideBar() {
 
   const fileTreeStructure = useFileTree(fileTree);
 
-  const toggleFolder = (name: string) => setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
+  const toggleFolder = (relativePath: string) =>
+    setExpanded(prev => ({ ...prev, [relativePath]: !prev[relativePath] }));
 
   const handleOpenFile = (item: FileStructure) => {
     if (item.type === 'file') {
