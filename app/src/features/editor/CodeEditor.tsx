@@ -11,6 +11,7 @@ import { useErrorMarkers } from '@/features/editor/hooks/useErrorMarkers';
 import { useFileContent } from '@/features/editor/hooks/useFileContent';
 import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
 import { editorOptions } from '@/features/editor/monaco/editorOptions';
+import '@/features/editor/monaco/monacoLoader';
 import { registerSicxe, SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 import { useProjectStore } from '@/features/project/projectStore';
 import '@/features/editor/syntaxError.css';
