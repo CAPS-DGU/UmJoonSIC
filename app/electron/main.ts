@@ -15,7 +15,7 @@ import {
 import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
 import { checkJreExists, downloadJre } from './simulator/jre';
 import { simulatorProcess } from './simulator/process';
-import { createMainWindow, getMainWindow } from './windows/mainWindow';
+import { createMainWindow, getMainWindow, noteQuitRequested } from './windows/mainWindow';
 import { createSplashWindow, showSplashContent } from './windows/splashWindow';
 
 /** The splash stays up at least this long once the simulator is being started. */
@@ -128,6 +128,8 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+app.on('before-quit', noteQuitRequested);
 
 // Stop the current simulator, including one restarted from the Server panel.
 app.on('will-quit', () => {

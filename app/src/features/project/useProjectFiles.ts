@@ -1,3 +1,4 @@
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { FileStructure } from '@/features/fileTree/types';
 import { useProjectStore } from '@/features/project/projectStore';
 
@@ -16,7 +17,7 @@ const joinRelative = (folder: string, name: string) => (folder ? `${folder}/${na
 
 /** Create and delete files and folders of the open project, keeping project.sic and the tree in sync. */
 export function useProjectFiles() {
-  const { projectPath, addAsmFile, removeAsmFile, refreshFileTree, setSelectedFileOrFolder } =
+  const { projectPath, addAsmFile, removeAsmFiles, refreshFileTree, setSelectedFileOrFolder } =
     useProjectStore();
 
   const absolute = (relativePath: string) => `${projectPath}/${relativePath}`.replace(/\/+/g, '/');
@@ -57,7 +58,8 @@ export function useProjectFiles() {
       throw new Error(res.message);
     }
 
-    if (file.type === 'file' && file.name.endsWith('.asm')) removeAsmFile(file.relativePath);
+    removeAsmFiles([file.relativePath]);
+    useEditorTabStore.getState().closeTabsUnder(file.relativePath);
     refreshFileTree();
     deselectIfSelected(file);
   };
@@ -82,14 +84,16 @@ export function useProjectFiles() {
     });
   };
 
+  /** Delete a folder with everything in it; its files leave the asm list and their tabs close. */
   const deleteFolder = async (folder: FileStructure) => {
-    const parentRelativePath =
-      folder && folder.type === 'folder' ? parentOf(folder.relativePath) : '';
-    const res = await window.api.deleteFolder(absolute(parentRelativePath), folder.name);
+    const res = await window.api.deleteFolder(absolute(parentOf(folder.relativePath)), folder.name);
     if (!res.success) {
       throw new Error(res.message);
     }
 
+    const inFolder = (p: string) => p.startsWith(`${folder.relativePath}/`);
+    removeAsmFiles(useProjectStore.getState().settings.asm.filter(inFolder));
+    useEditorTabStore.getState().closeTabsUnder(folder.relativePath);
     refreshFileTree();
     deselectIfSelected(folder);
   };
