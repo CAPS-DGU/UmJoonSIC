@@ -1,66 +1,81 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
-import type * as monaco_editor from 'monaco-editor';
-import type { EditorTab } from '@/features/editor/editorTabStore';
+import { useEffect, useRef } from 'react';
+import * as monaco from 'monaco-editor';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { clampLine } from '@/features/editor/lib/clampLine';
+import { modelPath } from '@/features/editor/monaco/models';
 import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
-import { useErrorStore } from '@/features/panel/errorStore';
+import { useErrorStore, type CompileError } from '@/features/panel/errorStore';
+import { useProjectStore } from '@/features/project/projectStore';
+
+/** The open tab whose model this is, if any. */
+function filePathOf(model: monaco.editor.ITextModel, projectPath: string) {
+  const uri = model.uri.toString();
+  return useEditorTabStore.getState().tabs.find(tab => modelPath(projectPath, tab.filePath) === uri)
+    ?.filePath;
+}
 
 /**
- * Show the active file's errors in the editor: a squiggle under each error, and
- * a highlighted line for the errors reported when the program was loaded.
+ * Show each open file's errors in its editor model: a squiggle under each error, and a
+ * highlighted line for the errors reported when the program was loaded. Applied when the
+ * errors change, and to a model when it is created (a file shown for the first time).
  */
-export function useErrorMarkers(
-  editorRef: MutableRefObject<monaco_editor.editor.IStandaloneCodeEditor | null>,
-  monaco: typeof monaco_editor | null,
-  activeTab: EditorTab | undefined,
-) {
+export function useErrorMarkers() {
   const errors = useErrorStore(state => state.errors);
-  const loadErrorDecorationIdsRef = useRef<string[]>([]);
+  const projectPath = useProjectStore(state => state.projectPath);
+  /** Load-error line decorations per model, to replace them on the next update. */
+  const decorationIdsRef = useRef(new Map<string, string[]>());
 
   useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor || !activeTab || !errors) return;
-    const model = editor.getModel();
-    if (!model || !monaco) return;
+    const decorationIds = decorationIdsRef.current;
 
-    const fileErrors = errors[activeTab.filePath];
-    if (!fileErrors?.length) {
-      monaco.editor.setModelMarkers(model, SICXE_LANGUAGE_ID, []);
-      if (loadErrorDecorationIdsRef.current.length > 0) {
-        loadErrorDecorationIdsRef.current = editor.deltaDecorations(
-          loadErrorDecorationIdsRef.current,
-          [],
-        );
-      }
-      return;
+    const apply = (model: monaco.editor.ITextModel, fileErrors: CompileError[]) => {
+      monaco.editor.setModelMarkers(
+        model,
+        SICXE_LANGUAGE_ID,
+        fileErrors.map(err => {
+          const line = clampLine(err.row, model);
+          const maxColumn = model.getLineMaxColumn(line);
+          return {
+            severity: monaco.MarkerSeverity.Error,
+            message: err.message,
+            startLineNumber: line,
+            startColumn: Math.max(1, Math.min(err.col, maxColumn)),
+            endLineNumber: line,
+            endColumn: Math.max(1, Math.min(err.col + (err.length ?? 1), maxColumn)),
+          };
+        }),
+      );
+      const uri = model.uri.toString();
+      const loadErrorLines = fileErrors
+        .filter(err => err.type === 'load')
+        .map(err => clampLine(err.row, model));
+      decorationIds.set(
+        uri,
+        model.deltaDecorations(
+          decorationIds.get(uri) ?? [],
+          loadErrorLines.map(line => ({
+            range: new monaco.Range(line, 1, line, 1),
+            options: { isWholeLine: true, className: 'load-error-line' },
+          })),
+        ),
+      );
+    };
+
+    for (const model of monaco.editor.getModels()) {
+      const filePath = filePathOf(model, projectPath);
+      if (filePath) apply(model, errors[filePath] ?? []);
     }
 
-    const markers = fileErrors.map(err => {
-      const line = clampLine(err.row, model);
-      const maxColumn = model.getLineMaxColumn(line);
-      return {
-        severity: monaco.MarkerSeverity.Error,
-        message: err.message,
-        startLineNumber: line,
-        startColumn: Math.max(1, Math.min(err.col, maxColumn)),
-        endLineNumber: line,
-        endColumn: Math.max(1, Math.min(err.col + (err.length ?? 1), maxColumn)),
-      };
+    const created = monaco.editor.onDidCreateModel(model => {
+      const filePath = filePathOf(model, projectPath);
+      if (filePath) apply(model, useErrorStore.getState().errors[filePath] ?? []);
     });
-    monaco.editor.setModelMarkers(model, SICXE_LANGUAGE_ID, markers);
-
-    const loadErrorDecorations = fileErrors
-      .filter(err => err.type === 'load')
-      .map(err => clampLine(err.row, model))
-      .map(line => ({
-        range: new monaco.Range(line, 1, line, 1),
-        options: { isWholeLine: true, className: 'load-error-line' },
-      }));
-    loadErrorDecorationIdsRef.current = editor.deltaDecorations(
-      loadErrorDecorationIdsRef.current,
-      loadErrorDecorations,
-    );
-    // Re-run when the errors or the active tab change; the tab object itself changes on every keystroke.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [errors, activeTab?.idx, monaco]);
+    const disposed = monaco.editor.onWillDisposeModel(model => {
+      decorationIds.delete(model.uri.toString());
+    });
+    return () => {
+      created.dispose();
+      disposed.dispose();
+    };
+  }, [errors, projectPath]);
 }

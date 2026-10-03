@@ -1,8 +1,11 @@
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import { requestCloseTab } from '@/features/editor/unsavedChanges';
 import { File, X, Settings } from 'lucide-react';
 
 export default function TabBar() {
-  const { tabs, closeTab, setActiveTab } = useEditorTabStore();
+  const tabs = useEditorTabStore(state => state.tabs);
+  const activePath = useEditorTabStore(state => state.activePath);
+  const activateTab = useEditorTabStore(state => state.activateTab);
 
   const getFileIcon = (fileName: string) => {
     if (fileName.toLowerCase() === 'project.sic') {
@@ -20,11 +23,11 @@ export default function TabBar() {
         <div
           key={tab.filePath}
           className={`flex items-center min-w-0 max-w-48 border-r border-gray-300 transition-colors ${
-            tab.isActive ? 'bg-gray-200 border-b-0' : 'bg-gray-50 hover:bg-gray-200'
+            tab.filePath === activePath ? 'bg-gray-200 border-b-0' : 'bg-gray-50 hover:bg-gray-200'
           }`}
         >
           <button
-            onClick={() => setActiveTab(tab.idx)}
+            onClick={() => activateTab(tab.filePath)}
             className="flex items-center gap-1 px-3 py-2 min-w-0 flex-1"
           >
             {getFileIcon(tab.title)}
@@ -37,7 +40,11 @@ export default function TabBar() {
               ●
             </span>
           </button>
-          <button onClick={() => closeTab(tab.idx)} className="p-1 rounded mr-1 " title="Close tab">
+          <button
+            onClick={() => requestCloseTab(tab.filePath)}
+            className="p-1 rounded mr-1 "
+            title="Close tab"
+          >
             <X width={12} height={12} className="text-gray-500 hover:text-gray-700" />
           </button>
         </div>

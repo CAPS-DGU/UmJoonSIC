@@ -5,7 +5,7 @@ import type { LoadedFile } from '@/api/types';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
-import { useListingStore } from '@/features/listing/listingStore';
+import { listingTabPath, useListingStore } from '@/features/listing/listingStore';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import { useProjectStore } from '@/features/project/projectStore';
@@ -49,7 +49,7 @@ async function publishLoadedFiles(files: LoadedFile[]) {
   files.forEach(file => {
     openTab({
       title: `List: ${file.fileName.split('/').pop()!}`,
-      filePath: path.join(file.fileName + '.lst'),
+      filePath: listingTabPath(file.fileName),
     });
     addListing(file.fileName, file.listing.rows);
     file.listing.watch.forEach(variable => addWatch({ filePath: file.fileName, ...variable }));
@@ -141,7 +141,7 @@ export const useRunningStore = create<RunningState>((set, get) => ({
       return;
     }
     useListingStore.getState().clearListings();
-    useEditorTabStore.getState().closeAllListFileTabs();
+    useEditorTabStore.getState().closeListingTabs();
     useWatchStore.getState().clearWatch();
     set({ isPaused: false, isRunning: false });
   },

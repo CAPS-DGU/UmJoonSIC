@@ -35,7 +35,7 @@ export function recheckOpenProjectFiles() {
   const tabs = useEditorTabStore.getState().tabs.filter(tab => isProjectAsmFile(tab.filePath));
   if (tabs.length === 0) return;
   checkSyntax(
-    tabs.map(tab => tab.fileContent ?? ''),
+    tabs.map(tab => tab.content),
     tabs.map(tab => tab.filePath),
   );
 }

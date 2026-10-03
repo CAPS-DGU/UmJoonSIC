@@ -3,7 +3,10 @@ import type { IpcResult, ProjectInfo, ProjectSettings } from '@shared/ipc';
 import { simulator } from '@/api/simulator';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import { resolveUnsavedChanges } from '@/features/editor/unsavedChanges';
 import type { FileStructure } from '@/features/fileTree/types';
+import { useErrorStore } from '@/features/panel/errorStore';
 
 const EMPTY_SETTINGS: ProjectSettings = { asm: [], main: '', filedevices: [] };
 
@@ -23,38 +26,59 @@ interface ProjectState {
 
   setSelectedFileOrFolder: (item: FileStructure | null) => void;
   refreshFileTree: () => void;
-  createNewProject: () => void;
-  openProject: () => void;
-  openProjectByPath: (sicPath: string) => void;
-  closeProject: () => void;
+  createNewProject: () => Promise<void>;
+  openProject: () => Promise<void>;
+  openProjectByPath: (sicPath: string) => Promise<void>;
+  /** Close the project (asking about unsaved changes first). */
+  closeProject: () => Promise<void>;
   addAsmFile: (file: FileStructure) => void;
-  removeAsmFile: (relativePath: string) => void;
+  /** Drop files from the project's asm list (for example the files of a deleted folder). */
+  removeAsmFiles: (relativePaths: string[]) => void;
   setSettings: (settings: ProjectSettings) => void;
   /** Write project.sic, then restart the simulation so new file devices take effect. */
   saveSettings: () => Promise<IpcResult>;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => {
-  /** Take over the project an IPC call returned, or log why it failed. */
-  const adoptProject = (request: Promise<IpcResult<ProjectInfo>>, action: string) => {
-    request
-      .then(res => {
-        if (res.success && res.data) {
-          set({
-            projectName: res.data.name,
-            projectPath: res.data.path,
-            settings: { ...res.data.settings },
-            fileTree: [],
-          });
-          get().refreshFileTree();
-          setTimeout(() => get().refreshFileTree(), SECOND_REFRESH_DELAY_MS);
-        } else {
-          console.error(`Failed to ${action}:`, res.message);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error(`Error while trying to ${action}:`, error);
-      });
+  /**
+   * Leave the open project: deal with unsaved changes, then stop a run and close the
+   * project's tabs and errors. False if the user cancelled.
+   */
+  const leaveProject = async () => {
+    if (!get().projectPath) return true;
+    if (!(await resolveUnsavedChanges())) return false;
+    const { isRunning, stopRunning } = useRunningStore.getState();
+    if (isRunning) await stopRunning();
+    useEditorTabStore.getState().closeAllTabs();
+    useErrorStore.getState().clearErrors();
+    return true;
+  };
+
+  /** Take over the project an IPC call returned (after leaving the open one), or log why not. */
+  const adoptProject = async (request: Promise<IpcResult<ProjectInfo>>, action: string) => {
+    let res: IpcResult<ProjectInfo>;
+    try {
+      res = await request;
+    } catch (error) {
+      console.error(`Error while trying to ${action}:`, error);
+      return;
+    }
+    if (!res.success || !res.data) {
+      console.error(`Failed to ${action}:`, res.message);
+      return;
+    }
+    const project = res.data;
+    // Opening the project that is already open keeps its tabs.
+    if (project.path !== get().projectPath && !(await leaveProject())) return;
+    set({
+      projectName: project.name,
+      projectPath: project.path,
+      settings: { ...project.settings },
+      fileTree: [],
+      selectedFileOrFolder: null,
+    });
+    get().refreshFileTree();
+    setTimeout(() => get().refreshFileTree(), SECOND_REFRESH_DELAY_MS);
   };
 
   return {
@@ -97,15 +121,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     createNewProject: () => adoptProject(window.api.createNewProject(), 'create new project'),
     openProject: () => adoptProject(window.api.openProject(), 'open project'),
-    openProjectByPath: sicPath => {
+    openProjectByPath: async sicPath => {
       if (!sicPath) {
         console.error('Invalid project path received');
         return;
       }
-      adoptProject(window.api.openProjectByPath(sicPath), 'open project by path');
+      await adoptProject(window.api.openProjectByPath(sicPath), 'open project by path');
     },
 
-    closeProject: () => {
+    closeProject: async () => {
+      if (!(await leaveProject())) return;
       set({
         projectName: '',
         projectPath: '',
@@ -126,11 +151,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }
     },
 
-    removeAsmFile: relativePath => {
+    removeAsmFiles: relativePaths => {
       const { settings, fileTree, saveSettings } = get();
+      if (!settings.asm.some(p => relativePaths.includes(p))) return;
       set({
-        settings: { ...settings, asm: settings.asm.filter(p => p !== relativePath) },
-        fileTree: fileTree.filter(f => f.relativePath !== relativePath),
+        settings: { ...settings, asm: settings.asm.filter(p => !relativePaths.includes(p)) },
+        fileTree: fileTree.filter(f => !relativePaths.includes(f.relativePath)),
       });
       saveSettings();
     },

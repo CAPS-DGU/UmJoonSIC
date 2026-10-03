@@ -55,7 +55,8 @@ export function createProjectSkeleton(projectPath: string): ProjectInfo {
 
   fs.writeFileSync(
     pathModule.join(projectPath, 'main.asm'),
-    `; main.asm (root)\n; put your assembly here\n`,
+    // '.' starts a comment in SIC/XE assembly (';' is a syntax error).
+    `. main.asm (root)\n. put your assembly here\n`,
     'utf8',
   );
 

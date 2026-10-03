@@ -33,6 +33,9 @@ export interface ServerLogPayload {
   message: string;
 }
 
+/** The answer to "save the unsaved changes?". */
+export type UnsavedChangesChoice = 'save' | 'discard' | 'cancel';
+
 /** Request/response channels (renderer -> main). */
 export const IpcChannel = {
   getFileList: 'getFileList',
@@ -49,6 +52,9 @@ export const IpcChannel = {
   restartServer: 'restartServer',
   waitForSimulator: 'waitForSimulator',
   getServerLog: 'getServerLog',
+  setHasUnsavedChanges: 'setHasUnsavedChanges',
+  confirmUnsavedChanges: 'confirmUnsavedChanges',
+  closeWindow: 'closeWindow',
 } as const;
 
 /**
@@ -61,6 +67,10 @@ export const AppEvent = {
   openProject: 'open-project',
   openProjectPath: 'open-project-path',
   closeProject: 'close-project',
+  /** The window is about to close but the renderer reported unsaved changes. */
+  closeRequested: 'close-requested',
+  /** File > Close Tab (Ctrl+W). */
+  closeActiveTab: 'close-active-tab',
 } as const;
 
 /** The object the preload script exposes as `window.api`. */
@@ -83,4 +93,10 @@ export interface RendererApi {
   waitForSimulator(): Promise<IpcResult>;
   /** The simulator output so far (the most recent lines), oldest first. */
   getServerLog(): Promise<IpcResult<ServerLogPayload[]>>;
+  /** Tell the main process whether closing the window would lose changes. */
+  setHasUnsavedChanges(hasUnsavedChanges: boolean): void;
+  /** Ask the user what to do with the unsaved changes of these files. */
+  confirmUnsavedChanges(fileNames: string[]): Promise<IpcResult<UnsavedChangesChoice>>;
+  /** Close the window after its unsaved changes have been dealt with. */
+  closeWindow(): Promise<IpcResult>;
 }

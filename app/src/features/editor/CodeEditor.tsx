@@ -1,89 +1,72 @@
 import { useEffect, useRef } from 'react';
-import Editor, { useMonaco } from '@monaco-editor/react';
-import type * as monaco_editor from 'monaco-editor';
+import Editor from '@monaco-editor/react';
+import type * as monaco from 'monaco-editor';
 import EditorErrorBoundary from '@/features/editor/EditorErrorBoundary';
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
-import { useAutoIndentation } from '@/features/editor/hooks/useAutoIndentation';
+import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { useDebounceFn } from '@/features/editor/hooks/useDebounceFn';
 import { useEditorShortcuts } from '@/features/editor/hooks/useEditorShortcuts';
 import { useErrorMarkers } from '@/features/editor/hooks/useErrorMarkers';
-import { useFileContent } from '@/features/editor/hooks/useFileContent';
-import {
-  checkSyntax,
-  isProjectAsmFile,
-  recheckOpenProjectFiles,
-} from '@/features/editor/lib/syntaxCheck';
+import { attachAutoIndentation } from '@/features/editor/lib/autoIndentation';
+import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
 import { editorOptions } from '@/features/editor/monaco/editorOptions';
-import '@/features/editor/monaco/monacoLoader';
-import { registerSicxe, SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
+import { modelPath } from '@/features/editor/monaco/models';
+import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
+import '@/features/editor/monaco/setupMonaco';
 import { useProjectStore } from '@/features/project/projectStore';
 import '@/features/editor/syntaxError.css';
 
-type MonacoEditor = monaco_editor.editor.IStandaloneCodeEditor;
+type MonacoEditor = monaco.editor.IStandaloneCodeEditor;
 
 /** Typing pauses this long before the syntax is checked. */
 const SYNTAX_CHECK_DEBOUNCE_MS = 1000;
 
-/** The Monaco editor for the active tab. A new editor instance is created per tab. */
+/**
+ * The Monaco editor for the active source tab. One editor instance shows one model per
+ * file (see monaco/models.ts), so switching tabs keeps each file's text, undo history,
+ * cursor and scroll position.
+ */
 export default function CodeEditor() {
-  const monaco = useMonaco();
-  const tabs = useEditorTabStore(state => state.tabs);
-  const getActiveTab = useEditorTabStore(state => state.getActiveTab);
-  const setFileContent = useEditorTabStore(state => state.setFileContent);
-  const setCursor = useEditorTabStore(state => state.setCursor);
-  const setIsModified = useEditorTabStore(state => state.setIsModified);
-  const { projectPath } = useProjectStore();
-  const activeTab = getActiveTab();
+  const activeTab = useEditorTabStore(selectActiveTab);
+  const revealRequest = useEditorTabStore(state => state.revealRequest);
+  const projectPath = useProjectStore(state => state.projectPath);
 
   const editorRef = useRef<MonacoEditor | null>(null);
-  const hasCheckedOnOpenRef = useRef(false);
+  /** The file shown, for the editor's event handlers (registered once, on mount). */
+  const shownPathRef = useRef<string | null>(null);
+  const appliedRevealIdRef = useRef<number | null>(null);
 
-  const { handleKeyDown: alignOnKeyDown, handlePaste: alignPastedLines } = useAutoIndentation(
-    editorRef,
-    monaco,
-  );
   const debouncedCheckSyntax = useDebounceFn(checkSyntax, SYNTAX_CHECK_DEBOUNCE_MS);
+  const activePath = activeTab?.filePath ?? null;
 
-  // Check the first file once, as soon as its content has been read.
   useEffect(() => {
-    if (!activeTab || hasCheckedOnOpenRef.current) return;
-    if (!activeTab.fileContent) return;
-    if (!isProjectAsmFile(activeTab.filePath)) return;
+    shownPathRef.current = activePath;
+  }, [activePath]);
 
-    checkSyntax([activeTab.fileContent], [activeTab.filePath]);
-    hasCheckedOnOpenRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab?.idx]);
+  useErrorMarkers();
+  useEditorShortcuts(editorRef);
 
-  // When the tab changes, restore its cursor and bring that line into view.
-  useEffect(() => {
+  /** Move the cursor to the position of a pending reveal request for the shown file. */
+  const applyRevealRequest = () => {
     const editor = editorRef.current;
-    if (!editor || !activeTab) return;
+    const request = useEditorTabStore.getState().revealRequest;
+    if (!editor || !request || request.filePath !== shownPathRef.current) return;
+    if (appliedRevealIdRef.current === request.id) return;
+    appliedRevealIdRef.current = request.id;
+    editor.setPosition({ lineNumber: request.line, column: request.column });
+    editor.revealLineInCenter(request.line);
+  };
 
-    const { line, column } = activeTab.cursor ?? { line: 1, column: 1 };
-    editor.setPosition({ lineNumber: line, column: column });
-    // after the layout has settled
-    setTimeout(() => {
-      editor.revealLineInCenter(line);
-    }, 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab?.idx]);
-
-  // Check the open project files when the editor appears (mode changes re-check them too).
-  useEffect(() => {
-    recheckOpenProjectFiles();
-  }, []);
-
-  useErrorMarkers(editorRef, monaco, activeTab);
-  useEditorShortcuts(editorRef, debouncedCheckSyntax);
-  const isLoadingRef = useFileContent(activeTab, projectPath);
-
-  useEffect(() => {
-    if (monaco) registerSicxe(monaco);
-  }, [monaco]);
+  // A request for a file that is already shown, or one that becomes shown.
+  // (The editor swaps the model in its own effect, which runs before this one.)
+  useEffect(applyRevealRequest, [revealRequest, activePath]);
 
   const handleEditorDidMount = (editor: MonacoEditor) => {
     editorRef.current = editor;
+    const shownPath = () => shownPathRef.current;
+    const isShownModel = (model: monaco.editor.ITextModel | null) => {
+      const filePath = shownPath();
+      return !!model && !!filePath && model.uri.toString() === modelPath(projectPath, filePath);
+    };
 
     // The column layout depends on the fixed-width font, so apply the options once it is there.
     (async () => {
@@ -99,49 +82,39 @@ export default function CodeEditor() {
     })();
 
     editor.onDidChangeCursorPosition(e => {
-      const currentTab = getActiveTab();
-      if (currentTab) {
-        setCursor(currentTab.idx, { line: e.position.lineNumber, column: e.position.column });
+      const filePath = shownPath();
+      if (filePath) {
+        useEditorTabStore
+          .getState()
+          .setCursor(filePath, { line: e.position.lineNumber, column: e.position.column });
+      }
+    });
+
+    editor.onDidChangeModelContent(() => {
+      const model = editor.getModel();
+      const filePath = shownPath();
+      if (!filePath || !isShownModel(model)) return;
+      const value = model!.getValue();
+      useEditorTabStore.getState().setContent(filePath, value);
+      if (isProjectAsmFile(filePath)) {
+        debouncedCheckSyntax([value], [filePath]);
       }
     });
 
     // Pasted text is checked at once, without the debounce.
-    // NOTE: reports under the path of the tab that was active when this editor was mounted.
     editor.onDidPaste(() => {
-      const currentTab = getActiveTab();
-      if (!currentTab || !isProjectAsmFile(currentTab.filePath)) return;
-      checkSyntax([editor.getValue()], [activeTab!.filePath]);
-    });
-
-    editor.onDidChangeModelContent(() => {
-      const currentTab = getActiveTab();
-      // Content that arrives from disk is not a modification.
-      if (!currentTab || isLoadingRef.current) return;
-
-      const value = editor.getValue();
-      setIsModified(currentTab.idx, true);
-      setFileContent(currentTab.idx, value);
-      if (isProjectAsmFile(currentTab.filePath)) {
-        debouncedCheckSyntax([value], [currentTab.filePath]);
-      }
+      const filePath = shownPath();
+      if (!filePath || !isProjectAsmFile(filePath)) return;
+      checkSyntax([editor.getValue()], [filePath]);
     });
 
     // Column alignment applies to the project's .asm files only.
-    editor.onKeyDown(e => {
-      if (!editor.getModel()) return;
-      if (isProjectAsmFile(getActiveTab()?.filePath)) {
-        alignOnKeyDown(e);
-      }
-    });
-    editor.onDidPaste(e => {
-      if (!editor.getModel()) return;
-      if (isProjectAsmFile(getActiveTab()?.filePath)) {
-        alignPastedLines(e);
-      }
-    });
+    attachAutoIndentation(editor, () => isProjectAsmFile(shownPath() ?? undefined));
+
+    applyRevealRequest();
   };
 
-  if (tabs.length === 0) {
+  if (!activeTab) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
@@ -152,14 +125,12 @@ export default function CodeEditor() {
 
   return (
     <EditorErrorBoundary>
-      {/* NOTE: 'asmTheme' is not a registered theme name (registerSicxe defines 'sicxeTheme'),
-          so Monaco falls back to its default theme. Kept as is to preserve the current look. */}
       <Editor
-        key={activeTab?.idx}
         height="100%"
-        theme="asmTheme"
+        path={modelPath(projectPath, activeTab.filePath)}
+        defaultValue={activeTab.content}
         defaultLanguage={SICXE_LANGUAGE_ID}
-        value={activeTab?.fileContent}
+        keepCurrentModel
         onMount={handleEditorDidMount}
       />
     </EditorErrorBoundary>

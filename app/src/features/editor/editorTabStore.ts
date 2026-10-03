@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import path from 'path-browserify';
+import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
+import { disposeModel } from '@/features/editor/monaco/models';
 import { useProjectStore } from '@/features/project/projectStore';
 
 export interface CursorPosition {
@@ -7,21 +9,34 @@ export interface CursorPosition {
   column: number;
 }
 
+/** What a tab shows: a source file in the editor, a listing while running, or project.sic. */
+export type TabKind = 'source' | 'listing' | 'settings';
+
 export interface EditorTab {
-  /** Position in `tabs`; kept equal to the array index. */
-  idx: number;
   title: string;
-  /** Project-relative path. A listing tab uses `<source file>.lst`, which is not a file on disk. */
+  /**
+   * Project-relative path; identifies the tab. A listing tab uses `<source file>.lst`,
+   * which is not a file on disk; the settings tab is `project.sic`.
+   */
   filePath: string;
+  /** Source tabs: the text being edited. */
+  content: string;
+  /** Source tabs: the text as it was last read from or written to disk. */
+  savedContent: string;
+  /** Changes that are not saved: edited text, or an edited settings form. */
   isModified: boolean;
-  fileContent: string;
-  /** Row indexes (listing tabs). */
-  breakpoints: number[];
-  isActive: boolean;
+  /** Cursor position, shown in the status bar. */
   cursor: CursorPosition;
 }
 
-/** What a caller has to say to open a tab; the rest starts from defaults. */
+/** A request to the editor to put the cursor at a position (for example an error's). */
+export interface RevealRequest extends CursorPosition {
+  filePath: string;
+  /** Distinguishes two requests for the same position. */
+  id: number;
+}
+
+/** What a caller has to say to open a tab; `cursor` also moves an open tab's cursor. */
 export type NewTab = Pick<EditorTab, 'title' | 'filePath'> & { cursor?: CursorPosition };
 
 interface SaveAllResult {
@@ -33,153 +48,160 @@ interface SaveAllResult {
 
 interface EditorTabState {
   tabs: EditorTab[];
-  /** Index of the active tab; -1 when no tab is open. */
-  activeTabIdx: number;
-  getActiveTab: () => EditorTab | undefined;
-  /** Open a tab for the file, or activate the one that is already open for it. */
-  openTab: (tab: NewTab) => void;
-  closeTab: (idx: number) => void;
-  closeAllListFileTabs: () => void;
-  setActiveTab: (idx: number) => void;
-  setCursor: (idx: number, cursor: CursorPosition) => void;
-  setFileContent: (idx: number, fileContent: string) => void;
-  setIsModified: (idx: number, isModified: boolean) => void;
-  toggleBreakpoint: (idx: number, lineNumber: number) => void;
-  /** Write every modified source tab to disk (listing and project.sic tabs are skipped). */
+  /** `filePath` of the active tab; null when no tab is open. */
+  activePath: string | null;
+  revealRequest: RevealRequest | null;
+  /**
+   * Open a tab for the file, or activate the one already open. A source file is read
+   * from disk first, so a tab always has its content.
+   */
+  openTab: (tab: NewTab) => Promise<void>;
+  activateTab: (filePath: string) => void;
+  /** Close a tab, unsaved changes included (ask first: see unsavedChanges.ts). */
+  closeTab: (filePath: string) => void;
+  closeListingTabs: () => void;
+  closeAllTabs: () => void;
+  /** Close the tabs of a deleted file, or of every file under a deleted folder. */
+  closeTabsUnder: (relativePath: string) => void;
+  setContent: (filePath: string, content: string) => void;
+  setCursor: (filePath: string, cursor: CursorPosition) => void;
+  /** For tabs whose changes live elsewhere (the settings form). */
+  setModified: (filePath: string, isModified: boolean) => void;
+  /** Write a source tab to disk. Resolves to false if that failed. */
+  saveTab: (filePath: string) => Promise<boolean>;
+  /** Write every modified source tab to disk. */
   saveAllTabs: () => Promise<SaveAllResult>;
 }
 
-const isListingTab = (tab: EditorTab) => tab.filePath.endsWith('.lst');
+export function tabKind(filePath: string): TabKind {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith('.lst')) return 'listing';
+  if (lower.endsWith('project.sic')) return 'settings';
+  return 'source';
+}
 
-/** Renumber the tabs and mark the one at `activeIdx` as active. */
-const withActive = (tabs: EditorTab[], activeIdx: number): EditorTab[] =>
-  tabs.map((tab, index) => ({ ...tab, idx: index, isActive: index === activeIdx }));
+export const selectActiveTab = (state: EditorTabState) =>
+  state.tabs.find(tab => tab.filePath === state.activePath);
 
-const patchTab = (tabs: EditorTab[], idx: number, patch: Partial<EditorTab>): EditorTab[] =>
-  tabs.map(tab => (tab.idx === idx ? { ...tab, ...patch } : tab));
+const absolutePath = (filePath: string) =>
+  path.join(useProjectStore.getState().projectPath, filePath);
 
-export const useEditorTabStore = create<EditorTabState>((set, get) => ({
-  tabs: [],
-  activeTabIdx: -1,
+let nextRevealId = 0;
 
-  getActiveTab: () => {
-    const { tabs, activeTabIdx } = get();
-    return activeTabIdx >= 0 && activeTabIdx < tabs.length ? tabs[activeTabIdx] : undefined;
-  },
+export const useEditorTabStore = create<EditorTabState>((set, get) => {
+  const patchTab = (filePath: string, patch: (tab: EditorTab) => Partial<EditorTab>) =>
+    set(state => ({
+      tabs: state.tabs.map(tab => (tab.filePath === filePath ? { ...tab, ...patch(tab) } : tab)),
+    }));
 
-  openTab: ({ title, filePath, cursor }) =>
-    set(state => {
-      const existingIdx = state.tabs.findIndex(tab => tab.filePath === filePath);
-      if (existingIdx !== -1) {
-        return { tabs: withActive(state.tabs, existingIdx), activeTabIdx: existingIdx };
-      }
-
-      const newIdx = state.tabs.length;
-      const newTab: EditorTab = {
-        idx: newIdx,
-        title,
-        filePath,
-        isModified: false,
-        fileContent: '',
-        breakpoints: [],
-        isActive: true,
-        cursor: cursor ?? { line: 0, column: 0 },
-      };
-      return { tabs: withActive([...state.tabs, newTab], newIdx), activeTabIdx: newIdx };
-    }),
-
-  closeTab: idx =>
-    set(state => {
-      const closedTabWasActive = state.tabs[idx]?.idx === state.activeTabIdx;
-      const remaining = state.tabs.filter(tab => tab.idx !== idx);
-
-      let newActiveIdx = -1;
-      if (remaining.length > 0) {
-        if (closedTabWasActive) {
-          // The active tab was closed: the last tab takes over.
-          newActiveIdx = remaining.length - 1;
-        } else {
-          // Another tab was closed: the active tab stays active at its new position.
-          const activeTab = state.tabs[state.activeTabIdx];
-          if (activeTab) {
-            newActiveIdx = remaining.findIndex(t => t.filePath === activeTab.filePath);
-          }
-        }
-      }
-      return { tabs: withActive(remaining, newActiveIdx), activeTabIdx: newActiveIdx };
-    }),
-
-  closeAllListFileTabs: () =>
-    set(state => {
-      const activeTab = state.tabs[state.activeTabIdx];
-      const remaining = state.tabs.filter(tab => !isListingTab(tab));
-
-      let newActiveIdx = -1;
-      if (remaining.length > 0) {
-        if (activeTab && !isListingTab(activeTab)) {
-          const idx = remaining.findIndex(t => t.filePath === activeTab.filePath);
-          newActiveIdx = idx !== -1 ? idx : remaining.length - 1;
-        } else {
-          newActiveIdx = remaining.length - 1;
-        }
-      }
-      return { tabs: withActive(remaining, newActiveIdx), activeTabIdx: newActiveIdx };
-    }),
-
-  setActiveTab: idx => set(state => ({ tabs: withActive(state.tabs, idx), activeTabIdx: idx })),
-
-  setCursor: (idx, cursor) => set(state => ({ tabs: patchTab(state.tabs, idx, { cursor }) })),
-  setFileContent: (idx, fileContent) =>
-    set(state => ({ tabs: patchTab(state.tabs, idx, { fileContent }) })),
-  setIsModified: (idx, isModified) =>
-    set(state => ({ tabs: patchTab(state.tabs, idx, { isModified }) })),
-
-  toggleBreakpoint: (idx, lineNumber) =>
-    set(state => {
-      const tab = state.tabs.find(t => t.idx === idx);
-      // a new (unchanged) array, so subscribers are notified as before
-      if (!tab) return { tabs: [...state.tabs] };
-      const breakpoints = tab.breakpoints || [];
-      const next = breakpoints.includes(lineNumber)
-        ? breakpoints.filter(bp => bp !== lineNumber)
-        : [...breakpoints, lineNumber].sort((a, b) => a - b);
-      return { tabs: patchTab(state.tabs, idx, { breakpoints: next }) };
-    }),
-
-  saveAllTabs: async () => {
-    const { projectPath } = useProjectStore.getState();
-    const modifiedTabs = get().tabs.filter(
-      tab => tab.isModified && !isListingTab(tab) && !tab.filePath.endsWith('.sic'),
-    );
-    if (modifiedTabs.length === 0) {
-      return { success: true, savedCount: 0, totalCount: 0, failedCount: 0 };
+  /** The content of a source file on disk ('' if it cannot be read). */
+  const readContent = async (filePath: string) => {
+    try {
+      const res = await window.api.readFile(absolutePath(filePath));
+      if (res.success) return res.data ?? '';
+      console.error('Failed to load file:', res.message);
+    } catch (error) {
+      console.error('Failed to load file:', error);
     }
+    return '';
+  };
 
-    const results = await Promise.allSettled(
-      modifiedTabs.map(async tab => {
-        const fullPath = path.join(projectPath, tab.filePath);
-        try {
-          const res = await window.api.saveFile(fullPath, tab.fileContent);
-          if (!res.success) {
-            console.error(`파일 저장 실패: ${fullPath}`, res.message);
-            return false;
+  /** Remove tabs; when the active one goes, the last remaining tab takes over. */
+  const removeTabs = (shouldClose: (tab: EditorTab) => boolean) => {
+    const { tabs, activePath } = get();
+    const closing = tabs.filter(shouldClose);
+    if (closing.length === 0) return;
+    const remaining = tabs.filter(tab => !shouldClose(tab));
+    const activeStays = remaining.some(tab => tab.filePath === activePath);
+    set({
+      tabs: remaining,
+      activePath: activeStays ? activePath : (remaining.at(-1)?.filePath ?? null),
+    });
+    const { projectPath } = useProjectStore.getState();
+    closing
+      .filter(tab => tabKind(tab.filePath) === 'source')
+      .forEach(tab => disposeModel(projectPath, tab.filePath));
+  };
+
+  return {
+    tabs: [],
+    activePath: null,
+    revealRequest: null,
+
+    openTab: async ({ title, filePath, cursor }) => {
+      const isOpen = () => get().tabs.some(tab => tab.filePath === filePath);
+      if (!isOpen()) {
+        const { projectPath } = useProjectStore.getState();
+        const isSource = tabKind(filePath) === 'source';
+        const content = isSource ? await readContent(filePath) : '';
+        // While the file was read, the project may have changed, or the tab been opened.
+        if (useProjectStore.getState().projectPath !== projectPath) return;
+        if (!isOpen()) {
+          const tab: EditorTab = {
+            title,
+            filePath,
+            content,
+            savedContent: content,
+            isModified: false,
+            cursor: cursor ?? { line: 1, column: 1 },
+          };
+          set(state => ({ tabs: [...state.tabs, tab] }));
+          if (content && isProjectAsmFile(filePath)) {
+            checkSyntax([content], [filePath]);
           }
-          get().setIsModified(tab.idx, false);
-          return true;
-        } catch (error) {
-          console.error(`파일 저장 중 오류 발생: ${fullPath}`, error);
+        }
+      }
+      set({
+        activePath: filePath,
+        ...(cursor && { revealRequest: { filePath, ...cursor, id: nextRevealId++ } }),
+      });
+    },
+
+    activateTab: filePath => set({ activePath: filePath }),
+
+    closeTab: filePath => removeTabs(tab => tab.filePath === filePath),
+    closeListingTabs: () => removeTabs(tab => tabKind(tab.filePath) === 'listing'),
+    closeAllTabs: () => removeTabs(() => true),
+    closeTabsUnder: relativePath =>
+      removeTabs(
+        tab => tab.filePath === relativePath || tab.filePath.startsWith(`${relativePath}/`),
+      ),
+
+    setContent: (filePath, content) =>
+      patchTab(filePath, tab => ({ content, isModified: content !== tab.savedContent })),
+    setCursor: (filePath, cursor) => patchTab(filePath, () => ({ cursor })),
+    setModified: (filePath, isModified) => patchTab(filePath, () => ({ isModified })),
+
+    saveTab: async filePath => {
+      const tab = get().tabs.find(t => t.filePath === filePath);
+      if (!tab || tabKind(filePath) !== 'source') return false;
+      const { content } = tab;
+      try {
+        const res = await window.api.saveFile(absolutePath(filePath), content);
+        if (!res.success) {
+          console.error(`파일 저장 실패: ${filePath}`, res.message);
           return false;
         }
-      }),
-    );
+      } catch (error) {
+        console.error(`파일 저장 중 오류 발생: ${filePath}`, error);
+        return false;
+      }
+      // Typing may have gone on while the file was written: compare with what was saved.
+      patchTab(filePath, current => ({
+        savedContent: content,
+        isModified: current.content !== content,
+      }));
+      return true;
+    },
 
-    const savedCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
-    const failedCount = results.length - savedCount;
-    return {
-      success: failedCount === 0,
-      savedCount,
-      totalCount: modifiedTabs.length,
-      failedCount,
-    };
-  },
-}));
+    saveAllTabs: async () => {
+      const modified = get().tabs.filter(
+        tab => tab.isModified && tabKind(tab.filePath) === 'source',
+      );
+      const results = await Promise.all(modified.map(tab => get().saveTab(tab.filePath)));
+      const savedCount = results.filter(Boolean).length;
+      const failedCount = results.length - savedCount;
+      return { success: failedCount === 0, savedCount, totalCount: modified.length, failedCount };
+    },
+  };
+});

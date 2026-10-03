@@ -43,7 +43,7 @@ const groupErrorsByFile = (errors: { [fileName: string]: CompileError[] }) => {
 export default function ErrorPanel() {
   const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
   const errors = useErrorStore(state => state.errors);
-  const { tabs, openTab, setActiveTab, setCursor } = useEditorTabStore();
+  const openTab = useEditorTabStore(state => state.openTab);
 
   const errorsByFile = useMemo(() => groupErrorsByFile(errors), [errors]);
   const fileNames = Object.keys(errorsByFile);
@@ -61,14 +61,7 @@ export default function ErrorPanel() {
   /** Open the file at the error's position. */
   const handleErrorClick = (item: ErrorItem) => {
     const cursor = { line: item.line ?? 1, column: item.col ?? 1 };
-    const tabIdx = tabs.findIndex(t => t.filePath === item.filePath);
-    if (tabIdx === -1) {
-      openTab({ title: item.file, filePath: item.filePath, cursor });
-      return;
-    }
-    setActiveTab(tabIdx);
-    // Move the cursor after the tab has been activated.
-    setTimeout(() => setCursor(tabIdx, cursor), 0);
+    openTab({ title: item.file, filePath: item.filePath, cursor });
   };
 
   return (

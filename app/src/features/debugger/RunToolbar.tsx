@@ -72,9 +72,8 @@ export function RunningButtons({ onContinue, onStopped }: RunningButtonsProps) {
   const toggleIsRunning = useRunningStore(s => s.toggleIsRunning);
   const fetchVarMemoryValue = useWatchStore(s => s.fetchVarMemoryValue);
 
-  // NOTE: read without subscribing, as before. The toolbar therefore reflects a pause only
-  // when something else re-renders it (in practice: the next memory refresh).
-  const { isPaused, setIsPaused } = useRunningStore.getState();
+  const isPaused = useRunningStore(s => s.isPaused);
+  const setIsPaused = useRunningStore(s => s.setIsPaused);
 
   const stepOnce = () => {
     step();

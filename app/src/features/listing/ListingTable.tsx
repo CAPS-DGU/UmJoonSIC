@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ListingRow } from '@/api/types';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
+import { hasObjectCode, rowAddress } from '@/features/listing/listingStore';
 
 const COLUMNS: { title: string; className: string }[] = [
   { title: '', className: 'w-8' },
@@ -15,11 +16,6 @@ const COLUMNS: { title: string; className: string }[] = [
   { title: 'Instruction Binary', className: 'w-24' },
   { title: 'NIXBPE Flags', className: 'w-24' },
 ];
-
-const rowAddress = (row: ListingRow) => parseInt(row.addressHex, 16);
-
-/** Rows that generate no object code (directives such as START or BASE) are never "current". */
-const hasObjectCode = (row: ListingRow) => row.rawCodeHex.replaceAll(' ', '') != '';
 
 /** A purely numeric operand is shown as hex; labels and expressions are shown as written. */
 function formatOperand(operand: string) {
@@ -38,7 +34,7 @@ interface ListingTableProps {
 
 /** The assembly listing of one file, with the row at the PC highlighted. */
 export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: ListingTableProps) {
-  const { PC } = useRegisterStore();
+  const PC = useRegisterStore(state => state.PC);
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
 

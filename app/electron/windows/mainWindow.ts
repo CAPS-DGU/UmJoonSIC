@@ -1,8 +1,37 @@
 import { BrowserWindow, shell } from 'electron';
 import { is } from '@electron-toolkit/utils';
+import { AppEvent } from '../../shared/ipc';
 import { PRELOAD_PATH, rendererFile } from '../paths';
 
 let mainWindow: BrowserWindow | null = null;
+
+/** Reported by the renderer: closing now would lose changes. */
+let hasUnsavedChanges = false;
+/** The renderer has dealt with the changes; the next close goes through. */
+let closeAllowed = false;
+/** A quit is under way (app 'before-quit'). */
+let quitRequested = false;
+/** The close that was held back was part of a quit, to be finished afterwards. */
+let quitPending = false;
+
+export function setHasUnsavedChanges(value: boolean) {
+  hasUnsavedChanges = value;
+  // macOS shows this in the window's close button.
+  mainWindow?.setDocumentEdited(value);
+}
+
+export function noteQuitRequested() {
+  quitRequested = true;
+}
+
+/** Close the main window without asking again. Returns true if a quit should follow. */
+export function allowMainWindowClose(): boolean {
+  closeAllowed = true;
+  mainWindow?.close();
+  const quit = quitPending;
+  quitPending = false;
+  return quit;
+}
 
 export function getMainWindow() {
   return mainWindow;
@@ -26,6 +55,24 @@ export function createMainWindow(): BrowserWindow {
     },
   });
   mainWindow = window;
+  hasUnsavedChanges = false;
+  closeAllowed = false;
+
+  // With unsaved changes, the renderer asks the user first (save / don't save / cancel)
+  // and then closes the window through allowMainWindowClose().
+  window.on('close', event => {
+    if (!hasUnsavedChanges || closeAllowed) return;
+    event.preventDefault();
+    quitPending = quitRequested;
+    quitRequested = false;
+    window.webContents.send(AppEvent.closeRequested);
+  });
+  // A page that crashed, hangs or reloads cannot answer, and its changes are gone anyway:
+  // do not hold the window open for it.
+  const forgetChanges = () => setHasUnsavedChanges(false);
+  window.webContents.on('render-process-gone', forgetChanges);
+  window.on('unresponsive', forgetChanges);
+  window.webContents.on('did-start-loading', forgetChanges);
 
   // Links open in the system browser, never in a new app window.
   window.webContents.setWindowOpenHandler(details => {

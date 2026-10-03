@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ProjectSettings as Settings } from '@shared/ipc';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
@@ -12,7 +12,15 @@ const toHexByte = (value: number) => `0x${value.toString(16).toUpperCase().padSt
 /** Editor for project.sic, shown while its tab is active: entry module, asm files, file devices. */
 export default function ProjectSettings() {
   const { settings, setSettings, saveSettings } = useProjectStore();
-  const { activeTabIdx, setIsModified } = useEditorTabStore();
+  // This view shows the active tab, which is the settings tab.
+  const settingsTabPath = useEditorTabStore(state => state.activePath);
+  const setModified = useEditorTabStore(state => state.setModified);
+  const setIsModified = useCallback(
+    (isModified: boolean) => {
+      if (settingsTabPath) setModified(settingsTabPath, isModified);
+    },
+    [settingsTabPath, setModified],
+  );
   const [newAsm, setNewAsm] = useState('');
   const [deviceIndex, setDeviceIndex] = useState<number>(0);
 
@@ -21,7 +29,7 @@ export default function ProjectSettings() {
   /** Apply a change to the settings and mark the tab as modified. */
   const update = (changed: Partial<Settings>) => {
     setSettings({ ...settings, ...changed });
-    setIsModified(activeTabIdx, true);
+    setIsModified(true);
   };
 
   // Ctrl+S / Cmd+S saves the settings.
@@ -32,19 +40,19 @@ export default function ProjectSettings() {
         e.stopPropagation();
         saveSettings().then(res => {
           if (res.success) {
-            setIsModified(activeTabIdx, false);
+            setIsModified(false);
           }
         });
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [saveSettings, activeTabIdx, setIsModified]);
+  }, [saveSettings, setIsModified]);
 
   const addAsm = () => {
     setSettings({ ...settings, asm: [...settings.asm, newAsm] });
     setNewAsm('');
-    setIsModified(activeTabIdx, true);
+    setIsModified(true);
   };
 
   /** Map the selected device number to a file chosen in the native file picker. */
@@ -59,7 +67,7 @@ export default function ProjectSettings() {
   const save = () => {
     saveSettings().then(res => {
       if (res.success) {
-        setIsModified(activeTabIdx, false);
+        setIsModified(false);
         alert('Settings saved');
       } else {
         alert(res.message ?? 'Failed to save settings');

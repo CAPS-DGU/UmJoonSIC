@@ -36,6 +36,12 @@ export const menuList: MenuItemConstructorOptions[] = [
       { label: 'New Project', click: () => sendToAllWindows(AppEvent.createNewProject) },
       { label: 'Open Project', click: () => sendToAllWindows(AppEvent.openProject) },
       { label: 'Close Project', click: () => sendToAllWindows(AppEvent.closeProject) },
+      { type: 'separator' },
+      {
+        label: 'Close Tab',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => sendToAllWindows(AppEvent.closeActiveTab),
+      },
     ],
   },
   {
@@ -64,7 +70,12 @@ export const menuList: MenuItemConstructorOptions[] = [
   },
   {
     label: 'Window',
-    submenu: [{ role: 'minimize' }, { role: 'close' }],
+    // Not role 'close': its Ctrl+W shortcut closed the window (and quit the app) when a
+    // tab was meant. The window still closes with its close button or Alt+F4.
+    submenu: [
+      { role: 'minimize' },
+      { label: 'Close Window', click: () => BrowserWindow.getFocusedWindow()?.close() },
+    ],
   },
   {
     label: 'Help',
