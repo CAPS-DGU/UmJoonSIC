@@ -12,5 +12,9 @@ describe('toProjectRelativePath', () => {
 
   it('returns a path outside the project as it is', () => {
     expect(toProjectRelativePath('/home/u/proj', '/tmp/x.asm')).toBe('/tmp/x.asm');
+    // a folder whose name only starts like the project's
+    expect(toProjectRelativePath('/home/u/proj', '/home/u/proj2/x.asm')).toBe(
+      '/home/u/proj2/x.asm',
+    );
   });
 });
