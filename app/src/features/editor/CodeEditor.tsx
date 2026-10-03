@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import type * as monaco_editor from 'monaco-editor';
-import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import EditorErrorBoundary from '@/features/editor/EditorErrorBoundary';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { useAutoIndentation } from '@/features/editor/hooks/useAutoIndentation';
@@ -9,7 +8,11 @@ import { useDebounceFn } from '@/features/editor/hooks/useDebounceFn';
 import { useEditorShortcuts } from '@/features/editor/hooks/useEditorShortcuts';
 import { useErrorMarkers } from '@/features/editor/hooks/useErrorMarkers';
 import { useFileContent } from '@/features/editor/hooks/useFileContent';
-import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
+import {
+  checkSyntax,
+  isProjectAsmFile,
+  recheckOpenProjectFiles,
+} from '@/features/editor/lib/syntaxCheck';
 import { editorOptions } from '@/features/editor/monaco/editorOptions';
 import '@/features/editor/monaco/monacoLoader';
 import { registerSicxe, SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
@@ -29,7 +32,6 @@ export default function CodeEditor() {
   const setFileContent = useEditorTabStore(state => state.setFileContent);
   const setCursor = useEditorTabStore(state => state.setCursor);
   const setIsModified = useEditorTabStore(state => state.setIsModified);
-  const mode = useMemoryViewStore(state => state.mode);
   const { projectPath } = useProjectStore();
   const activeTab = getActiveTab();
 
@@ -67,6 +69,11 @@ export default function CodeEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.idx]);
 
+  // Check the open project files when the editor appears (mode changes re-check them too).
+  useEffect(() => {
+    recheckOpenProjectFiles();
+  }, []);
+
   useErrorMarkers(editorRef, monaco, activeTab);
   useEditorShortcuts(editorRef, debouncedCheckSyntax);
   const isLoadingRef = useFileContent(activeTab, projectPath);
@@ -74,17 +81,6 @@ export default function CodeEditor() {
   useEffect(() => {
     if (monaco) registerSicxe(monaco);
   }, [monaco]);
-
-  // What is valid depends on the machine mode, so re-check the open project files when it changes.
-  useEffect(() => {
-    const { tabs: currentTabs } = useEditorTabStore.getState();
-    const projectTabs = currentTabs.filter(t => isProjectAsmFile(t.filePath));
-    if (!projectTabs.length) return;
-    checkSyntax(
-      projectTabs.map(t => t.fileContent ?? ''),
-      projectTabs.map(t => t.filePath),
-    );
-  }, [mode]);
 
   const handleEditorDidMount = (editor: MonacoEditor) => {
     editorRef.current = editor;

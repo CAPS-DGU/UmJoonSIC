@@ -17,8 +17,9 @@ export function createMainWindow(): BrowserWindow {
     autoHideMenuBar: false,
     webPreferences: {
       preload: PRELOAD_PATH,
-      contextIsolation: true,
-      nodeIntegration: true,
+      // The preload is an ES module, which a sandboxed preload cannot be. Node stays out of
+      // the page all the same: context isolation is on and node integration off (defaults).
+      sandbox: false,
     },
   });
   mainWindow = window;

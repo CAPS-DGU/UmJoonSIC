@@ -8,6 +8,7 @@ import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import SideBar from '@/features/fileTree/SideBar';
 import ListingView from '@/features/listing/ListingView';
 import BottomPanel from '@/features/panel/BottomPanel';
+import { useServerLog } from '@/features/panel/useServerLog';
 import ProjectSettings from '@/features/project/ProjectSettings';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useProjectEvents } from '@/features/project/useProjectEvents';
@@ -37,6 +38,7 @@ function App() {
   const appRef = useRef<HTMLDivElement>(null);
 
   useProjectEvents();
+  useServerLog();
 
   if (projectName === '') {
     return <WelcomeScreen />;

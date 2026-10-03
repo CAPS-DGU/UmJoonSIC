@@ -1,4 +1,5 @@
 import { simulator } from '@/api/simulator';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
 
@@ -27,4 +28,14 @@ export async function checkSyntax(texts: string[], fileNames: string[]) {
   } catch (error) {
     console.error('Syntax check failed:', error);
   }
+}
+
+/** Check every open project file again, for example after the machine mode has changed. */
+export function recheckOpenProjectFiles() {
+  const tabs = useEditorTabStore.getState().tabs.filter(tab => isProjectAsmFile(tab.filePath));
+  if (tabs.length === 0) return;
+  checkSyntax(
+    tabs.map(tab => tab.fileContent ?? ''),
+    tabs.map(tab => tab.filePath),
+  );
 }

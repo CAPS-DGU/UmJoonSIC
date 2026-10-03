@@ -2,6 +2,11 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
+    <!-- A static local page: nothing is loaded from elsewhere. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'unsafe-inline'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>About</title>
     <style>
