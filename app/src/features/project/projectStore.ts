@@ -51,6 +51,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     if (isRunning) await stopRunning();
     useEditorTabStore.getState().closeAllTabs();
     useErrorStore.getState().clearErrors();
+    await useMemoryViewStore.getState().reload();
     return true;
   };
 

@@ -102,13 +102,13 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
 /** Read the memory the views show (the memory viewer and the watch list) again. */
 function refreshMemoryViews() {
   return Promise.all([
-    useMemoryViewStore.getState().fetchMemoryValues(),
+    useMemoryViewStore.getState().refresh(),
     useWatchStore.getState().fetchVarMemoryValue(),
   ]);
 }
 
 /**
- * Auto-play runs as a loop; starting, pausing or stopping it makes the running loop
+ * Auto-play runs as a loop; starting, pausing or stopping it makes the current loop
  * outdated, and it ends at its next check.
  */
 let playGeneration = 0;
@@ -138,7 +138,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
   };
 
   /**
-   * Execute an instruction every `delayMs` until paused or stopped. The program pauses
+   * Execute an instruction every `delayMs` until the user pauses or stops. The program pauses
    * when the PC reaches a row with a breakpoint, before that row is executed.
    */
   const autoPlay = async (delayMs: number) => {
@@ -184,6 +184,8 @@ export const useRunningStore = create<RunningState>((set, get) => {
       const { projectPath, settings } = useProjectStore.getState();
 
       await beginSimulation();
+      // The memory of an earlier run is gone from the simulator; stop showing it.
+      await useMemoryViewStore.getState().reload();
       const { success } = await useEditorTabStore.getState().saveAllTabs();
       if (!success) return false;
 
@@ -200,10 +202,6 @@ export const useRunningStore = create<RunningState>((set, get) => {
       }
       useErrorStore.getState().clearErrors(undefined, 'load');
       useRegisterStore.getState().setAll(data.registers);
-      useMemoryViewStore.getState().setMemoryRange({
-        start: data.registers.PC,
-        end: data.registers.PC + 256,
-      });
       publishLoadedFiles(data.files);
       return true;
     },

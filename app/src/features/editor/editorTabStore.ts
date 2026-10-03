@@ -9,7 +9,7 @@ export interface CursorPosition {
   column: number;
 }
 
-/** What a tab shows: a source file in the editor, a listing while running, or project.sic. */
+/** What a tab shows: a source file in the editor, a listing during a run, or project.sic. */
 export type TabKind = 'source' | 'listing' | 'settings';
 
 export interface EditorTab {
