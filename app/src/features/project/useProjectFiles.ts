@@ -4,6 +4,16 @@ import { useProjectStore } from '@/features/project/projectStore';
 /** 'a/b/c' -> 'a/b'; a top-level entry -> ''. */
 const parentOf = (relativePath: string) => relativePath.split('/').slice(0, -1).join('/');
 
+/** The folder a new entry goes into: the selected folder, or the selected file's folder. */
+const targetFolder = (selected: FileStructure | null) =>
+  !selected
+    ? ''
+    : selected.type === 'folder'
+      ? selected.relativePath
+      : parentOf(selected.relativePath);
+
+const joinRelative = (folder: string, name: string) => (folder ? `${folder}/${name}` : name);
+
 /** Create and delete files and folders of the open project, keeping project.sic and the tree in sync. */
 export function useProjectFiles() {
   const { projectPath, addAsmFile, removeAsmFile, refreshFileTree, setSelectedFileOrFolder } =
@@ -26,19 +36,15 @@ export function useProjectFiles() {
     const trimmed = fileName.trim();
     if (!trimmed) return;
 
-    const folderPath = folder
-      ? folder.type === 'folder'
-        ? folder.relativePath
-        : parentOf(folder.relativePath)
-      : '';
-    const relativePath = folderPath ? `${folderPath}/${trimmed}${fileExt}` : `${trimmed}${fileExt}`;
+    const folderPath = targetFolder(folder);
+    const relativePath = joinRelative(folderPath, `${trimmed}${fileExt}`);
 
     const res = await window.api.createNewFile(absolute(folderPath), `${trimmed}${fileExt}`);
     if (!res.success) {
       throw new Error(res.message);
     }
 
-    const newFile: FileStructure = { type: 'file', name: `${fileName}${fileExt}`, relativePath };
+    const newFile: FileStructure = { type: 'file', name: `${trimmed}${fileExt}`, relativePath };
     if (fileExt === '.asm') addAsmFile(newFile);
     refreshFileTree();
     return newFile;
@@ -56,13 +62,12 @@ export function useProjectFiles() {
     deselectIfSelected(file);
   };
 
-  /** Create a folder. NOTE: with a folder selected, the new one becomes its sibling, not its child. */
+  /** Create a folder in the selected folder (or next to the selected file, or at the root). */
   const createFolder = async (folder: FileStructure | null, folderName: string) => {
     const trimmed = folderName.trim();
     if (!trimmed) return;
 
-    const parentRelativePath =
-      folder && folder.type === 'folder' ? parentOf(folder.relativePath) : '';
+    const parentRelativePath = targetFolder(folder);
     const result = await window.api.createNewFolder(absolute(parentRelativePath), trimmed);
     if (!result.success) {
       throw new Error(result.message ?? '폴더 생성 실패');
@@ -72,7 +77,7 @@ export function useProjectFiles() {
     setSelectedFileOrFolder({
       type: 'folder',
       name: trimmed,
-      relativePath: parentRelativePath + '/' + trimmed,
+      relativePath: joinRelative(parentRelativePath, trimmed),
       children: [],
     });
   };

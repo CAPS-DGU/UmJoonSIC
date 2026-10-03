@@ -63,7 +63,7 @@ export default function SideBar() {
   );
 
   return (
-    <div className="w-full bg-white border-r border-gray-300 flex flex-col h-screen">
+    <div className="w-full bg-white border-r border-gray-300 flex flex-col h-full">
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
         <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">

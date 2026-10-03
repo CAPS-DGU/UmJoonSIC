@@ -13,6 +13,9 @@ export function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1200,
     height: 640,
+    // Below this the three columns no longer fit: tabs wrap and the bottom panel's tabs overlap.
+    minWidth: 800,
+    minHeight: 600,
     show: false,
     autoHideMenuBar: false,
     webPreferences: {
