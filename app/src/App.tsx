@@ -1,156 +1,46 @@
-import { useState, useEffect, useRef } from 'react';
-import SideBar from '@/components/common/SideBar';
-import UnderStatusBar from '@/components/common/UnderStatusBar';
-import Debug from '@/components/debug';
-import EditorContainer from './components/editor/EditorContainer';
-import ListContainer from './components/assembleList/ListContainer';
-import { useProjectStore } from './stores/ProjectStore';
-import { useEditorTabStore } from './stores/EditorTabStore';
+import { useRef, useState } from 'react';
+import { InfoModal } from '@/components/InfoModal';
+import Resizer from '@/components/Resizer';
+import StatusBar from '@/components/StatusBar';
+import DebugPanel from '@/features/debugger/DebugPanel';
+import EditorContainer from '@/features/editor/EditorContainer';
+import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import SideBar from '@/features/fileTree/SideBar';
+import ListingView from '@/features/listing/ListingView';
+import BottomPanel from '@/features/panel/BottomPanel';
+import ProjectSettings from '@/features/project/ProjectSettings';
+import { useProjectStore } from '@/features/project/projectStore';
+import { useProjectEvents } from '@/features/project/useProjectEvents';
+import WelcomeScreen from '@/features/project/WelcomeScreen';
 
-import Pannel from './components/pannel/Pannel';
-import Resizer from './components/common/Resizer';
-import SicSettingContainer from './components/setting/SicSettingContainer';
-
-import { InfoModal } from '@/components/common/InfoModal';
-
+/** Height the panel resizer reserves at the bottom of the window, in px. */
 const STATUS_BAR_HEIGHT = 40;
+const INITIAL_PANEL_HEIGHT = 250;
+
+/** What the centre area shows depends on the active tab: a listing, the project settings, or the editor. */
+function MainView({ activeFilePath }: { activeFilePath?: string }) {
+  const filePath = activeFilePath?.toLowerCase();
+
+  if (filePath?.endsWith('.lst')) return <ListingView />;
+  if (filePath?.endsWith('project.sic')) return <ProjectSettings />;
+  return <EditorContainer />;
+}
 
 function App() {
-  const createNewProject = useProjectStore(s => s.createNewProject);
-  const openProject = useProjectStore(s => s.openProject);
-  const openProjectByPath = useProjectStore(s => s.openProjectByPath);
   const projectName = useProjectStore(s => s.projectName);
-  const closeProject = useProjectStore(s => s.closeProject);
+  // NOTE: subscribes to the whole tab store, as before, so the entire layout re-renders on
+  // every tab change. The debugger toolbar and the memory labels read some state without
+  // subscribing and depend on these re-renders to stay current.
   const { tabs, activeTabIdx } = useEditorTabStore();
-
-  const [panelHeight, setPanelHeight] = useState(250);
+  const [panelHeight, setPanelHeight] = useState(INITIAL_PANEL_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
   const appRef = useRef<HTMLDivElement>(null);
-  const lastOpenedProjectPathRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const handleCreateNewProject = () => {
-      createNewProject();
-    };
-
-    window.addEventListener('create-new-project', handleCreateNewProject);
-    return () => {
-      window.removeEventListener('create-new-project', handleCreateNewProject);
-    };
-  }, [createNewProject]);
-
-  useEffect(() => {
-    const handleOpenProject = () => {
-      openProject();
-    };
-    window.addEventListener('open-project', handleOpenProject);
-    return () => {
-      window.removeEventListener('open-project', handleOpenProject);
-    };
-  }, [openProject]);
-
-  useEffect(() => {
-    const handleOpenProjectByPath = (event: Event) => {
-      const sicPath = (event as CustomEvent<string>).detail;
-      if (typeof sicPath === 'string' && sicPath.length > 0) {
-        if (lastOpenedProjectPathRef.current === sicPath) {
-          return;
-        }
-        console.log('[UmJoonSIC] Handling open-project-path event for', sicPath);
-        lastOpenedProjectPathRef.current = sicPath;
-        openProjectByPath(sicPath);
-      }
-    };
-
-    window.addEventListener('open-project-path', handleOpenProjectByPath as EventListener);
-
-    let retryHandle: number | null = null;
-    let attempts = 0;
-
-    const tryConsumeQueuedPath = () => {
-      const initialPath = window.api.consumeQueuedProjectPath?.();
-      if (typeof initialPath === 'string' && initialPath.length > 0) {
-        if (lastOpenedProjectPathRef.current === initialPath) {
-          retryHandle = null;
-          return;
-        }
-        console.log('[UmJoonSIC] Consuming queued project path', initialPath);
-        lastOpenedProjectPathRef.current = initialPath;
-        openProjectByPath(initialPath);
-        retryHandle = null;
-        return;
-      }
-
-      attempts += 1;
-      if (attempts < 20) {
-        retryHandle = window.setTimeout(tryConsumeQueuedPath, 250);
-      } else {
-        retryHandle = null;
-      }
-    };
-
-    retryHandle = window.setTimeout(tryConsumeQueuedPath, 0);
-
-    return () => {
-      window.removeEventListener('open-project-path', handleOpenProjectByPath as EventListener);
-      if (retryHandle !== null) {
-        window.clearTimeout(retryHandle);
-      }
-    };
-  }, [openProjectByPath]);
-
-  useEffect(() => {
-    if (!projectName) {
-      lastOpenedProjectPathRef.current = null;
-    }
-  }, [projectName]);
-
-  useEffect(() => {
-    const handleCloseProject = () => {
-      closeProject();
-    };
-    window.addEventListener('close-project', handleCloseProject);
-    return () => {
-      window.removeEventListener('close-project', handleCloseProject);
-    };
-  }, [closeProject]);
+  useProjectEvents();
 
   if (projectName === '') {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen w-screen">
-        <div className="text-center max-w-md mx-auto px-4">
-          <h1 className="text-2xl font-bold mb-4">아직 프로젝트를 생성하지 않았습니다.</h1>
-          <p className="text-sm text-gray-500 mb-8">
-            File &gt; New Project 를 클릭하여 프로젝트를 생성하거나
-            <br />
-            File &gt; Open Project 를 클릭하여 기존 프로젝트를 열어주세요.
-          </p>
-          <div className="flex gap-4 justify-center">
-            <button
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-              onClick={() => {
-                window.dispatchEvent(new Event('create-new-project'));
-              }}
-            >
-              새 프로젝트 생성
-            </button>
-            <button
-              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
-              onClick={() => {
-                window.dispatchEvent(new Event('open-project'));
-              }}
-            >
-              기존 프로젝트 열기
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <WelcomeScreen />;
   }
-
-  const activeTab = tabs[activeTabIdx];
-  const isLstFile = activeTab?.filePath?.toLowerCase().endsWith('.lst');
-  const isSicFile = activeTab?.filePath?.toLowerCase().endsWith('project.sic');
 
   return (
     <div className="flex h-screen w-screen flex-col">
@@ -160,33 +50,28 @@ function App() {
         </div>
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-hidden">
-            {isLstFile ? (
-              <ListContainer />
-            ) : isSicFile ? (
-              <SicSettingContainer />
-            ) : (
-              <EditorContainer />
-            )}
+            <MainView activeFilePath={tabs[activeTabIdx]?.filePath} />
           </div>
           <Resizer
-            onResize={(newHeight: number) => setPanelHeight(newHeight)}
+            onResize={setPanelHeight}
             containerRef={appRef}
             statusBarHeight={STATUS_BAR_HEIGHT}
             onDragStart={() => setIsResizing(true)}
             onDragEnd={() => setIsResizing(false)}
           />
+          {/* no height transition while dragging, so the panel follows the pointer */}
           <div
             className={isResizing ? '' : 'transition-all duration-200 ease-in-out'}
             style={{ height: panelHeight }}
           >
-            <Pannel />
+            <BottomPanel />
           </div>
         </div>
         <div className="min-w-64 max-w-xs flex-shrink-0 overflow-y-auto overflow-x-hidden">
-          <Debug />
+          <DebugPanel />
         </div>
       </div>
-      <UnderStatusBar />
+      <StatusBar />
       <InfoModal />
     </div>
   );

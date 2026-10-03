@@ -1,138 +1,63 @@
-// electron/preload.ts
+// Preload script: the only bridge between the renderer and the main process.
+// It exposes `window.api` (see shared/ipc.ts) and re-dispatches main-process
+// messages as DOM events on `window`.
 import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
+import { AppEvent, IpcChannel, type RendererApi, type ServerLogPayload } from '../shared/ipc';
 
-type IpcApiResponse<T = void> = Promise<{
-  success: boolean;
-  data?: T;
-  message?: string;
-}>;
-
-interface FileDevice {
-  index: number;
-  filename: string;
-}
-
+// A project path can arrive before React has mounted its listener; keep it until asked for.
 let queuedProjectPath: string | null = null;
 
-// Custom APIs for renderer
-const api = {
-  getFileList: (path: string): IpcApiResponse<string[]> => {
-    return ipcRenderer.invoke('getFileList', path);
-  },
-  createNewProject: (): IpcApiResponse<{
-    name: string;
-    path: string;
-    settings: {
-      asm: string[];
-      main: string;
-      filedevices: FileDevice[];
-    };
-  }> => {
-    return ipcRenderer.invoke('createNewProject');
-  },
-  readFile: (path: string): IpcApiResponse<string> => {
-    return ipcRenderer.invoke('readFile', path);
-  },
-  saveFile: (path: string, content: string): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('saveFile', path, content);
-  },
-  openProject: (): IpcApiResponse<{
-    name: string;
-    path: string;
-    settings: { asm: string[]; main: string; filedevices: FileDevice[] };
-  }> => {
-    return ipcRenderer.invoke('openProject');
-  },
-  openProjectByPath: (sicPath: string): IpcApiResponse<{
-    name: string;
-    path: string;
-    settings: { asm: string[]; main: string; filedevices: FileDevice[] };
-  }> => {
-    return ipcRenderer.invoke('openProjectByPath', sicPath);
-  },
-  loadAsm: (
-    port: number,
-    filePath: string,
-  ): IpcApiResponse<{
-    status?: number;
-    data?: any;
-  }> => {
-    return ipcRenderer.invoke('loadAsm', { port, filePath });
-  },
-  createNewFile: (folderPath: string, fileName: string): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('createNewFile', { folderPath, fileName });
-  },
-  createNewFolder: (folderPath: string, folderName: string): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('createNewFolder', { folderPath, folderName });
-  },
-  deleteFile: (projectPath: string, relativePath: string): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('deleteFile', { projectPath, relativePath });
-  },
-  deleteFolder: (projectPath: string, relativePath: string): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('deleteFolder', { projectPath, relativePath });
-  },
-  pickFile: (): IpcApiResponse<string> => {
-    return ipcRenderer.invoke('pickFile');
-  },
-  restartServer: (): IpcApiResponse<void> => {
-    return ipcRenderer.invoke('restartServer');
-  },
-  consumeQueuedProjectPath: (): string | null => {
+const api: RendererApi = {
+  getFileList: path => ipcRenderer.invoke(IpcChannel.getFileList, path),
+  createNewProject: () => ipcRenderer.invoke(IpcChannel.createNewProject),
+  openProject: () => ipcRenderer.invoke(IpcChannel.openProject),
+  openProjectByPath: sicPath => ipcRenderer.invoke(IpcChannel.openProjectByPath, sicPath),
+  consumeQueuedProjectPath: () => {
     const current = queuedProjectPath;
     queuedProjectPath = null;
-    if (current) {
-      console.log('[UmJoonSIC] consumeQueuedProjectPath returning', current);
-    } else {
-      console.log('[UmJoonSIC] consumeQueuedProjectPath called with no queued path');
-    }
     return current;
   },
+  readFile: path => ipcRenderer.invoke(IpcChannel.readFile, path),
+  saveFile: (path, content) => ipcRenderer.invoke(IpcChannel.saveFile, path, content),
+  createNewFile: (folderPath, fileName) =>
+    ipcRenderer.invoke(IpcChannel.createNewFile, { folderPath, fileName }),
+  createNewFolder: (folderPath, folderName) =>
+    ipcRenderer.invoke(IpcChannel.createNewFolder, { folderPath, folderName }),
+  deleteFile: (projectPath, relativePath) =>
+    ipcRenderer.invoke(IpcChannel.deleteFile, { projectPath, relativePath }),
+  deleteFolder: (projectPath, relativePath) =>
+    ipcRenderer.invoke(IpcChannel.deleteFolder, { projectPath, relativePath }),
+  pickFile: () => ipcRenderer.invoke(IpcChannel.pickFile),
+  restartServer: () => ipcRenderer.invoke(IpcChannel.restartServer),
 };
 
-// 서버 로그 브릿지: IPC -> DOM 이벤트
-ipcRenderer.on('server-log', (_event, payload: { type: 'out' | 'error'; message: string }) => {
-  window.dispatchEvent(new CustomEvent('server-log', { detail: payload }));
+// main -> renderer messages become DOM events of the same name.
+ipcRenderer.on(AppEvent.serverLog, (_event, payload: ServerLogPayload) => {
+  window.dispatchEvent(new CustomEvent(AppEvent.serverLog, { detail: payload }));
 });
 
-// 새 프로젝트 생성 이벤트 리스너
-ipcRenderer.on('create-new-project', () => {
-  // 전역 이벤트 발생
-  window.dispatchEvent(new CustomEvent('create-new-project'));
-});
+for (const event of [AppEvent.createNewProject, AppEvent.openProject, AppEvent.closeProject]) {
+  ipcRenderer.on(event, () => {
+    window.dispatchEvent(new CustomEvent(event));
+  });
+}
 
-// 프로젝트 열기 이벤트 리스너
-ipcRenderer.on('open-project', () => {
-  window.dispatchEvent(new CustomEvent('open-project'));
-});
-
-// 경로 기반 프로젝트 열기 이벤트 리스너
-ipcRenderer.on('open-project-path', (_event, sicPath: string) => {
+ipcRenderer.on(AppEvent.openProjectPath, (_event, sicPath: string) => {
   queuedProjectPath = sicPath;
-  console.log('[UmJoonSIC] Queued project path in preload:', sicPath);
-  window.dispatchEvent(new CustomEvent('open-project-path', { detail: sicPath }));
+  window.dispatchEvent(new CustomEvent(AppEvent.openProjectPath, { detail: sicPath }));
 });
 
-// 프로젝트 닫기 이벤트 리스너
-ipcRenderer.on('close-project', () => {
-  window.dispatchEvent(new CustomEvent('close-project'));
-});
-
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// With context isolation the API must go through contextBridge; without it, plain globals work.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('api', api);
   } catch (error) {
     console.error('Failed to expose Electron API in the renderer:', error);
-    console.error(error);
   }
 } else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI;
-  // @ts-ignore (define in dts)
-  window.api = api;
-  // @ts-ignore (define in dts)
+  const globals = window as unknown as { electron: typeof electronAPI; api: RendererApi };
+  globals.electron = electronAPI;
+  globals.api = api;
 }
