@@ -1,8 +1,8 @@
 // IPC: the simulator process.
 import { ipcMain, dialog, BrowserWindow, type MessageBoxOptions } from 'electron';
 import { IpcChannel, type IpcResult } from '../../shared/ipc';
-import { restartServerProcess } from '../simulator/process';
-import { toErrorMessage } from './result';
+import { logServerOutput, serverLogHistory, simulatorProcess } from '../simulator/process';
+import { ipcResult, toErrorMessage } from './result';
 
 const okBox = (
   options: Pick<MessageBoxOptions, 'type' | 'title' | 'message'>,
@@ -16,7 +16,8 @@ const okBox = (
 export function registerServerHandlers() {
   ipcMain.handle(IpcChannel.restartServer, async (): Promise<IpcResult> => {
     try {
-      await restartServerProcess();
+      await simulatorProcess.restart();
+      logServerOutput('out', 'Server restarted.');
       const restarted = okBox({
         type: 'info',
         title: '서버 재시작',
@@ -31,8 +32,14 @@ export function registerServerHandlers() {
       return { success: true };
     } catch (error) {
       const message = toErrorMessage(error);
+      logServerOutput('error', `Restart failed: ${message}`);
       await dialog.showMessageBox(okBox({ type: 'error', title: '서버 재시작 실패', message }));
       return { success: false, message };
     }
   });
+
+  // Resolves when the simulator accepts requests; waits while it is (re)starting.
+  ipcMain.handle(IpcChannel.waitForSimulator, () => ipcResult(() => simulatorProcess.whenReady()));
+
+  ipcMain.handle(IpcChannel.getServerLog, () => ipcResult(() => serverLogHistory()));
 }

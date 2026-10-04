@@ -1,5 +1,8 @@
-@import url('https://cdnjs.cloudflare.com/ajax/libs/pretendard/1.3.9/variable/pretendardvariable.min.css');
-@import 'tailwindcss';
+/* Pretendard (UI font) is bundled, so the interface looks the same offline. */
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+/* Classes are generated from the renderer's own files only (not electron/ or the docs). */
+@import 'tailwindcss' source('../src');
+@source '../index.html';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));

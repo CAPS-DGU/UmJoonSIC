@@ -26,20 +26,19 @@ export default function SideBar() {
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  const {
-    projectName,
-    fileTree,
-    refreshFileTree,
-    selectedFileOrFolder,
-    setSelectedFileOrFolder,
-    settings,
-  } = useProjectStore();
-  const { openTab } = useEditorTabStore();
+  const projectName = useProjectStore(s => s.projectName);
+  const fileTree = useProjectStore(s => s.fileTree);
+  const refreshFileTree = useProjectStore(s => s.refreshFileTree);
+  const selectedFileOrFolder = useProjectStore(s => s.selectedFileOrFolder);
+  const setSelectedFileOrFolder = useProjectStore(s => s.setSelectedFileOrFolder);
+  const projectFiles = useProjectStore(s => s.settings.asm);
+  const openTab = useEditorTabStore(s => s.openTab);
   const { deleteFile, deleteFolder } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
 
-  const toggleFolder = (name: string) => setExpanded(prev => ({ ...prev, [name]: !prev[name] }));
+  const toggleFolder = (relativePath: string) =>
+    setExpanded(prev => ({ ...prev, [relativePath]: !prev[relativePath] }));
 
   const handleOpenFile = (item: FileStructure) => {
     if (item.type === 'file') {
@@ -63,7 +62,7 @@ export default function SideBar() {
   );
 
   return (
-    <div className="w-full bg-white border-r border-gray-300 flex flex-col h-screen">
+    <div className="w-full bg-white border-r border-gray-300 flex flex-col h-full">
       <div className="flex items-center justify-between p-2 border-b border-gray-300">
         <span className="font-bold">{projectName}</span>
         <div className="flex gap-2">
@@ -98,7 +97,7 @@ export default function SideBar() {
             onSelect={setSelectedFileOrFolder}
             onOpenFile={handleOpenFile}
             onContextMenu={(e, item) => setContextMenu({ x: e.clientX, y: e.clientY, item })}
-            projectFiles={settings.asm}
+            projectFiles={projectFiles}
             focusPath={focusPath}
           />
         ))}

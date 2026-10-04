@@ -1,72 +1,46 @@
 import { useEffect, type MutableRefObject } from 'react';
-import type * as monaco_editor from 'monaco-editor';
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import type * as monaco from 'monaco-editor';
+import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
-import { useProjectStore } from '@/features/project/projectStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 /**
- * Delay between Ctrl+S and reading the editor's content. Kept from the original code;
- * it also gives an input-method composition in progress (Hangul) time to be committed.
+ * Delay between Ctrl+S and saving. It gives an input-method composition in progress
+ * (Hangul) time to be committed to the text first.
  */
 const SAVE_DELAY_MS = 100;
 
-const ZOOM_KEYS = ['+', '-', '=', '0'];
-
-/**
- * Window-level keyboard handling while the code editor is shown:
- * Ctrl/Cmd+S saves the active file (and checks its syntax); any other key typed
- * into the editor schedules a syntax check.
- */
+/** Ctrl/Cmd+S while the code editor is shown: save the active file and check its syntax. */
 export function useEditorShortcuts(
-  editorRef: MutableRefObject<monaco_editor.editor.IStandaloneCodeEditor | null>,
-  scheduleSyntaxCheck: (texts: string[], fileNames: string[]) => void,
+  editorRef: MutableRefObject<monaco.editor.IStandaloneCodeEditor | null>,
 ) {
-  const getActiveTab = useEditorTabStore(state => state.getActiveTab);
-  const setIsModified = useEditorTabStore(state => state.setIsModified);
-  const { projectPath } = useProjectStore();
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      const editor = editorRef.current;
-      const isCommand = event.ctrlKey || event.metaKey;
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      event.stopPropagation();
 
-      // Zoom shortcuts belong to Electron's View menu.
-      if (isCommand && ZOOM_KEYS.includes(event.key)) {
-        return;
-      }
-
-      if (isCommand && event.key.toLowerCase() === 's') {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const activeTab = getActiveTab();
-        if (activeTab && editor) {
-          setTimeout(() => {
-            const content = editor.getValue();
-            if (isProjectAsmFile(activeTab.filePath)) {
-              checkSyntax([content], [activeTab.filePath]);
-            }
-            window.api.saveFile(projectPath + '/' + activeTab.filePath, content).then(res => {
-              if (res.success) {
-                setIsModified(activeTab.idx, false);
-              } else {
-                console.error('Failed to save file:', res.message);
-              }
-            });
-          }, SAVE_DELAY_MS);
+      const activeTab = selectActiveTab(useEditorTabStore.getState());
+      if (!activeTab || !editorRef.current) return;
+      const { filePath } = activeTab;
+      setTimeout(() => {
+        const { tabs, saveTab } = useEditorTabStore.getState();
+        const tab = tabs.find(t => t.filePath === filePath);
+        if (!tab) return;
+        if (isProjectAsmFile(filePath)) {
+          checkSyntax([tab.content], [filePath]);
         }
-        return;
-      }
-
-      if (editor && editor.hasTextFocus()) {
-        const activeTab = getActiveTab();
-        if (activeTab && isProjectAsmFile(activeTab.filePath)) {
-          scheduleSyntaxCheck([editor.getValue()], [activeTab.filePath]);
-        }
-      }
+        void saveTab(filePath).then(saved => {
+          if (!saved) {
+            useInfoModalStore
+              .getState()
+              .show('저장 실패', `${tab.title} 을(를) 저장하지 못했습니다.`);
+          }
+        });
+      }, SAVE_DELAY_MS);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorRef, getActiveTab, projectPath, setIsModified, scheduleSyntaxCheck]);
+  }, [editorRef]);
 }

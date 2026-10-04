@@ -4,7 +4,7 @@ import type { FileStructure } from '@/features/fileTree/types';
 export function useFileTreeNavigation(
   fileTree: FileStructure[],
   expanded: Record<string, boolean>,
-  toggleFolder: (name: string) => void,
+  toggleFolder: (relativePath: string) => void,
   onOpenFile: (item: FileStructure) => void,
 ) {
   const [focusIndex, setFocusIndex] = useState(0);
@@ -13,7 +13,7 @@ export function useFileTreeNavigation(
     const flatten = (items: FileStructure[], acc: FileStructure[] = []): FileStructure[] => {
       for (const item of items) {
         acc.push(item);
-        if (item.type === 'folder' && expanded[item.name] && item.children) {
+        if (item.type === 'folder' && expanded[item.relativePath] && item.children) {
           flatten(item.children, acc);
         }
       }
@@ -28,7 +28,7 @@ export function useFileTreeNavigation(
     (e: React.KeyboardEvent) => {
       if (!flatList.length) return;
       const item = flatList[focusIndex];
-      if (!item) return; // 안전 체크
+      if (!item) return;
 
       switch (e.key) {
         case 'ArrowDown':
@@ -40,10 +40,12 @@ export function useFileTreeNavigation(
           setFocusIndex(prev => Math.max(prev - 1, 0));
           break;
         case 'ArrowRight':
-          if (item.type === 'folder' && !expanded[item.name]) toggleFolder(item.name);
+          if (item.type === 'folder' && !expanded[item.relativePath])
+            toggleFolder(item.relativePath);
           break;
         case 'ArrowLeft':
-          if (item.type === 'folder' && expanded[item.name]) toggleFolder(item.name);
+          if (item.type === 'folder' && expanded[item.relativePath])
+            toggleFolder(item.relativePath);
           break;
         case 'Enter':
           onOpenFile(item);

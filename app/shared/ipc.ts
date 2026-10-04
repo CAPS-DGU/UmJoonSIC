@@ -26,10 +26,15 @@ export interface IpcResult<T = void> {
   message?: string;
 }
 
+/** One chunk of simulator output, numbered in the order the main process received it. */
 export interface ServerLogPayload {
+  seq: number;
   type: 'out' | 'error';
   message: string;
 }
+
+/** The answer to "save the unsaved changes?". */
+export type UnsavedChangesChoice = 'save' | 'discard' | 'cancel';
 
 /** Request/response channels (renderer -> main). */
 export const IpcChannel = {
@@ -45,6 +50,12 @@ export const IpcChannel = {
   deleteFile: 'deleteFile',
   deleteFolder: 'deleteFolder',
   restartServer: 'restartServer',
+  waitForSimulator: 'waitForSimulator',
+  getServerLog: 'getServerLog',
+  setHasUnsavedChanges: 'setHasUnsavedChanges',
+  confirmUnsavedChanges: 'confirmUnsavedChanges',
+  closeWindow: 'closeWindow',
+  abortClose: 'abortClose',
 } as const;
 
 /**
@@ -57,6 +68,10 @@ export const AppEvent = {
   openProject: 'open-project',
   openProjectPath: 'open-project-path',
   closeProject: 'close-project',
+  /** The window is about to close but the renderer reported unsaved changes. */
+  closeRequested: 'close-requested',
+  /** File > Close Tab (Ctrl+W). */
+  closeActiveTab: 'close-active-tab',
 } as const;
 
 /** The object the preload script exposes as `window.api`. */
@@ -75,4 +90,16 @@ export interface RendererApi {
   deleteFolder(projectPath: string, relativePath: string): Promise<IpcResult>;
   pickFile(): Promise<IpcResult<string>>;
   restartServer(): Promise<IpcResult>;
+  /** Resolves once the simulator accepts requests (waits while it starts or restarts). */
+  waitForSimulator(): Promise<IpcResult>;
+  /** The simulator output so far (the most recent lines), oldest first. */
+  getServerLog(): Promise<IpcResult<ServerLogPayload[]>>;
+  /** Tell the main process whether closing the window would lose changes. */
+  setHasUnsavedChanges(hasUnsavedChanges: boolean): void;
+  /** Ask the user what to do with the unsaved changes of these files. */
+  confirmUnsavedChanges(fileNames: string[]): Promise<IpcResult<UnsavedChangesChoice>>;
+  /** Close the window after its unsaved changes have been dealt with. */
+  closeWindow(): Promise<IpcResult>;
+  /** The window stays open after all (the user cancelled, or saving failed). */
+  abortClose(): void;
 }

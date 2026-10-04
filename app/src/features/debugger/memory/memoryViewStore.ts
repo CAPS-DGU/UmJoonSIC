@@ -1,20 +1,13 @@
 import { create } from 'zustand';
 import { simulator } from '@/api/simulator';
 import type { MachineMode } from '@/api/types';
+import { recheckOpenProjectFiles } from '@/features/editor/lib/syntaxCheck';
 import { useProjectStore } from '@/features/project/projectStore';
 
 export type { MachineMode };
 
-export type MemoryNodeStatus = 'normal' | 'highlighted' | 'red bold';
-
-/** One byte as the viewer shows it: two hex digits, or 'ER' when loading it failed. */
-export interface MemoryNodeData {
-  value: string;
-  status?: MemoryNodeStatus;
-  isLoading?: boolean;
-}
-
-interface AddressRange {
+/** A range of addresses; `end` is exclusive. */
+export interface AddressRange {
   start: number;
   end: number;
 }
@@ -22,163 +15,140 @@ interface AddressRange {
 /** Address space per machine mode: SIC has 32 KiB, SIC/XE has 1 MiB. */
 const MEMORY_SIZE: Record<MachineMode, number> = { SIC: 0x8000, SICXE: 0x100000 };
 
-const toHexByte = (value: number) => value.toString(16).toUpperCase().padStart(2, '0');
+/** Where the viewer starts: the first 1 KiB. */
+const INITIAL_VIEW: AddressRange = { start: 0, end: 1024 };
 
 interface MemoryViewState {
   mode: MachineMode;
   totalMemorySize: number;
-  /** The range refreshed after every step (around the program). */
-  memoryRange: AddressRange;
-  /** Sparse by address; bytes never requested are undefined. */
-  memoryValues: MemoryNodeData[];
+  /** Byte values by address, as last read. Addresses never read are absent. */
+  bytes: ReadonlyMap<number, number>;
+  /** Addresses whose last read failed. */
+  failed: ReadonlySet<number>;
+  /** Reads in progress; bytes not known yet are shown as loading meanwhile. */
+  pendingReads: number;
+  /** What the viewer shows (with a margin around it). Read again after every step. */
+  viewRange: AddressRange;
   /** Addresses whose value changed in the last refresh; the viewer flashes them. */
-  changedNodes: Set<number>;
-  loadedRanges: Set<string>;
-  loadingRanges: Set<string>;
+  changedNodes: ReadonlySet<number>;
 
   /** Switch machine mode: clears the view and restarts the simulation in that mode. */
-  setMode: (newMode: MachineMode) => void;
-  setMemoryRange: (memoryRange: AddressRange) => void;
+  setMode: (mode: MachineMode) => void;
+  /**
+   * Show another range and read it. With `keepKnown`, bytes already shown keep their
+   * value (after a run has ended, the view keeps the memory as the run left it).
+   */
+  setViewRange: (range: AddressRange, options?: { keepKnown?: boolean }) => Promise<void>;
+  /** Read the shown range again and mark the bytes that changed (after a step). */
+  refresh: () => Promise<void>;
+  /** Forget what is shown and read it again (the simulator's memory was reset). */
+  reload: () => Promise<void>;
   clearChangedNodes: () => void;
-  /** Re-read `memoryRange` and mark the bytes that changed. */
-  fetchMemoryValues: () => Promise<void>;
-  /** Load a range once; later calls for the same range are ignored. */
-  loadMemoryRange: (start: number, end: number) => Promise<void>;
 }
 
-export const useMemoryViewStore = create<MemoryViewState>((set, get) => ({
-  mode: 'SIC',
-  totalMemorySize: MEMORY_SIZE.SIC,
-  memoryRange: { start: 0, end: 256 },
-  memoryValues: [],
-  changedNodes: new Set(),
-  loadedRanges: new Set(),
-  loadingRanges: new Set(),
+const clamp = (range: AddressRange, size: number): AddressRange => ({
+  start: Math.max(0, Math.min(range.start, size)),
+  end: Math.max(0, Math.min(range.end, size)),
+});
 
-  setMode: newMode => {
-    const totalSize = MEMORY_SIZE[newMode];
-    set({
-      mode: newMode,
-      totalMemorySize: totalSize,
-      memoryRange: { start: 0, end: totalSize - 1 },
-      memoryValues: [],
-      loadedRanges: new Set(),
-      loadingRanges: new Set(),
-      changedNodes: new Set(),
-    });
-
-    // Same request as when a run starts; not awaited.
-    (async () => {
-      try {
-        const { settings } = useProjectStore.getState();
-        const data = await simulator.begin(newMode, settings.filedevices);
-        if (!data.ok) {
-          console.error('Failed to begin after mode change');
-        }
-      } catch (e) {
-        console.error('Begin request failed after mode change:', e);
-      }
-    })();
-  },
-
-  setMemoryRange: memoryRange => set({ memoryRange }),
-  clearChangedNodes: () => set({ changedNodes: new Set() }),
-
-  loadMemoryRange: async (start, end) => {
-    if (start < 0 || start >= end) {
-      return;
+export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
+  /** Read a range from the simulator; null if that failed (its bytes are then marked). */
+  const read = async ({ start, end }: AddressRange) => {
+    if (end <= start) return null;
+    set(state => ({ pendingReads: state.pendingReads + 1 }));
+    try {
+      // The simulator's range is inclusive.
+      const { values } = await simulator.memory(start, end - 1);
+      return values;
+    } catch (error) {
+      console.error(`메모리 범위 ${start}-${end} 로드 실패:`, error);
+      set(state => {
+        const failed = new Set(state.failed);
+        for (let address = start; address < end; address++) failed.add(address);
+        return { failed };
+      });
+      return null;
+    } finally {
+      set(state => ({ pendingReads: state.pendingReads - 1 }));
     }
+  };
 
-    const rangeKey = `${start}-${end}`;
-    const { loadedRanges, loadingRanges } = get();
-    if (loadedRanges.has(rangeKey) || loadingRanges.has(rangeKey)) {
-      return;
-    }
-
-    // Mark the range as loading, growing the array with placeholders if needed.
+  /** Store bytes read from `start`; returns the addresses whose known value changed. */
+  const store = (start: number, values: number[], keepKnown: boolean) => {
+    const changed = new Set<number>();
     set(state => {
-      const mergedValues = [...state.memoryValues];
-      if (mergedValues.length < end) {
-        const placeholders = Array.from({ length: end - mergedValues.length }, () => ({
-          value: '00',
-          status: 'normal' as const,
-          isLoading: false,
-        }));
-        mergedValues.push(...placeholders);
-      }
-
-      for (let i = start; i < end; i++) {
-        if (i < mergedValues.length && (!mergedValues[i] || !mergedValues[i].isLoading)) {
-          mergedValues[i] = { value: '00', status: 'normal', isLoading: true };
-        }
-      }
-
-      return {
-        memoryValues: mergedValues,
-        loadingRanges: new Set(state.loadingRanges).add(rangeKey),
-      };
+      const bytes = new Map(state.bytes);
+      const failed = new Set(state.failed);
+      values.forEach((value, i) => {
+        const address = start + i;
+        const known = bytes.get(address);
+        failed.delete(address);
+        if (known !== undefined && keepKnown) return;
+        if (known !== undefined && known !== value) changed.add(address);
+        bytes.set(address, value);
+      });
+      return { bytes, failed };
     });
+    return changed;
+  };
 
-    try {
-      const data = await simulator.memory(start, end);
+  return {
+    mode: 'SIC',
+    totalMemorySize: MEMORY_SIZE.SIC,
+    bytes: new Map(),
+    failed: new Set(),
+    pendingReads: 0,
+    viewRange: INITIAL_VIEW,
+    changedNodes: new Set(),
 
-      set(state => {
-        const mergedValues = [...state.memoryValues];
-        data.values.forEach((value, i) => {
-          const address = start + i;
-          if (address < mergedValues.length) {
-            mergedValues[address] = { value: toHexByte(value), status: 'normal', isLoading: false };
+    setMode: mode => {
+      const totalMemorySize = MEMORY_SIZE[mode];
+      set(state => ({
+        mode,
+        totalMemorySize,
+        bytes: new Map(),
+        failed: new Set(),
+        changedNodes: new Set(),
+        viewRange: clamp(state.viewRange, totalMemorySize),
+      }));
+
+      // Restart the simulation in the new mode, then read the view and check the open files
+      // again: what is valid depends on the mode, and the simulator works in the mode it is in.
+      void (async () => {
+        try {
+          const { settings } = useProjectStore.getState();
+          const data = await simulator.begin(mode, settings.filedevices);
+          if (!data.ok) {
+            console.error('Failed to begin after mode change');
           }
-        });
-
-        const newLoadingRanges = new Set(state.loadingRanges);
-        newLoadingRanges.delete(rangeKey);
-        return {
-          memoryValues: mergedValues,
-          loadingRanges: newLoadingRanges,
-          loadedRanges: new Set(state.loadedRanges).add(rangeKey),
-        };
-      });
-    } catch (error) {
-      console.error(`메모리 범위 ${rangeKey} 로드 실패:`, error);
-      set(state => {
-        const mergedValues = [...state.memoryValues];
-        for (let i = start; i < end; i++) {
-          if (i < mergedValues.length && mergedValues[i]?.isLoading) {
-            mergedValues[i] = { ...mergedValues[i], isLoading: false, value: 'ER' };
-          }
+        } catch (e) {
+          console.error('Begin request failed after mode change:', e);
         }
+        await get().setViewRange(get().viewRange);
+        recheckOpenProjectFiles();
+      })();
+    },
 
-        const newLoadingRanges = new Set(state.loadingRanges);
-        newLoadingRanges.delete(rangeKey);
-        return { loadingRanges: newLoadingRanges, memoryValues: mergedValues };
-      });
-    }
-  },
+    setViewRange: async (range, { keepKnown = false } = {}) => {
+      const viewRange = clamp(range, get().totalMemorySize);
+      set({ viewRange });
+      const values = await read(viewRange);
+      if (values) store(viewRange.start, values, keepKnown);
+    },
 
-  fetchMemoryValues: async () => {
-    const { memoryRange } = get();
-    try {
-      const data = await simulator.memory(memoryRange.start, memoryRange.end);
+    refresh: async () => {
+      const { viewRange } = get();
+      const values = await read(viewRange);
+      if (values) {
+        set({ changedNodes: store(viewRange.start, values, false) });
+      }
+    },
 
-      set(state => {
-        const mergedValues = [...state.memoryValues];
-        const changedNodes = new Set<number>();
-        data.values.forEach((value, i) => {
-          const address = memoryRange.start + i;
-          const hex = toHexByte(value);
-          const oldNode = state.memoryValues[address];
-          if (oldNode && oldNode.value !== hex) {
-            changedNodes.add(address);
-          }
-          if (address < mergedValues.length) {
-            mergedValues[address] = { value: hex, status: 'normal' };
-          }
-        });
-        return { memoryValues: mergedValues, changedNodes };
-      });
-    } catch (error) {
-      console.error('메모리 값 fetch 실패:', error);
-    }
-  },
-}));
+    reload: async () => {
+      set({ bytes: new Map(), failed: new Set(), changedNodes: new Set() });
+      await get().setViewRange(get().viewRange);
+    },
+
+    clearChangedNodes: () => set({ changedNodes: new Set() }),
+  };
+});

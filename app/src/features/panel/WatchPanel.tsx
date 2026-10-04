@@ -32,7 +32,7 @@ export default function WatchPanel() {
   const watch = useWatchStore(s => s.watch);
   const [expanded, setExpanded] = useState<ExpandedState>({});
 
-  // 데이터를 파일별로 그룹화
+  // Rows grouped by source file.
   const groupedData: GroupedWatchData = watch.reduce((acc, row) => {
     if (!acc[row.filePath]) {
       acc[row.filePath] = [];

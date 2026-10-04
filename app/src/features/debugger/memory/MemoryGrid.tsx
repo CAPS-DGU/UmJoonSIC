@@ -1,6 +1,5 @@
 // The memory viewer's grid: an address column and rows of bytes. Only the rows in
 // `visibleRowRange` are rendered; each is positioned absolutely inside a tall container.
-import type { MemoryNodeData } from '@/features/debugger/memory/memoryViewStore';
 
 /** Bytes per row. */
 export const ROW_SIZE = 8;
@@ -8,6 +7,13 @@ export const ROW_SIZE = 8;
 export const ROW_HEIGHT = 32;
 /** Width of one byte cell in px (w-6). */
 const CELL_WIDTH = 24;
+
+/** What a cell shows: two hex digits, or 'ER' if reading the byte failed. */
+export interface MemoryCellValue {
+  value: string;
+  /** Not read yet; a read is in progress. */
+  isLoading?: boolean;
+}
 
 /** A named address range (a watched variable), underlined and labelled in the grid. */
 export interface MemoryLabel {
@@ -29,34 +35,24 @@ function visibleRowIndexes(range: RowRange, totalRows: number) {
   return rows;
 }
 
-const STATUS_CLASSES = {
-  normal: '',
-  highlighted: 'bg-yellow-200',
-  'red bold': 'text-red-500 font-bold',
-};
-
 interface MemoryCellProps {
-  node: MemoryNodeData | null;
+  cell: MemoryCellValue;
   labelHighlight?: boolean;
   isChanged?: boolean;
   isSearched?: boolean;
 }
 
-function MemoryCell({ node, labelHighlight, isChanged, isSearched }: MemoryCellProps) {
-  const value = node?.value || '00';
-  const status = node?.status || 'normal';
-
+function MemoryCell({ cell, labelHighlight, isChanged, isSearched }: MemoryCellProps) {
   return (
     <span
       className={`font-mono text-sm px-1 w-6 text-center rounded
-      ${STATUS_CLASSES[status]}
       ${labelHighlight ? '!text-orange-500 font-semibold' : ''}
       ${isChanged ? 'memory-flash' : ''}
       ${isSearched ? 'search-flash' : ''}
-      ${node?.isLoading ? 'bg-gray-200 animate-pulse' : ''}
+      ${cell.isLoading ? 'bg-gray-200 animate-pulse' : ''}
       `}
     >
-      {value}
+      {cell.value}
     </span>
   );
 }
@@ -91,16 +87,16 @@ interface ValueColumnProps {
   totalRows: number;
   visibleRowRange: RowRange;
   labels: MemoryLabel[];
-  memoryValues: (MemoryNodeData | null)[];
-  changedNodes: Set<number>;
-  searchedNodes: Set<number>;
+  cellAt: (address: number) => MemoryCellValue;
+  changedNodes: ReadonlySet<number>;
+  searchedNodes: ReadonlySet<number>;
 }
 
 export function ValueColumn({
   totalRows,
   visibleRowRange,
   labels,
-  memoryValues,
+  cellAt,
   changedNodes,
   searchedNodes,
 }: ValueColumnProps) {
@@ -114,9 +110,11 @@ export function ValueColumn({
         const rowLabels = labels
           .filter(l => l.end >= rowStartAddr && l.start <= rowEndAddr)
           .map(l => ({
-            ...l,
+            name: l.name,
             start: Math.max(l.start, rowStartAddr) - rowStartAddr,
             end: Math.min(l.end, rowEndAddr) - rowStartAddr,
+            /** The range begins on this row (its name is shown here). */
+            beginsHere: l.start >= rowStartAddr,
           }));
 
         return (
@@ -135,7 +133,7 @@ export function ValueColumn({
                 return (
                   <MemoryCell
                     key={column}
-                    node={memoryValues[address]}
+                    cell={cellAt(address)}
                     labelHighlight={rowLabels.some(l => column >= l.start && column <= l.end)}
                     isChanged={changedNodes.has(address)}
                     isSearched={searchedNodes.has(address)}
@@ -144,32 +142,20 @@ export function ValueColumn({
               })}
 
               {/* a line beneath each labelled range */}
-              {rowLabels.map((label, idx) => {
-                const originalLabel = labels.find(l => l.name === label.name);
-                if (!originalLabel) return null;
-
-                const relativeStart = Math.max(originalLabel.start, rowStartAddr) - rowStartAddr;
-                const width =
-                  (Math.min(originalLabel.end, rowEndAddr) - rowStartAddr - relativeStart + 1) *
-                    CELL_WIDTH -
-                  8;
-
-                return (
-                  <div
-                    key={`line-${idx}`}
-                    className="absolute -bottom-0.5 border-t-2 border-orange-500"
-                    style={{ left: relativeStart * CELL_WIDTH + 4, width }}
-                  />
-                );
-              })}
+              {rowLabels.map((label, idx) => (
+                <div
+                  key={`line-${idx}`}
+                  className="absolute -bottom-0.5 border-t-2 border-orange-500"
+                  style={{
+                    left: label.start * CELL_WIDTH + 4,
+                    width: (label.end - label.start + 1) * CELL_WIDTH - 8,
+                  }}
+                />
+              ))}
 
               {/* the name, only on the row where the range starts */}
               {rowLabels
-                .filter(label => {
-                  const originalLabel = labels.find(l => l.name === label.name);
-                  if (!originalLabel) return false;
-                  return Math.floor(originalLabel.start / ROW_SIZE) === rowIndex;
-                })
+                .filter(label => label.beginsHere)
                 .map((label, idx) => (
                   <div
                     key={`name-${idx}`}

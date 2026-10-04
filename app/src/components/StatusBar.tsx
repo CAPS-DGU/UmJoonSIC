@@ -1,9 +1,8 @@
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 
 /** Bottom bar: cursor position of the active tab. Hidden while no tab is open. */
 export default function StatusBar() {
-  const { getActiveTab } = useEditorTabStore();
-  const activeTab = getActiveTab();
+  const activeTab = useEditorTabStore(selectActiveTab);
 
   if (!activeTab) {
     return null;
