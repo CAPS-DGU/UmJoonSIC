@@ -1,5 +1,5 @@
-import path from 'path';
-import { app, BrowserWindow, shell } from 'electron';
+import { BrowserWindow, shell } from 'electron';
+import { staticPage } from '../paths';
 
 export function openAboutWindow() {
   const aboutWindow = new BrowserWindow({
@@ -10,7 +10,7 @@ export function openAboutWindow() {
     title: 'About UmJoonSIC',
     parent: BrowserWindow.getFocusedWindow() ?? undefined,
   });
-  aboutWindow.loadFile(path.join(app.getAppPath(), 'public/about.html'));
+  aboutWindow.loadFile(staticPage('about.html'));
   // Links in the page open in the system browser.
   aboutWindow.webContents.on('will-navigate', (event, url) => {
     event.preventDefault();

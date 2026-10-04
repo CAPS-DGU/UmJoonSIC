@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { simulator } from '@/api/simulator';
 import type { Registers } from '@/api/types';
-import { useRunningStore } from '@/features/debugger/runningStore';
 
 const REGISTER_NAMES = ['A', 'X', 'L', 'S', 'T', 'B', 'SW', 'PC', 'F'] as const;
 export type RegisterName = (typeof REGISTER_NAMES)[number];
@@ -11,8 +10,11 @@ interface RegisterState extends Registers {
   changedRegisters: Set<string>;
   setAll: (registers: Registers) => void;
   clearChangedRegisters: () => void;
-  /** Execute one instruction and take over the resulting registers. */
-  step: () => Promise<void>;
+  /**
+   * Execute one instruction and take over the resulting registers. 'halted' means the PC
+   * did not move: the program ended (it jumps to itself).
+   */
+  step: () => Promise<'stepped' | 'halted' | 'failed'>;
 }
 
 export const useRegisterStore = create<RegisterState>((set, get) => ({
@@ -47,12 +49,10 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
     const data = await simulator.step();
     if (!data.ok) {
       console.error('Failed to step');
-      return;
+      return 'failed';
     }
-    // A PC that does not move means the program has halted (it jumps to itself).
-    if (get().PC === data.registers.PC) {
-      useRunningStore.getState().stopRunning();
-    }
+    const halted = get().PC === data.registers.PC;
     get().setAll(data.registers);
+    return halted ? 'halted' : 'stepped';
   },
 }));

@@ -6,10 +6,14 @@ type IntermediateFolderNode = { __type: 'folder'; __children: Record<string, Int
 type IntermediateNode = IntermediateFileNode | IntermediateFolderNode;
 
 function normalizePath(path: string) {
-  return path.replace(/\\/g, '/'); // 윈도우 경로 → POSIX 스타일
+  return path.replace(/\\/g, '/'); // Windows separators to '/'
 }
 
-function convertToFileStructure(fileTree: FileStructure[]): FileStructure[] {
+/**
+ * The nested tree of the project's entries (a flat list of paths; folders end with '/'),
+ * folders first, then by name.
+ */
+export function buildFileTree(fileTree: FileStructure[]): FileStructure[] {
   const root: Record<string, IntermediateNode> = {};
 
   fileTree.forEach(file => {
@@ -63,5 +67,5 @@ function convertToFileStructure(fileTree: FileStructure[]): FileStructure[] {
 }
 
 export function useFileTree(fileTree: FileStructure[]) {
-  return useMemo(() => convertToFileStructure(fileTree), [fileTree]);
+  return useMemo(() => buildFileTree(fileTree), [fileTree]);
 }

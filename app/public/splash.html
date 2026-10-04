@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- A static local page: nothing is loaded from elsewhere. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Splash</title>
     <style>
@@ -26,12 +31,7 @@
   </head>
   <body>
     <div id="splash">
-      <img
-        src="https://github.com/CAPS-DGU/UmJoonSIC/blob/main/images/splash.png?raw=true"
-        alt="UmJoonSIC"
-        width="600"
-        height="400"
-      />
+      <img src="splash.png" alt="UmJoonSIC" width="600" height="400" />
     </div>
   </body>
 </html>

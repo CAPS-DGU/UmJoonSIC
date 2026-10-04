@@ -2,10 +2,10 @@
 // It exposes `window.api` (see shared/ipc.ts) and re-dispatches main-process
 // messages as DOM events on `window`.
 import { contextBridge, ipcRenderer } from 'electron';
-import { electronAPI } from '@electron-toolkit/preload';
 import { AppEvent, IpcChannel, type RendererApi, type ServerLogPayload } from '../shared/ipc';
 
-// A project path can arrive before React has mounted its listener; keep it until asked for.
+// A project path from outside the app (file association, second instance) waits here until
+// the renderer takes it: it may arrive before React listens, and each path is opened once.
 let queuedProjectPath: string | null = null;
 
 const api: RendererApi = {
@@ -30,6 +30,14 @@ const api: RendererApi = {
     ipcRenderer.invoke(IpcChannel.deleteFolder, { projectPath, relativePath }),
   pickFile: () => ipcRenderer.invoke(IpcChannel.pickFile),
   restartServer: () => ipcRenderer.invoke(IpcChannel.restartServer),
+  waitForSimulator: () => ipcRenderer.invoke(IpcChannel.waitForSimulator),
+  getServerLog: () => ipcRenderer.invoke(IpcChannel.getServerLog),
+  setHasUnsavedChanges: hasUnsavedChanges =>
+    ipcRenderer.send(IpcChannel.setHasUnsavedChanges, hasUnsavedChanges),
+  confirmUnsavedChanges: fileNames =>
+    ipcRenderer.invoke(IpcChannel.confirmUnsavedChanges, fileNames),
+  closeWindow: () => ipcRenderer.invoke(IpcChannel.closeWindow),
+  abortClose: () => ipcRenderer.send(IpcChannel.abortClose),
 };
 
 // main -> renderer messages become DOM events of the same name.
@@ -37,7 +45,13 @@ ipcRenderer.on(AppEvent.serverLog, (_event, payload: ServerLogPayload) => {
   window.dispatchEvent(new CustomEvent(AppEvent.serverLog, { detail: payload }));
 });
 
-for (const event of [AppEvent.createNewProject, AppEvent.openProject, AppEvent.closeProject]) {
+for (const event of [
+  AppEvent.createNewProject,
+  AppEvent.openProject,
+  AppEvent.closeProject,
+  AppEvent.closeRequested,
+  AppEvent.closeActiveTab,
+]) {
   ipcRenderer.on(event, () => {
     window.dispatchEvent(new CustomEvent(event));
   });
@@ -45,19 +59,8 @@ for (const event of [AppEvent.createNewProject, AppEvent.openProject, AppEvent.c
 
 ipcRenderer.on(AppEvent.openProjectPath, (_event, sicPath: string) => {
   queuedProjectPath = sicPath;
-  window.dispatchEvent(new CustomEvent(AppEvent.openProjectPath, { detail: sicPath }));
+  window.dispatchEvent(new CustomEvent(AppEvent.openProjectPath));
 });
 
-// With context isolation the API must go through contextBridge; without it, plain globals work.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI);
-    contextBridge.exposeInMainWorld('api', api);
-  } catch (error) {
-    console.error('Failed to expose Electron API in the renderer:', error);
-  }
-} else {
-  const globals = window as unknown as { electron: typeof electronAPI; api: RendererApi };
-  globals.electron = electronAPI;
-  globals.api = api;
-}
+// The renderer runs with context isolation, so the API goes through contextBridge.
+contextBridge.exposeInMainWorld('api', api);

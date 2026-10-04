@@ -1,7 +1,10 @@
+import { useShallow } from 'zustand/react/shallow';
 import { useInfoModalStore } from '@/stores/infoModalStore';
 
 export function InfoModal() {
-  const { isOpen, title, message, close } = useInfoModalStore();
+  const { isOpen, title, message, close } = useInfoModalStore(
+    useShallow(s => ({ isOpen: s.isOpen, title: s.title, message: s.message, close: s.close })),
+  );
 
   if (!isOpen) return null;
 

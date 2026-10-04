@@ -4,6 +4,14 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    // Only the build output, package.json and the runtime dependencies are shipped;
+    // sources, configuration and caches stay out of the app.
+    ignore: [
+      /^\/(src|electron|shared|public|out)(\/|$)/,
+      /^\/node_modules\/\.(cache|tmp|vite)(\/|$)/,
+      /^\/(?!package\.json$)[^/]+\.(html|json|ts|js|cjs|md|yaml)$/,
+      /^\/\.[^/]+$/,
+    ],
     icon: './src/assets/icon',
     executableName: 'UmJoonSIC',
     osxSign: {},

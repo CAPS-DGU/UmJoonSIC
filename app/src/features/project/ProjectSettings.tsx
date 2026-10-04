@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ProjectSettings as Settings } from '@shared/ipc';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
 import { useProjectStore } from '@/features/project/projectStore';
+import { useInfoModalStore } from '@/stores/infoModalStore';
 
 /** Device numbers 0x00-0xFF. */
 const DEVICE_INDEXES = Array.from({ length: 256 }, (_, i) => i);
@@ -11,8 +12,18 @@ const toHexByte = (value: number) => `0x${value.toString(16).toUpperCase().padSt
 
 /** Editor for project.sic, shown while its tab is active: entry module, asm files, file devices. */
 export default function ProjectSettings() {
-  const { settings, setSettings, saveSettings } = useProjectStore();
-  const { activeTabIdx, setIsModified } = useEditorTabStore();
+  const settings = useProjectStore(s => s.settings);
+  const setSettings = useProjectStore(s => s.setSettings);
+  const saveSettings = useProjectStore(s => s.saveSettings);
+  // This view shows the active tab, which is the settings tab.
+  const settingsTabPath = useEditorTabStore(state => state.activePath);
+  const setModified = useEditorTabStore(state => state.setModified);
+  const setIsModified = useCallback(
+    (isModified: boolean) => {
+      if (settingsTabPath) setModified(settingsTabPath, isModified);
+    },
+    [settingsTabPath, setModified],
+  );
   const [newAsm, setNewAsm] = useState('');
   const [deviceIndex, setDeviceIndex] = useState<number>(0);
 
@@ -21,7 +32,7 @@ export default function ProjectSettings() {
   /** Apply a change to the settings and mark the tab as modified. */
   const update = (changed: Partial<Settings>) => {
     setSettings({ ...settings, ...changed });
-    setIsModified(activeTabIdx, true);
+    setIsModified(true);
   };
 
   // Ctrl+S / Cmd+S saves the settings.
@@ -32,19 +43,21 @@ export default function ProjectSettings() {
         e.stopPropagation();
         saveSettings().then(res => {
           if (res.success) {
-            setIsModified(activeTabIdx, false);
+            setIsModified(false);
+          } else {
+            useInfoModalStore.getState().show('저장 실패', res.message ?? 'project.sic');
           }
         });
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [saveSettings, activeTabIdx, setIsModified]);
+  }, [saveSettings, setIsModified]);
 
   const addAsm = () => {
     setSettings({ ...settings, asm: [...settings.asm, newAsm] });
     setNewAsm('');
-    setIsModified(activeTabIdx, true);
+    setIsModified(true);
   };
 
   /** Map the selected device number to a file chosen in the native file picker. */
@@ -59,7 +72,7 @@ export default function ProjectSettings() {
   const save = () => {
     saveSettings().then(res => {
       if (res.success) {
-        setIsModified(activeTabIdx, false);
+        setIsModified(false);
         alert('Settings saved');
       } else {
         alert(res.message ?? 'Failed to save settings');
@@ -137,7 +150,7 @@ export default function ProjectSettings() {
               <span className="font-bold text-sm">Add Device :</span>
               <select
                 className="border border-gray-300 rounded-md px-2 py-1 text-sm font-mono"
-                value={deviceIndex}
+                value={deviceIndex.toString(16)}
                 onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
               >
                 {DEVICE_INDEXES.map(i => (
