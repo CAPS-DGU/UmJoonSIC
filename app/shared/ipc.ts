@@ -77,6 +77,11 @@ export const AppEvent = {
   closeRequested: 'close-requested',
   /** File > Close Tab (Ctrl+W). */
   closeActiveTab: 'close-active-tab',
+  /** File > Next Tab, Previous Tab, Move Tab Right, Move Tab Left. */
+  nextTab: 'next-tab',
+  previousTab: 'previous-tab',
+  moveTabRight: 'move-tab-right',
+  moveTabLeft: 'move-tab-left',
 } as const;
 
 /** The object the preload script exposes as `window.api`. */

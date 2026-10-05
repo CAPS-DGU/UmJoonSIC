@@ -5,7 +5,12 @@ import type { LoadedFile } from '@/api/types';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
-import { breakpointAt, listingTabPath, useListingStore } from '@/features/listing/listingStore';
+import {
+  breakpointAt,
+  listingsAt,
+  listingTabPath,
+  useListingStore,
+} from '@/features/listing/listingStore';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import { useProjectStore } from '@/features/project/projectStore';
@@ -63,6 +68,8 @@ interface RunningState {
   restart: () => Promise<void>;
   /** Reset the simulator and close everything that belongs to the run. */
   stopRunning: () => Promise<void>;
+  /** Open the List tabs that were closed during the run, and show the one the PC is in. */
+  showListings: () => Promise<void>;
 }
 
 /** Restart the simulation in the current machine mode with the project's file devices. */
@@ -72,6 +79,12 @@ function beginSimulation() {
   return simulator.begin(mode, settings.filedevices);
 }
 
+/** The tab that shows the listing of a loaded file (named as the simulator names it). */
+const listingTab = (fileName: string) => ({
+  title: `List: ${fileName.split('/').pop()!}`,
+  filePath: listingTabPath(fileName),
+});
+
 /** Open a List tab for every loaded file and register its listing and watch variables. */
 function publishLoadedFiles(files: LoadedFile[]) {
   const { addWatch } = useWatchStore.getState();
@@ -79,10 +92,7 @@ function publishLoadedFiles(files: LoadedFile[]) {
   const { openTab } = useEditorTabStore.getState();
 
   files.forEach(file => {
-    openTab({
-      title: `List: ${file.fileName.split('/').pop()!}`,
-      filePath: listingTabPath(file.fileName),
-    });
+    openTab(listingTab(file.fileName));
     addListing(file.fileName, file.listing.rows);
     file.listing.watch.forEach(variable => addWatch({ filePath: file.fileName, ...variable }));
   });
@@ -315,6 +325,17 @@ export const useRunningStore = create<RunningState>((set, get) => {
       } catch (error) {
         console.error('Failed to reset the simulation:', error);
       }
+    },
+
+    showListings: async () => {
+      if (!get().isRunning) return;
+      const { listings } = useListingStore.getState();
+      const { openTab } = useEditorTabStore.getState();
+      for (const listing of listings) {
+        await openTab(listingTab(listing.filePath));
+      }
+      const current = listingsAt(listings, useRegisterStore.getState().PC)[0] ?? listings[0];
+      if (current) await openTab(listingTab(current.filePath));
     },
   };
 });

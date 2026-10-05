@@ -13,6 +13,21 @@ function sendToAllWindows(event: string) {
   BrowserWindow.getAllWindows().forEach(window => window.webContents.send(event));
 }
 
+/** A command for the tabs of the main window (another window, such as About, has none). */
+const tabCommand = (
+  label: string,
+  accelerator: string,
+  event: string,
+): MenuItemConstructorOptions => ({
+  label,
+  accelerator,
+  click: (_item, focusedWindow) => {
+    const mainWindow = getMainWindow();
+    if (focusedWindow && focusedWindow !== mainWindow) return;
+    mainWindow?.webContents.send(event);
+  },
+});
+
 const devToolsItems: MenuItemConstructorOptions[] = isDevtoolsEnabled
   ? [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }, { type: 'separator' }]
   : [];
@@ -51,6 +66,11 @@ export const menuList: MenuItemConstructorOptions[] = [
           }
         },
       },
+      // Ctrl, also on macOS, where Cmd+PageDown scrolls the editor (setupMonaco.ts frees Ctrl).
+      tabCommand('Next Tab', 'Ctrl+PageDown', AppEvent.nextTab),
+      tabCommand('Previous Tab', 'Ctrl+PageUp', AppEvent.previousTab),
+      tabCommand('Move Tab Right', 'Ctrl+Shift+PageDown', AppEvent.moveTabRight),
+      tabCommand('Move Tab Left', 'Ctrl+Shift+PageUp', AppEvent.moveTabLeft),
     ],
   },
   {

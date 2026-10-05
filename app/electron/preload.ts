@@ -51,6 +51,10 @@ for (const event of [
   AppEvent.closeProject,
   AppEvent.closeRequested,
   AppEvent.closeActiveTab,
+  AppEvent.nextTab,
+  AppEvent.previousTab,
+  AppEvent.moveTabRight,
+  AppEvent.moveTabLeft,
 ]) {
   ipcRenderer.on(event, () => {
     window.dispatchEvent(new CustomEvent(event));
