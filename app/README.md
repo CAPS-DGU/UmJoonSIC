@@ -77,7 +77,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 렌더러(`src/`)의 import 는 `@/…`(src), `@shared/…`(shared) 별칭을 씁니다. `electron/` 에는 별칭이 없으므로 상대 경로(`../shared/ipc`)를 씁니다.
 - 기능 폴더 안에 그 기능의 컴포넌트·스토어·훅을 함께 둡니다.
 - 시뮬레이터 호출은 `src/api/simulator.ts`, 파일 작업은 `window.api`만 사용합니다.
-- 단위 테스트는 대상 파일 옆에 `*.test.ts` 로 둡니다.
+- 단위 테스트는 대상 파일 옆에 `*.test.ts` 로 둡니다 (`src/`, 그리고 Electron API 를 쓰지 않는 `electron/` 모듈).
 - Tailwind 는 `src/` 와 `index.html` 의 모든 글자에서 클래스 이름을 찾습니다. 주석에 `visible`, `hidden`, `resize` 같은 클래스 이름을 단어 그대로 쓰면 그 클래스가 CSS 에 들어갑니다 (Monaco 가 쓰는 `.visible` 처럼 화면이 달라질 수 있음).
 - 커밋 전에 `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` 가 통과해야 합니다.
 
@@ -86,3 +86,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 저장하지 않은 변경: 수정한 탭, 프로젝트, 창을 닫거나 앱을 끝낼 때 저장 / 저장 안 함 / 취소를 묻습니다 (`src/features/editor/unsavedChanges.ts`). 창 닫기는 메인 프로세스가 붙잡아 두었다가 렌더러가 답하면 닫습니다 (`electron/windows/mainWindow.ts`).
 - 자동 열 맞춤(`src/features/editor/lib/autoIndentLine.ts`)은 입력 한 번마다 실행되므로, 바꿀 때는 `autoIndentLine.test.ts` 와 함께 확인하세요.
 - 실행 제어(실행, 지연 실행, 계속, 한 줄 실행, 중지)는 `src/features/debugger/runningStore.ts` 에 있습니다. 중단점은 그 줄을 실행하기 전에 멈춥니다.
+- `project.sic` 는 JSON 입니다: `asm`(프로젝트 기준 경로), `main`(확장자 없는 이름), `filedevices`, `mode`(`"SIC"` 또는 `"SICXE"`, 없으면 SIC). 모드를 바꾸면 `mode` 만 바로 저장되고, 설정 화면의 저장하지 않은 편집은 그대로 남습니다.
+- 사용자 지정 지연 시간은 프로젝트가 아니라 앱의 설정이라 렌더러의 localStorage(`umjoonsic.delayTime`)에 둡니다.
+- 탭: 끌어서 순서를 바꾸고, Ctrl+PageDown / Ctrl+PageUp 으로 옮겨 가며, Ctrl+Shift+PageDown / Ctrl+Shift+PageUp 으로 자리를 옮깁니다 (File 메뉴). macOS 에서도 Ctrl 입니다 (Cmd+PageDown 은 에디터의 스크롤).
+- 스플래시는 시작이 끝날 때까지의 창입니다. 닫으면 시작을 취소하고 앱이 끝납니다 (`electron/main.ts`).
