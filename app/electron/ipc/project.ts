@@ -1,12 +1,12 @@
 // IPC: creating and opening projects.
 import { ipcMain, dialog } from 'electron';
 import * as pathModule from 'path';
-import { IpcChannel, type IpcResult, type ProjectInfo } from '../../shared/ipc';
+import { IpcChannel, type IpcResult, type MachineMode, type ProjectInfo } from '../../shared/ipc';
 import { createProjectSkeleton, loadProjectFromSic } from '../project/projectFiles';
 import { ipcResult, toErrorMessage } from './result';
 
 /** Ask for a parent folder, then for the project's name, and create <parent>/<name>/. */
-async function createNewProjectInteractive(): Promise<IpcResult<ProjectInfo>> {
+async function createNewProjectInteractive(mode: MachineMode): Promise<IpcResult<ProjectInfo>> {
   const parentPick = await dialog.showOpenDialog({
     properties: ['openDirectory', 'createDirectory'],
     title: 'Choose parent folder for the new project',
@@ -28,14 +28,16 @@ async function createNewProjectInteractive(): Promise<IpcResult<ProjectInfo>> {
   }
 
   try {
-    return { success: true, data: createProjectSkeleton(savePick.filePath) };
+    return { success: true, data: createProjectSkeleton(savePick.filePath, mode) };
   } catch (error) {
     return { success: false, message: toErrorMessage(error) };
   }
 }
 
 export function registerProjectHandlers() {
-  ipcMain.handle(IpcChannel.createNewProject, () => createNewProjectInteractive());
+  ipcMain.handle(IpcChannel.createNewProject, (_event, mode: unknown) =>
+    createNewProjectInteractive(mode === 'SICXE' ? 'SICXE' : 'SIC'),
+  );
 
   // Pick a .sic file and load the project around it.
   ipcMain.handle(IpcChannel.openProject, async (): Promise<IpcResult<ProjectInfo>> => {

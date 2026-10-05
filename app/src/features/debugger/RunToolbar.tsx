@@ -1,6 +1,5 @@
 import {
   AlarmClock,
-  Cpu,
   Pause,
   Play,
   Redo,
@@ -17,11 +16,10 @@ const ICON = 'w-4 h-4';
 interface IdleButtonsProps {
   delayTime: number;
   onOpenDelayModal: () => void;
-  onToggleModeMenu: () => void;
 }
 
-/** Toolbar while no program is loaded: run with delay, delay setting, run, machine mode. */
-export function IdleButtons({ delayTime, onOpenDelayModal, onToggleModeMenu }: IdleButtonsProps) {
+/** Toolbar while no program is loaded: run with delay, delay setting, run. */
+export function IdleButtons({ delayTime, onOpenDelayModal }: IdleButtonsProps) {
   const run = useRunningStore(s => s.run);
   const runWithDelay = useRunningStore(s => s.runWithDelay);
 
@@ -35,9 +33,6 @@ export function IdleButtons({ delayTime, onOpenDelayModal, onToggleModeMenu }: I
       </ToolbarButton>
       <ToolbarButton title="실행" onClick={run}>
         <Play className={ICON} />
-      </ToolbarButton>
-      <ToolbarButton title="아키텍처 설정" onClick={onToggleModeMenu}>
-        <Cpu className={ICON} />
       </ToolbarButton>
     </>
   );

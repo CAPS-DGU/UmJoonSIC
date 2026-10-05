@@ -1,7 +1,7 @@
 import path from 'path';
 import { defineConfig } from 'vitest/config';
 
-// Unit tests for the renderer's pure modules (no Electron, no DOM): `pnpm test`.
+// Unit tests for modules without Electron or DOM (renderer and main process): `pnpm test`.
 export default defineConfig({
   resolve: {
     alias: {
@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'electron/**/*.test.ts'],
     environment: 'node',
   },
 });

@@ -1,6 +1,6 @@
 // Shapes of the simulator's HTTP API (simulator/src/main/java/com/sicserver).
 
-export type MachineMode = 'SIC' | 'SICXE';
+export type { MachineMode } from '@shared/ipc';
 
 export interface Registers {
   A: number;

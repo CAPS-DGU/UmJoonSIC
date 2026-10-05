@@ -8,6 +8,7 @@ import {
 import { disposeModel, modelPath } from '@/features/editor/monaco/models';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
+import { moveItem } from '@/lib/moveItem';
 import { useInfoModalStore } from '@/stores/infoModalStore';
 
 export interface CursorPosition {
@@ -65,6 +66,12 @@ interface EditorTabState {
   openTab: (tab: NewTab) => Promise<void>;
   clearRevealRequest: (id: number) => void;
   activateTab: (filePath: string) => void;
+  /** Activate the next (1) or the previous (-1) tab, going round at the ends. */
+  activateAdjacentTab: (offset: 1 | -1) => void;
+  /** Move a tab to another place in the tab bar (0 is the first). */
+  moveTab: (filePath: string, toIndex: number) => void;
+  /** Move the active tab one place to the right (1) or to the left (-1). */
+  moveActiveTab: (offset: 1 | -1) => void;
   /** Close a tab, unsaved changes included (ask first: see unsavedChanges.ts). */
   closeTab: (filePath: string) => void;
   closeListingTabs: () => void;
@@ -196,6 +203,28 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
       set(state => (state.revealRequest?.id === id ? { revealRequest: null } : {})),
 
     activateTab: filePath => set({ activePath: filePath }),
+
+    activateAdjacentTab: offset => {
+      const { tabs, activePath } = get();
+      if (tabs.length === 0) return;
+      const index = tabs.findIndex(tab => tab.filePath === activePath);
+      // Without an active tab, the first (next) or the last (previous) one.
+      const next = index < 0 ? (offset > 0 ? 0 : tabs.length - 1) : index + offset;
+      set({ activePath: tabs[(next + tabs.length) % tabs.length].filePath });
+    },
+
+    moveTab: (filePath, toIndex) =>
+      set(state => {
+        const from = state.tabs.findIndex(tab => tab.filePath === filePath);
+        const to = Math.max(0, Math.min(toIndex, state.tabs.length - 1));
+        return from < 0 || from === to ? {} : { tabs: moveItem(state.tabs, from, to) };
+      }),
+
+    moveActiveTab: offset => {
+      const { tabs, activePath, moveTab } = get();
+      const index = tabs.findIndex(tab => tab.filePath === activePath);
+      if (index >= 0) moveTab(tabs[index].filePath, index + offset);
+    },
 
     closeTab: filePath => {
       const tab = get().tabs.find(t => t.filePath === filePath);
