@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useWatchStore } from '@/features/panel/watchStore';
 import type { WatchRow } from '@/features/panel/watchStore';
 import { ChevronDown, ChevronRight, Folder, FileText } from 'lucide-react';
+import { PANEL_HEADER } from '@/lib/controls';
 
 const toHex = (value: number[]) => {
   if (!Array.isArray(value)) return '';
@@ -59,19 +60,19 @@ export default function WatchPanel() {
 
       elements.push(
         <tr key={`${row.name}[${i}]`} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-          <td className="py-1 font-mono pl-8">
+          <td className="py-1 font-mono pl-8 truncate">
             <FileText className="inline w-3 h-3 mr-1" />
             {row.name}[{i}]
           </td>
-          <td className="py-1 font-mono">{row.dataType}</td>
-          <td className="py-1 font-mono">
+          <td className="py-1 font-mono truncate">{row.dataType}</td>
+          <td className="py-1 font-mono truncate">
             {'0x' + (row.address + i * row.elementSize).toString(16).toUpperCase().padStart(6, '0')}
           </td>
-          <td className="py-1 font-mono">
+          <td className="py-1 font-mono truncate">
             {elementValue.length > 0 ? parseInt(toHex(elementValue).replaceAll(' ', ''), 16) : ''}
           </td>
-          <td className="py-1 font-mono">{toHex(elementValue)}</td>
-          <td className="py-1 font-mono">{toChar(elementValue)}</td>
+          <td className="py-1 font-mono truncate">{toHex(elementValue)}</td>
+          <td className="py-1 font-mono truncate">{toChar(elementValue)}</td>
         </tr>,
       );
     }
@@ -79,18 +80,21 @@ export default function WatchPanel() {
   };
 
   return (
-    <div className="p-4 text-black dark:text-white h-full font-sans">
-      <h2 className="text-xl font-bold mb-3">Watch</h2>
-      <div className="overflow-auto">
-        <table className="w-full text-sm table-fixed border-collapse">
+    <div className="flex h-full flex-col overflow-hidden text-black dark:text-white">
+      <div className={PANEL_HEADER}>
+        <span className="font-semibold text-sm">Watch</span>
+      </div>
+      {/* Narrower than the table's minimum, the table scrolls instead of overlapping. */}
+      <div className="slim-scroll flex-1 overflow-auto p-2">
+        <table className="w-full min-w-[36rem] text-sm table-fixed border-collapse">
           <thead className="text-left text-gray-500 dark:text-gray-400">
             <tr>
-              <th className="py-2 font-semibold w-1/3">Name</th>
-              <th className="py-2 font-semibold w-1/4">Type</th>
-              <th className="py-2 font-semibold w-1/3">Address</th>
-              <th className="py-2 font-semibold w-1/4">DEC</th>
-              <th className="py-2 font-semibold w-1/4">HEX</th>
-              <th className="py-2 font-semibold w-1/4">CHAR</th>
+              <th className="py-2 font-semibold w-[22%]">Name</th>
+              <th className="py-2 font-semibold w-[12%]">Type</th>
+              <th className="py-2 font-semibold w-[16%]">Address</th>
+              <th className="py-2 font-semibold w-[18%]">DEC</th>
+              <th className="py-2 font-semibold w-[18%]">HEX</th>
+              <th className="py-2 font-semibold w-[14%]">CHAR</th>
             </tr>
           </thead>
           <tbody>
@@ -100,23 +104,25 @@ export default function WatchPanel() {
 
               return (
                 <React.Fragment key={filePath}>
-                  {/* 파일 헤더 */}
+                  {/* the file's row */}
                   <tr
                     className="hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
                     onClick={() => toggleExpanded(fileKey)}
                   >
-                    <td colSpan={6} className="py-1 font-semibold">
-                      {isFileExpanded ? (
-                        <ChevronDown className="inline w-4 h-4 mr-1" />
-                      ) : (
-                        <ChevronRight className="inline w-4 h-4 mr-1" />
-                      )}
-                      <Folder className="inline w-4 h-4 mr-1" />
-                      {filePath.split('/').pop()}
+                    <td colSpan={6} className="py-1">
+                      <div className="flex items-center gap-1 font-semibold">
+                        {isFileExpanded ? (
+                          <ChevronDown className="w-4 h-4 shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 shrink-0" />
+                        )}
+                        <Folder className="w-4 h-4 shrink-0" />
+                        <span className="min-w-0 truncate">{filePath.split('/').pop()}</span>
+                      </div>
                     </td>
                   </tr>
 
-                  {/* 파일 내용 */}
+                  {/* its variables */}
                   {isFileExpanded &&
                     rows.map(row => {
                       const arrayKey = `${filePath}-${row.name}`;
@@ -125,9 +131,9 @@ export default function WatchPanel() {
 
                       return (
                         <React.Fragment key={row.name}>
-                          {/* 메인 변수 행 */}
+                          {/* a variable */}
                           <tr className="hover:bg-gray-200 dark:hover:bg-gray-800">
-                            <td className="py-1 font-mono pl-4">
+                            <td className="py-1 font-mono pl-4 truncate">
                               {isArray && (
                                 <span
                                   className="cursor-pointer mr-1"
@@ -143,20 +149,20 @@ export default function WatchPanel() {
                               <FileText className="inline w-3 h-3 mr-1" />
                               {row.name} ({row.dataType.toUpperCase()})
                             </td>
-                            <td className="py-1 font-mono">{row.dataType}</td>
-                            <td className="py-1 font-mono">
+                            <td className="py-1 font-mono truncate">{row.dataType}</td>
+                            <td className="py-1 font-mono truncate">
                               {'0x' + row.address.toString(16).toUpperCase().padStart(6, '0')}
                             </td>
-                            <td className="py-1 font-mono">
+                            <td className="py-1 font-mono truncate">
                               {row.value && row.value.length > 0
                                 ? parseInt(toHex(row.value).replaceAll(' ', ''), 16)
                                 : ''}
                             </td>
-                            <td className="py-1 font-mono">{toHex(row.value ?? [])}</td>
-                            <td className="py-1 font-mono">{toChar(row.value ?? [])}</td>
+                            <td className="py-1 font-mono truncate">{toHex(row.value ?? [])}</td>
+                            <td className="py-1 font-mono truncate">{toChar(row.value ?? [])}</td>
                           </tr>
 
-                          {/* 배열 요소들 */}
+                          {/* the elements of an array */}
                           {isArray && isArrayExpanded && renderArrayElements(row)}
                         </React.Fragment>
                       );

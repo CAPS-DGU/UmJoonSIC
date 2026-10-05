@@ -3,6 +3,7 @@ import { File, ChevronRight, Settings, List, CircleX } from 'lucide-react';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { CompileError } from '@/features/panel/errorStore';
+import { PANEL_HEADER } from '@/lib/controls';
 
 /** One error as a row of the panel. */
 interface ErrorItem {
@@ -67,19 +68,16 @@ export default function ErrorPanel() {
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 flex flex-col h-full overflow-hidden">
       {/* Panel Header */}
-      <div className="flex items-center p-2 border-b border-gray-300 dark:border-gray-700">
-        <div className="flex items-center">
-          <CircleX className="text-red-500 mr-1 w-4 h-4" />
-          <span className="font-semibold text-sm">Errors</span>
-        </div>
+      <div className={PANEL_HEADER}>
+        <span className="font-semibold text-sm">Errors</span>
         <div className="ml-auto flex items-center">
           <CircleX className="text-red-500 mr-1 w-4 h-4" />
-          <span className="text-sm font-bold">{totalErrorCount}</span>
+          <span className="text-sm font-semibold">{totalErrorCount}</span>
         </div>
       </div>
 
       {/* errors, grouped by file */}
-      <div className="flex-1 overflow-auto p-1">
+      <div className="slim-scroll flex-1 overflow-auto p-2">
         {fileNames.length === 0 ? (
           <p className="text-gray-400 text-sm mt-2 ml-2">No Error found.</p>
         ) : (

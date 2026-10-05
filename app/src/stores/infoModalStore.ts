@@ -14,5 +14,6 @@ export const useInfoModalStore = create<ModalState>(set => ({
   title: undefined,
   message: undefined,
   show: (title: string, message: string) => set({ isOpen: true, title, message }),
-  close: () => set({ isOpen: false, title: undefined, message: undefined }),
+  // The text stays while the dialog fades out (show replaces it).
+  close: () => set({ isOpen: false }),
 }));

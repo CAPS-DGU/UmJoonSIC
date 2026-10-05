@@ -35,7 +35,7 @@ export function NewFolderDialog({ open, onOpenChange, currentFolder, onFolderCre
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>새 폴더 만들기</DialogTitle>
         </DialogHeader>

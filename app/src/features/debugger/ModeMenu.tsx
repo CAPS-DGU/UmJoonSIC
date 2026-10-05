@@ -24,7 +24,7 @@ export function ModeButton({ mode, disabled, onClick }: ModeButtonProps) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-2 py-1 rounded-md border text-sm font-semibold transition-colors ${colors} ${
+      className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-sm font-semibold transition-colors ${colors} ${
         disabled ? 'opacity-60 cursor-default' : 'hover:bg-gray-100'
       }`}
       title={disabled ? '실행 중에는 아키텍처를 바꿀 수 없습니다' : '아키텍처 설정'}
