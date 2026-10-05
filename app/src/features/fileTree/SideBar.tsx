@@ -8,6 +8,7 @@ import { NewFolderDialog } from '@/features/fileTree/NewFolderDialog';
 import type { FileStructure } from '@/features/fileTree/types';
 import { useFileTree } from '@/features/fileTree/useFileTree';
 import { useFileTreeNavigation } from '@/features/fileTree/useFileTreeNavigation';
+import { BAR_ICON_BUTTON } from '@/lib/controls';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useProjectFiles } from '@/features/project/useProjectFiles';
 
@@ -63,30 +64,36 @@ export default function SideBar() {
 
   return (
     <div className="w-full bg-white border-r border-gray-300 flex flex-col h-full">
-      <div className="flex items-center justify-between p-2 border-b border-gray-300">
-        <span className="font-bold">{projectName}</span>
-        <div className="flex gap-2">
+      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-gray-300 px-2">
+        <span className="min-w-0 truncate text-sm font-semibold" title={projectName}>
+          {projectName}
+        </span>
+        <div className="flex shrink-0 gap-1">
           <button
-            className="p-1 rounded hover:bg-gray-200"
+            className={BAR_ICON_BUTTON}
             onClick={() => setNewFileDialogOpen(true)}
             title="새 파일 생성"
           >
             <FilePlus width={ICON_SIZE} height={ICON_SIZE} />
           </button>
           <button
-            className="p-1 rounded hover:bg-gray-200"
+            className={BAR_ICON_BUTTON}
             onClick={() => setNewFolderDialogOpen(true)}
             title="새 폴더 생성"
           >
             <FolderPlus width={ICON_SIZE} height={ICON_SIZE} />
           </button>
-          <button className="p-1 rounded hover:bg-gray-200" onClick={refreshFileTree}>
+          <button className={BAR_ICON_BUTTON} onClick={refreshFileTree} title="새로 고침">
             <RefreshCcw width={ICON_SIZE} height={ICON_SIZE} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto" tabIndex={0} onKeyDown={handleKeyDown}>
+      <div
+        className="slim-scroll flex-1 overflow-y-auto overflow-x-hidden"
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+      >
         {fileTreeStructure.map(item => (
           <FileTreeItem
             key={item.relativePath}

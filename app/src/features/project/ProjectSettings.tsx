@@ -4,6 +4,9 @@ import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useInfoModalStore } from '@/stores/infoModalStore';
+import { FORM_BUTTON, FORM_FIELD, INLINE_ICON_BUTTON } from '@/lib/controls';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /** Device numbers 0x00-0xFF. */
 const DEVICE_INDEXES = Array.from({ length: 256 }, (_, i) => i);
@@ -83,62 +86,76 @@ export default function ProjectSettings() {
   return (
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
-      <div className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">
-        <h1 className="font-bold text-lg mb-2">SIC Setting</h1>
-        <div className="flex flex-col gap-2">
-          <div>
-            <span className="font-bold">Main: </span>
+      <div className="flex-1 overflow-auto bg-gray-100 p-4 text-sm">
+        <div className="flex max-w-2xl flex-col gap-5">
+          <h1 className="text-base font-semibold">SIC Setting</h1>
+
+          <section className="flex flex-col gap-2">
+            <label className="font-semibold" htmlFor="sic-main">
+              Main
+            </label>
             <input
+              id="sic-main"
               type="text"
-              className="border border-gray-300 rounded-md p-1"
+              className={`${FORM_FIELD} w-full max-w-xs font-mono`}
               value={settings.main}
               onChange={e => update({ main: e.target.value })}
             />
-          </div>
+          </section>
 
-          <div className="flex flex-col gap-2">
-            <h2 className="font-bold">Asm List</h2>
-            <ul>
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">Asm List</h2>
+            <ul className="divide-y rounded border bg-white">
               {settings.asm.map(asm => (
-                <li key={asm}>
-                  {asm}{' '}
-                  <span
-                    className="text-gray-500 text-xs"
+                <li key={asm} className="flex items-center gap-2 px-2 py-1">
+                  <span className="min-w-0 flex-1 truncate font-mono" title={asm}>
+                    {asm}
+                  </span>
+                  <button
+                    className={INLINE_ICON_BUTTON}
+                    title="목록에서 빼기"
                     onClick={() => update({ asm: settings.asm.filter(a => a !== asm) })}
                   >
-                    x
-                  </span>
+                    <X width={12} height={12} />
+                  </button>
                 </li>
               ))}
+              {settings.asm.length === 0 && (
+                <li className="px-2 py-1 text-xs text-gray-400">No file</li>
+              )}
             </ul>
-          </div>
-          <div>
-            <span className="font-bold">Add Asm: </span>
-            <input
-              type="text"
-              className="border border-gray-300 rounded-md p-1"
-              value={newAsm}
-              onChange={e => setNewAsm(e.target.value)}
-            />
-            <button className="border border-gray-300 rounded-md p-1" onClick={addAsm}>
-              Add
-            </button>
-          </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                aria-label="Add Asm"
+                placeholder="file.asm"
+                className={`${FORM_FIELD} min-w-0 flex-1 basis-40 font-mono`}
+                value={newAsm}
+                onChange={e => setNewAsm(e.target.value)}
+              />
+              <button className={FORM_BUTTON} onClick={addAsm}>
+                Add
+              </button>
+            </div>
+          </section>
 
-          <div className="flex flex-col gap-2 mt-4">
-            <h2 className="font-bold">Device List</h2>
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">Device List</h2>
             <ul className="divide-y rounded border bg-white">
               {devices.map(d => (
-                <li key={d.index} className="flex items-center justify-between px-2 py-1">
-                  <span className="font-mono text-xs">{toHexByte(d.index)}</span>
-                  <span className="flex-1 px-2 truncate font-mono text-sm">{d.filename}</span>
+                <li key={d.index} className="flex items-center gap-2 px-2 py-1">
+                  <span className="shrink-0 font-mono text-xs">{toHexByte(d.index)}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono" title={d.filename}>
+                    {d.filename}
+                  </span>
                   <button
-                    className="text-xs text-gray-500"
+                    className={INLINE_ICON_BUTTON}
+                    title="장치 연결 해제"
                     onClick={() =>
                       update({ filedevices: devices.filter(x => x.index !== d.index) })
                     }
                   >
-                    x
+                    <X width={12} height={12} />
                   </button>
                 </li>
               ))}
@@ -146,10 +163,10 @@ export default function ProjectSettings() {
                 <li className="px-2 py-1 text-xs text-gray-400">No device mapped</li>
               )}
             </ul>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm">Add Device :</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="shrink-0 font-semibold">Add Device</span>
               <select
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm font-mono"
+                className={`${FORM_FIELD} shrink-0 font-mono`}
                 value={deviceIndex.toString(16)}
                 onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
               >
@@ -159,22 +176,31 @@ export default function ProjectSettings() {
                   </option>
                 ))}
               </select>
-              <input
-                type="text"
-                className="border border-gray-300 rounded-md p-1 flex-1 bg-gray-100 cursor-not-allowed"
-                value={devices.find(d => d.index === deviceIndex)?.filename ?? ''}
-                placeholder="파일을 선택하세요"
-                disabled
-              />
-              <button className="border px-2 py-1 rounded" onClick={pickDeviceFile}>
-                …
-              </button>
+              <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
+                <input
+                  type="text"
+                  className="h-7 min-w-0 flex-1 cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-2 font-mono"
+                  value={devices.find(d => d.index === deviceIndex)?.filename ?? ''}
+                  placeholder="파일을 선택하세요"
+                  disabled
+                />
+                <button
+                  className={cn(FORM_BUTTON, 'px-2')}
+                  title="파일 선택"
+                  onClick={pickDeviceFile}
+                >
+                  …
+                </button>
+              </div>
             </div>
+          </section>
+
+          <div>
+            <button className={FORM_BUTTON} onClick={save}>
+              Save
+            </button>
           </div>
         </div>
-        <button className="border border-gray-300 rounded-md p-1 mt-2" onClick={save}>
-          Save
-        </button>
       </div>
     </div>
   );

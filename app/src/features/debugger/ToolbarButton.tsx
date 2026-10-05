@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { BAR_ICON_BUTTON } from '@/lib/controls';
 
 interface ToolbarButtonProps {
   /** Tooltip; the buttons show only an icon. */
@@ -9,11 +10,7 @@ interface ToolbarButtonProps {
 
 export function ToolbarButton({ title, onClick, children }: ToolbarButtonProps) {
   return (
-    <button
-      onClick={onClick}
-      className="hover:bg-gray-100 p-2 rounded-md transition-colors"
-      title={title}
-    >
+    <button onClick={onClick} className={BAR_ICON_BUTTON} title={title}>
       {children}
     </button>
   );

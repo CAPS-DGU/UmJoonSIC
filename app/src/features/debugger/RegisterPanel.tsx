@@ -29,22 +29,22 @@ export default function RegisterPanel() {
   return (
     <div className="flex flex-col px-2 gap-2">
       <section className="flex w-full items-center justify-between">
-        <h2 className="text-lg font-bold">레지스터 값</h2>
-        <div className="flex items-center gap-1">
-          <p>HEX MODE</p>
+        <h2 className="text-sm font-semibold">레지스터 값</h2>
+        <div className="flex items-center gap-2">
+          <p className="text-sm">HEX MODE</p>
           <button
             onClick={() => setIsHex(!isHex)}
             role="switch"
             aria-checked={isHex}
             className={`
-        relative inline-flex h-7 w-12 items-center rounded-full transition-colors
+        relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors
         ${isHex ? 'bg-blue-500' : 'bg-gray-300'}
       `}
           >
             <span
               className={`
           inline-block h-5 w-5 transform rounded-full bg-white transition-transform
-          ${isHex ? 'translate-x-6' : 'translate-x-1'}
+          ${isHex ? 'translate-x-[18px]' : 'translate-x-0.5'}
         `}
             />
           </button>
@@ -62,7 +62,7 @@ export default function RegisterPanel() {
               key={name}
               className={`w-full flex justify-between items-center gap-4 ${isFloat ? 'col-span-2' : ''}`}
             >
-              <p className="text-base font-normal">{name}:</p>
+              <p className="text-sm font-normal">{name}:</p>
               <div
                 className={`w-full h-8 rounded-xl bg-[#CB601529] flex items-center justify-end px-2 transition-all duration-300 overflow-x-auto ${
                   isChanged ? 'register-flash' : ''

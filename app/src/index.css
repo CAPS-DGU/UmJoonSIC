@@ -7,16 +7,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* 일반체 */
+/* JetBrains Mono, regular */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('/fonts/JetBrainsMono[wght].ttf') format('truetype');
-  font-weight: 100 900; /* Variable weight 범위 */
+  font-weight: 100 900; /* variable font: the whole weight range */
   font-style: normal;
   font-display: swap;
 }
 
-/* 이탤릭체 */
+/* JetBrains Mono, italic */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('/fonts/JetBrainsMono-Italic[wght].ttf') format('truetype');
@@ -25,27 +25,49 @@
   font-display: swap;
 }
 
-body {
-  font-family:
-    'Pretendard Variable',
-    Pretendard,
-    'JetBrains Mono',
-    -apple-system,
-    BlinkMacSystemFont,
-    system-ui,
-    Roboto,
-    'Helvetica Neue',
-    'Segoe UI',
-    'Apple SD Gothic Neo',
-    'Noto Sans KR',
-    'Malgun Gothic',
-    'Apple Color Emoji',
-    'Segoe UI Emoji',
-    'Segoe UI Symbol',
-    sans-serif;
+/*
+ * The two fonts of the app, both bundled: Pretendard for the interface, JetBrains Mono for
+ * code, addresses and values (font-sans / font-mono). Bundled fonts look and measure the same
+ * on every system, so the layout's sizes hold everywhere.
+ */
+@theme {
+  --font-sans:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI',
+    'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
-/* 메모리 값 변경 애니메이션 */
+body {
+  font-family: var(--font-sans);
+  /* Korean breaks between words, not inside them; a word too long for its line still breaks. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* Slim scrollbars without arrow buttons, the same width on every system (8 px). */
+.slim-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.slim-scroll::-webkit-scrollbar-button {
+  display: none;
+}
+.slim-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.25) padding-box;
+}
+.slim-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* No scrollbar at all (the tab strip: scrolled with the wheel, the keys and to the active tab). */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* A memory byte that changed flashes. */
 @keyframes memory-flash {
   0% {
     background-color: transparent;
@@ -189,7 +211,7 @@ body {
   }
 }
 
-/* 레지스터 값 변경 애니메이션 */
+/* A register that changed flashes. */
 @keyframes register-flash {
   0%,
   100% {
