@@ -23,3 +23,11 @@ window.addEventListener('unhandledrejection', event => {
   }
 });
 registerSicxe(monaco);
+
+// Ctrl+PageDown / Ctrl+PageUp switch tabs (File menu). On macOS Monaco scrolls a line with
+// them, which would take the keys first; scrolling by line stays on its other keys.
+// (WinCtrl is Ctrl on macOS and the Windows key elsewhere, where Monaco has no such binding.)
+monaco.editor.addKeybindingRules([
+  { keybinding: monaco.KeyMod.WinCtrl | monaco.KeyCode.PageDown, command: '-scrollLineDown' },
+  { keybinding: monaco.KeyMod.WinCtrl | monaco.KeyCode.PageUp, command: '-scrollLineUp' },
+]);

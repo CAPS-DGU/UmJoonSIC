@@ -19,6 +19,12 @@ interface ListingState {
    * when that row no longer exists after an edit.
    */
   savedBreakpoints: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * What the List tabs last followed (see ListingView): the PC, with the number of listings
+   * loaded then. Null until they have followed the PC in this run.
+   */
+  followed: { pc: number; listingCount: number } | null;
+  setFollowed: (followed: { pc: number; listingCount: number }) => void;
   /** Add a file's listing, with the breakpoints it had in an earlier run. */
   addListing: (filePath: string, rows: ListingRow[]) => void;
   toggleBreakpoint: (filePath: string, rowIndex: number) => void;
@@ -42,6 +48,12 @@ export const breakpointAt = (listings: ListingFile[], address: number) =>
     listing.breakpoints.some(index => rowAddress(listing.rows[index]) === address),
   );
 
+/** The listings in which the instruction at `address` is (the code the PC is in). */
+export const listingsAt = (listings: ListingFile[], address: number) =>
+  listings.filter(listing =>
+    listing.rows.some(row => rowAddress(row) === address && hasObjectCode(row)),
+  );
+
 /** The path of the tab that shows a file's listing. */
 export const listingTabPath = (filePath: string) => path.join(filePath + '.lst');
 
@@ -52,6 +64,9 @@ export const listingOfTab = (listings: ListingFile[], tabPath: string | null) =>
 export const useListingStore = create<ListingState>(set => ({
   listings: [],
   savedBreakpoints: new Map(),
+  followed: null,
+
+  setFollowed: followed => set({ followed }),
 
   addListing: (filePath, rows) =>
     set(state => {
@@ -82,6 +97,6 @@ export const useListingStore = create<ListingState>(set => ({
       return { listings, savedBreakpoints };
     }),
 
-  clearListings: () => set({ listings: [] }),
-  forgetBreakpoints: () => set({ listings: [], savedBreakpoints: new Map() }),
+  clearListings: () => set({ listings: [], followed: null }),
+  forgetBreakpoints: () => set({ listings: [], savedBreakpoints: new Map(), followed: null }),
 }));

@@ -1,13 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
 import ListingTable from '@/features/listing/ListingTable';
 import {
-  hasObjectCode,
   listingOfTab,
+  listingsAt,
   listingTabPath,
-  rowAddress,
   useListingStore,
 } from '@/features/listing/listingStore';
 
@@ -19,18 +18,27 @@ export default function ListingView() {
   const PC = useRegisterStore(state => state.PC);
 
   const listingCount = listings.length;
+  const mounting = useRef(true);
 
   // Follow the PC across files: when it enters another file's code, switch to that file's
-  // List tab. Only when the PC moves (or a program is loaded): the user may look at another
-  // file's listing meanwhile, and set breakpoints there.
+  // List tab. Only when the PC moves while a listing is shown, or once a program is loaded:
+  // a List tab the user opens stays (they may look at another file's listing meanwhile, and
+  // set breakpoints there).
   useEffect(() => {
+    const isMount = mounting.current;
+    mounting.current = false;
+    const { followed, setFollowed } = useListingStore.getState();
+    const now = { pc: PC, listingCount };
+    if (isMount && followed !== null) {
+      setFollowed(now);
+      return;
+    }
+    // Nothing new (React runs effects twice in development).
+    if (followed?.pc === PC && followed.listingCount === listingCount) return;
     const { activePath, tabs, activateTab } = useEditorTabStore.getState();
-    const matches = useListingStore
-      .getState()
-      .listings.filter(listing =>
-        listing.rows.some(row => rowAddress(row) === PC && hasObjectCode(row)),
-      );
+    const matches = listingsAt(useListingStore.getState().listings, PC);
     if (matches.length === 0) return;
+    setFollowed(now);
     // The tab already showing a matching listing stays.
     if (matches.some(listing => listingTabPath(listing.filePath) === activePath)) return;
 

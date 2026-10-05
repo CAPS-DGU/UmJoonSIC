@@ -6,11 +6,16 @@ export interface FileDevice {
   filename: string;
 }
 
+/** The simulated machine: SIC, or its extension SIC/XE. */
+export type MachineMode = 'SIC' | 'SICXE';
+
 /** Contents of project.sic. `asm` paths are relative to the project root; `main` has no extension. */
 export interface ProjectSettings {
   asm: string[];
   main: string;
   filedevices: FileDevice[];
+  /** The machine the project is written for; a project.sic without it is SIC. */
+  mode?: MachineMode;
 }
 
 export interface ProjectInfo {
@@ -72,12 +77,18 @@ export const AppEvent = {
   closeRequested: 'close-requested',
   /** File > Close Tab (Ctrl+W). */
   closeActiveTab: 'close-active-tab',
+  /** File > Next Tab, Previous Tab, Move Tab Right, Move Tab Left. */
+  nextTab: 'next-tab',
+  previousTab: 'previous-tab',
+  moveTabRight: 'move-tab-right',
+  moveTabLeft: 'move-tab-left',
 } as const;
 
 /** The object the preload script exposes as `window.api`. */
 export interface RendererApi {
   getFileList(path: string): Promise<IpcResult<string[]>>;
-  createNewProject(): Promise<IpcResult<ProjectInfo>>;
+  /** Ask where, then create a project for the given machine mode. */
+  createNewProject(mode: MachineMode): Promise<IpcResult<ProjectInfo>>;
   openProject(): Promise<IpcResult<ProjectInfo>>;
   openProjectByPath(sicPath: string): Promise<IpcResult<ProjectInfo>>;
   /** A project path that arrived before the renderer was listening (file association, second instance). */

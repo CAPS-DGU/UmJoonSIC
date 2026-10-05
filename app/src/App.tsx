@@ -6,6 +6,7 @@ import DebugPanel from '@/features/debugger/DebugPanel';
 import EditorContainer from '@/features/editor/EditorContainer';
 import { tabKind, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { useCloseRequests } from '@/features/editor/hooks/useCloseRequests';
+import { useTabShortcuts } from '@/features/editor/hooks/useTabShortcuts';
 import SideBar from '@/features/fileTree/SideBar';
 import ListingView from '@/features/listing/ListingView';
 import BottomPanel from '@/features/panel/BottomPanel';
@@ -37,6 +38,7 @@ function App() {
   useProjectEvents();
   useServerLog();
   useCloseRequests();
+  useTabShortcuts();
 
   if (projectName === '') {
     return <WelcomeScreen />;
