@@ -53,13 +53,26 @@ function createWindow(): void {
   const mainWindow = createMainWindow();
   const splash = createSplashWindow();
 
+  // Closing the splash (its close button in the taskbar, Alt+F4) cancels the start: the app
+  // quits, and does not show its main window later on.
+  let started = false;
+  let cancelled = false;
+  splash.on('close', () => {
+    if (started) return;
+    cancelled = true;
+    app.quit();
+  });
+
   mainWindow.on('ready-to-show', async () => {
+    if (cancelled) return;
     showSplashContent(splash);
     try {
       await prepareSimulator();
       await Promise.all([simulatorProcess.start(), sleep(SPLASH_HOLD_MS)]);
     } catch (error) {
-      // The splash stays on top of other windows; the error box would end up behind it.
+      // Stopped by the quit, not a failure.
+      if (cancelled) return;
+      // The error box comes alone (destroy() does not count as the user closing the splash).
       if (!splash.isDestroyed()) splash.destroy();
       dialog.showErrorBox(
         '시뮬레이터 오류',
@@ -68,7 +81,8 @@ function createWindow(): void {
       app.quit();
       return;
     }
-    // The user may have closed the splash already.
+    if (cancelled) return;
+    started = true;
     if (!splash.isDestroyed()) {
       splash.close();
     }
