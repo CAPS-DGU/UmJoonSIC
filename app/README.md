@@ -81,6 +81,17 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - Tailwind 는 `src/` 와 `index.html` 의 모든 글자에서 클래스 이름을 찾습니다. 주석에 `visible`, `hidden`, `resize` 같은 클래스 이름을 단어 그대로 쓰면 그 클래스가 CSS 에 들어갑니다 (Monaco 가 쓰는 `.visible` 처럼 화면이 달라질 수 있음).
 - 커밋 전에 `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` 가 통과해야 합니다.
 
+## 화면 배치
+
+- 세 열(파일 목록 | 에디터 | 실행 패널)과 아래 패널의 크기는 `src/features/layout/columns.ts` 에 있습니다. 최소값은 측정해서 정했습니다 (작업 공간의 `documentations/08_layout`): 파일 목록 180 px, 실행 패널 296 px(SIC/XE 의 다섯 자리 주소와 8바이트 열, 스크롤 막대까지), 에디터 320 px. 정한 크기는 localStorage(`umjoonsic.layout`)에 남습니다.
+- 경계는 `src/components/Splitter.tsx` 하나로 만듭니다(끌기, 키보드, 두 번 클릭).
+- 크기 단계: 위쪽 막대 40 px, 패널 머리 막대 32 px, 막대와 입력 칸의 컨트롤 28 px, 패널 머리와 줄 안의 작은 버튼 24 px, 대화상자 36 px (`src/lib/controls.ts`). 새 컨트롤은 이 상수를 씁니다.
+- 글꼴은 `font-sans`(Pretendard)와 `font-mono`(JetBrains Mono) 둘뿐이고, 둘 다 앱에 들어 있습니다 (`src/index.css` 의 `@theme`). 글자 크기는 12 / 14 / 16 / 24 px, 패널 안은 14 px.
+- 스크롤 막대: 목록과 패널은 `slim-scroll`(8 px), 탭 줄은 `no-scrollbar`.
+- 대화상자는 `src/components/ui/dialog.tsx` 로 만듭니다(Esc, 바깥 클릭, 포커스).
+- 메모리 뷰어의 너비는 `ch` 단위입니다 (`src/features/debugger/memory/gridLayout.ts`). 실행 패널은 높이가 고정(`h-full`)이어야 합니다. 높이가 열리면 메모리 뷰어가 4096 줄을 모두 그립니다.
+- 시험용 표시: `data-column`(세 열), `data-memory-row`(메모리 한 줄), `data-tab-path`(탭).
+
 ## 알아 둘 점
 
 - 저장하지 않은 변경: 수정한 탭, 프로젝트, 창을 닫거나 앱을 끝낼 때 저장 / 저장 안 함 / 취소를 묻습니다 (`src/features/editor/unsavedChanges.ts`). 창 닫기는 메인 프로세스가 붙잡아 두었다가 렌더러가 답하면 닫습니다 (`electron/windows/mainWindow.ts`).
