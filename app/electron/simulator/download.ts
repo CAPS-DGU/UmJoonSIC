@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { BrowserWindow } from 'electron';
 import { staticPage } from '../paths';
+import { getSplashWindow } from '../windows/splashWindow';
 import { getSimulatorDataDir } from './paths';
 
 /** The page's scripts get this long to start before the window is shown. */
@@ -14,10 +15,14 @@ const CLOSE_AFTER_FAILURE_MS = 3000;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-/** The small window that shows a download's progress (public/progress.html). */
+/**
+ * The small window that shows a download's progress (public/progress.html). It belongs to
+ * the splash: it stays in front of it, without staying in front of other programs.
+ */
 async function openProgressWindow(title: string) {
   const window = new BrowserWindow({
     title,
+    parent: getSplashWindow() ?? undefined,
     width: 400,
     height: 200,
     resizable: false,
@@ -25,7 +30,6 @@ async function openProgressWindow(title: string) {
     maximizable: false,
     show: false,
     modal: false,
-    alwaysOnTop: true,
     autoHideMenuBar: true,
     frame: false,
   });
