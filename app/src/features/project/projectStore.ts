@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { IpcResult, ProjectInfo, ProjectSettings } from '@shared/ipc';
+import type { IpcResult, MachineMode, ProjectInfo, ProjectSettings } from '@shared/ipc';
 import { simulator } from '@/api/simulator';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
@@ -39,6 +39,8 @@ interface ProjectState {
   addAsmFile: (file: FileStructure) => Promise<void>;
   /** Drop files from the project's asm list (the files of a deleted folder, say), on disk at once. */
   removeAsmFiles: (relativePaths: string[]) => Promise<void>;
+  /** Switch the machine mode; an open project remembers it (in project.sic, on disk at once). */
+  changeMode: (mode: MachineMode) => Promise<void>;
   /** Edit the settings (the settings form); saveSettings writes them. */
   setSettings: (settings: ProjectSettings) => void;
   /** Write the edited settings to project.sic; then the simulation restarts with them. */
@@ -51,17 +53,41 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   const writeSettingsFile = (settings: ProjectSettings) =>
     window.api.saveFile(get().projectPath + '/project.sic', JSON.stringify(settings));
 
-  /** Change the asm list on disk and in the edited settings, leaving other edits unsaved. */
-  const changeAsmList = async (change: (asm: string[]) => string[]) => {
-    const { savedSettings, settings } = get();
-    const saved = { ...savedSettings, asm: change(savedSettings.asm) };
-    const res = await writeSettingsFile(saved);
-    if (!res.success) {
-      console.error('Failed to update project.sic:', res.message);
-      return;
-    }
-    set({ savedSettings: saved, settings: { ...settings, asm: change(settings.asm) } });
+  /** Writes of project.sic, one after another (changeSavedSettings, saveSettings). */
+  let settingsWrites: Promise<void> = Promise.resolve();
+
+  /**
+   * Change some settings on disk at once, and in the edited settings too; the other edits
+   * of the settings form stay unsaved. `change` runs when it is this write's turn, so it
+   * sees the earlier writes.
+   */
+  const changeSavedSettings = (change: (settings: ProjectSettings) => Partial<ProjectSettings>) => {
+    const { projectPath } = get();
+    const write = settingsWrites.then(async () => {
+      // Another project was opened meanwhile.
+      if (get().projectPath !== projectPath) return;
+      const { savedSettings } = get();
+      const patch = change(savedSettings);
+      const keys = Object.keys(patch) as (keyof ProjectSettings)[];
+      if (keys.every(key => patch[key] === savedSettings[key])) return;
+      const saved = { ...savedSettings, ...patch };
+      const res = await writeSettingsFile(saved);
+      if (!res.success) {
+        console.error('Failed to update project.sic:', res.message);
+        return;
+      }
+      if (get().projectPath !== projectPath) return;
+      set(state => ({
+        savedSettings: saved,
+        settings: { ...state.settings, ...change(state.settings) },
+      }));
+    });
+    settingsWrites = write.catch(() => {});
+    return write;
   };
+
+  const changeAsmList = (change: (asm: string[]) => string[]) =>
+    changeSavedSettings(settings => ({ asm: change(settings.asm) }));
 
   /** Restart the simulation with the saved file devices (they are opened by /begin). */
   const applySettings = async () => {
@@ -124,6 +150,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       fileTree: [],
       selectedFileOrFolder: null,
     });
+    // The project's machine mode; a project.sic that does not say is SIC.
+    const mode = project.settings.mode ?? 'SIC';
+    if (mode !== useMemoryViewStore.getState().mode) {
+      useMemoryViewStore.getState().setMode(mode);
+    }
     get().refreshFileTree();
     setTimeout(() => get().refreshFileTree(), SECOND_REFRESH_DELAY_MS);
   };
@@ -167,7 +198,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         });
     },
 
-    createNewProject: () => adoptProject(window.api.createNewProject(), 'create new project'),
+    // A new project is for the machine the user is working with.
+    createNewProject: () =>
+      adoptProject(
+        window.api.createNewProject(useMemoryViewStore.getState().mode),
+        'create new project',
+      ),
     openProject: () => adoptProject(window.api.openProject(), 'open project'),
     openProjectByPath: async sicPath => {
       if (!sicPath) {
@@ -201,16 +237,36 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       await changeAsmList(asm => asm.filter(p => !relativePaths.includes(p)));
     },
 
+    changeMode: async mode => {
+      useMemoryViewStore.getState().setMode(mode);
+      if (get().projectPath) {
+        // The mode when the write's turn comes: after a quick change back, nothing is written.
+        await changeSavedSettings(() => ({ mode: useMemoryViewStore.getState().mode }));
+      }
+    },
+
     setSettings: settings => set({ settings }),
 
-    saveSettings: async () => {
-      const { settings } = get();
-      const res = await writeSettingsFile(settings);
-      if (res.success) {
-        set({ savedSettings: settings });
-        void applySettings();
-      }
-      return res;
+    saveSettings: () => {
+      const { projectPath } = get();
+      // After the changes already on their way to disk (the mode, say), so as not to undo them.
+      const save = settingsWrites.then(async (): Promise<IpcResult> => {
+        if (get().projectPath !== projectPath) {
+          return { success: false, message: '설정을 저장하기 전에 프로젝트가 바뀌었습니다.' };
+        }
+        const { settings } = get();
+        const res = await writeSettingsFile(settings);
+        if (res.success) {
+          set({ savedSettings: settings });
+          void applySettings();
+        }
+        return res;
+      });
+      settingsWrites = save.then(
+        () => {},
+        () => {},
+      );
+      return save;
     },
 
     discardSettingsChanges: () => set(state => ({ settings: state.savedSettings })),

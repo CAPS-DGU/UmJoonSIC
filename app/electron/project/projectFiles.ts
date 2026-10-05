@@ -1,7 +1,14 @@
 // Reading and creating projects on disk. No Electron APIs here: plain filesystem work.
 import * as fs from 'fs';
 import * as pathModule from 'path';
-import type { ProjectInfo, ProjectSettings } from '../../shared/ipc';
+import type { MachineMode, ProjectInfo, ProjectSettings } from '../../shared/ipc';
+
+/** The machine mode written in a project.sic: "SIC" or "SICXE" (also "sic", "SIC/XE"). */
+function readMode(value: unknown): MachineMode | undefined {
+  if (typeof value !== 'string') return undefined;
+  const mode = value.toUpperCase().replace('/', '');
+  return mode === 'SIC' || mode === 'SICXE' ? mode : undefined;
+}
 
 function ensureDir(p: string) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
@@ -22,6 +29,7 @@ export function loadProjectFromSic(sicPath: string): ProjectInfo {
     asm?: unknown;
     main?: unknown;
     filedevices?: unknown;
+    mode?: unknown;
   };
 
   const asm: string[] = Array.isArray(sic.asm) ? sic.asm.map(item => String(item)) : [];
@@ -33,6 +41,8 @@ export function loadProjectFromSic(sicPath: string): ProjectInfo {
       }))
     : [];
 
+  const mode = readMode(sic.mode);
+
   return {
     name: projectName,
     path: projectRoot,
@@ -40,6 +50,7 @@ export function loadProjectFromSic(sicPath: string): ProjectInfo {
       asm,
       main: mainProgram,
       filedevices,
+      ...(mode && { mode }),
     },
   };
 }
@@ -47,9 +58,9 @@ export function loadProjectFromSic(sicPath: string): ProjectInfo {
 /**
  * Create the layout of a new project:
  *   <root>/main.asm, <root>/.out/, <root>/project.sic
- * `asm` entries are relative paths; `main` has no extension.
+ * `asm` entries are relative paths; `main` has no extension; `mode` is the machine mode.
  */
-export function createProjectSkeleton(projectPath: string): ProjectInfo {
+export function createProjectSkeleton(projectPath: string, mode: MachineMode): ProjectInfo {
   ensureDir(projectPath);
   ensureDir(pathModule.join(projectPath, '.out'));
 
@@ -60,7 +71,12 @@ export function createProjectSkeleton(projectPath: string): ProjectInfo {
     'utf8',
   );
 
-  const settings: ProjectSettings = { asm: ['main.asm'], main: 'main', filedevices: [] };
+  const settings: ProjectSettings = {
+    asm: ['main.asm'],
+    main: 'main',
+    filedevices: [],
+    mode,
+  };
   fs.writeFileSync(
     pathModule.join(projectPath, 'project.sic'),
     JSON.stringify(settings, null, 2),

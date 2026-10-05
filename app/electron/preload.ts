@@ -10,7 +10,7 @@ let queuedProjectPath: string | null = null;
 
 const api: RendererApi = {
   getFileList: path => ipcRenderer.invoke(IpcChannel.getFileList, path),
-  createNewProject: () => ipcRenderer.invoke(IpcChannel.createNewProject),
+  createNewProject: mode => ipcRenderer.invoke(IpcChannel.createNewProject, mode),
   openProject: () => ipcRenderer.invoke(IpcChannel.openProject),
   openProjectByPath: sicPath => ipcRenderer.invoke(IpcChannel.openProjectByPath, sicPath),
   consumeQueuedProjectPath: () => {
