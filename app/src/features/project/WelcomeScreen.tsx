@@ -13,13 +13,13 @@ export default function WelcomeScreen() {
         </p>
         <div className="flex gap-4 justify-center">
           <button
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+            className="inline-flex h-9 items-center rounded-md bg-blue-500 px-4 text-sm text-white transition hover:bg-blue-600"
             onClick={() => window.dispatchEvent(new Event(AppEvent.createNewProject))}
           >
             새 프로젝트 생성
           </button>
           <button
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+            className="inline-flex h-9 items-center rounded-md bg-gray-500 px-4 text-sm text-white transition hover:bg-gray-600"
             onClick={() => window.dispatchEvent(new Event(AppEvent.openProject))}
           >
             기존 프로젝트 열기

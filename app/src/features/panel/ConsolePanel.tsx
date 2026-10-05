@@ -1,6 +1,7 @@
 import { useConsoleStore } from '@/features/panel/consoleStore';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
+import { PANEL_HEADER } from '@/lib/controls';
 
 /** Server tab: simulator output (collected by useServerLog) and a restart button. */
 export default function ConsolePanel() {
@@ -20,16 +21,16 @@ export default function ConsolePanel() {
 
   return (
     <div className="bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 flex flex-col h-full overflow-hidden">
-      <div className="font-semibold text-sm p-2 border-b border-gray-300 dark:border-gray-700 flex items-center justify-between">
-        <h2>Server</h2>
+      <div className={PANEL_HEADER}>
+        <h2 className="text-sm font-semibold">Server</h2>
         <button
-          className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
+          className="inline-flex h-6 items-center rounded px-2 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
           onClick={handleRestart}
         >
           Restart
         </button>
       </div>
-      <div className="flex-1 overflow-auto p-2">
+      <div className="slim-scroll flex-1 overflow-auto p-2">
         {messages.length === 0 ? (
           <p className="text-gray-400 text-sm">No output available.</p>
         ) : (

@@ -37,9 +37,13 @@ export default function DebugPanel() {
   }, []);
 
   return (
-    <div className="flex flex-col w-max border border-gray-200">
-      <section className="flex w-full items-center justify-between border-b border-gray-200 py-3 h-[54px] px-2">
-        <h2 className="text-lg font-bold">실행</h2>
+    // Full height: the toolbar and the registers keep their size, the memory viewer takes the
+    // rest and is the only part that scrolls.
+    // h-full, not min-h-full: with an open height the memory viewer would grow to its content
+    // (4096 rows × 32 px) and render every row. The column draws the background and border.
+    <div className="flex flex-col h-full w-full">
+      <section className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-gray-300 px-2">
+        <h2 className="text-sm font-semibold">실행</h2>
         <div className="flex items-center space-x-2 relative" ref={toolbarRef}>
           {isRunning ? (
             <RunningButtons />
@@ -74,10 +78,10 @@ export default function DebugPanel() {
         />
       )}
 
-      <section className="border-b border-gray-200 py-3">
+      <section className="shrink-0 border-b border-gray-200 py-3">
         <RegisterPanel />
       </section>
-      <section className="border-b border-gray-200 py-3">
+      <section className="flex flex-1 min-h-40 flex-col py-3">
         <MemoryViewer />
       </section>
     </div>

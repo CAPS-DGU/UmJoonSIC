@@ -17,9 +17,8 @@ function colorClasses(item: FileStructure, projectFiles: string[]) {
 
 function FileIcon({ fileName }: { fileName: string }) {
   const lower = fileName.toLowerCase();
-  if (lower === 'project.sic') return <Settings width={ICON_SIZE} height={ICON_SIZE} />;
-  if (lower.endsWith('.lst')) return <List width={ICON_SIZE} height={ICON_SIZE} />;
-  return <File width={ICON_SIZE} height={ICON_SIZE} />;
+  const Icon = lower === 'project.sic' ? Settings : lower.endsWith('.lst') ? List : File;
+  return <Icon width={ICON_SIZE} height={ICON_SIZE} className="shrink-0" />;
 }
 
 interface FileTreeItemProps {
@@ -55,7 +54,7 @@ export function FileTreeItem(props: FileTreeItemProps) {
       <div>
         <div
           className={`
-            flex items-center gap-2 cursor-pointer px-2 py-1 hover:bg-gray-200${stateClasses}`}
+            flex items-center gap-2 cursor-pointer px-2 py-1 text-sm hover:bg-gray-200${stateClasses}`}
           tabIndex={0}
           onClick={() => {
             onSelect(item);
@@ -63,11 +62,11 @@ export function FileTreeItem(props: FileTreeItemProps) {
           }}
           onContextMenu={e => onContextMenu(e, item)}
         >
-          <span className="text-xs w-3">
-            <Chevron width={ICON_SIZE} height={ICON_SIZE} />
+          <Chevron width={ICON_SIZE} height={ICON_SIZE} className="shrink-0" />
+          <Folder width={ICON_SIZE} height={ICON_SIZE} className={`shrink-0 ${color}`} />
+          <span className={`min-w-0 truncate font-semibold ${color}`} title={item.relativePath}>
+            {item.name}
           </span>
-          <Folder width={ICON_SIZE} height={ICON_SIZE} className={color} />
-          <span className={`font-semibold ${color}`}>{item.name}</span>
         </div>
         {isOpen && (
           <div className="ml-6">
@@ -84,7 +83,7 @@ export function FileTreeItem(props: FileTreeItemProps) {
     // A file opens on a single click.
     <div
       className={`
-        pl-7 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer${stateClasses}`}
+        flex items-center gap-2 py-1 pl-8 pr-2 text-sm hover:bg-gray-100 cursor-pointer${stateClasses}`}
       onClick={() => {
         onSelect(item);
         onOpenFile(item);
@@ -93,7 +92,9 @@ export function FileTreeItem(props: FileTreeItemProps) {
       tabIndex={0}
     >
       <FileIcon fileName={item.name} />
-      <span className={`${color}`}>{item.name}</span>
+      <span className={`min-w-0 truncate ${color}`} title={item.relativePath}>
+        {item.name}
+      </span>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { File, ListOrdered, Settings, X } from 'lucide-react';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { requestCloseTab } from '@/features/editor/unsavedChanges';
+import { INLINE_ICON_BUTTON } from '@/lib/controls';
 
 /** Where a dragged tab would go: before or after the tab under the pointer. */
 interface DropTarget {
@@ -12,12 +13,12 @@ interface DropTarget {
 
 const getFileIcon = (fileName: string) => {
   if (fileName.toLowerCase() === 'project.sic') {
-    return <Settings width={14} height={14} className="text-blue-500" />;
+    return <Settings width={16} height={16} className="shrink-0 text-blue-500" />;
   }
   if (fileName.toLowerCase().endsWith('.asm')) {
-    return <File width={14} height={14} className="text-green-500" />;
+    return <File width={16} height={16} className="shrink-0 text-green-500" />;
   }
-  return <File width={14} height={14} className="text-gray-500" />;
+  return <File width={16} height={16} className="shrink-0 text-gray-500" />;
 };
 
 /** Open tabs; drag a tab to move it. While a program runs, a button re-opens its List tabs. */
@@ -89,10 +90,20 @@ export default function TabBar() {
   };
 
   return (
-    <div className="flex flex-row bg-white border-b border-gray-300">
+    <div className="flex h-10 shrink-0 flex-row bg-white border-b border-gray-300">
       <div
         ref={stripRef}
-        className="flex flex-row flex-1 min-w-0 overflow-x-auto"
+        // Tabs keep a readable width; when they do not fit, the strip scrolls: with the mouse
+        // wheel, Ctrl+PageDown/PageUp, and to the active tab. No scrollbar: it would take the
+        // tabs' height.
+        className="no-scrollbar flex flex-row flex-1 min-w-0 overflow-x-auto"
+        onWheel={event => {
+          const strip = event.currentTarget;
+          const vertical = Math.abs(event.deltaY) > Math.abs(event.deltaX);
+          if (vertical && strip.scrollWidth > strip.clientWidth) {
+            strip.scrollLeft += event.deltaY;
+          }
+        }}
         onDragOver={event => {
           if (!draggedPath || !lastTab || !isOnStrip(event)) return;
           event.preventDefault();
@@ -128,7 +139,7 @@ export default function TabBar() {
               dropOn(targetAt(event, tab.filePath));
             }}
             onDragEnd={endDrag}
-            className={`flex items-center min-w-0 max-w-48 border-r border-gray-300 transition-colors ${
+            className={`flex shrink-0 items-center min-w-28 max-w-48 border-r border-gray-300 transition-colors ${
               tab.filePath === activePath
                 ? 'bg-gray-200 border-b-0'
                 : 'bg-gray-50 hover:bg-gray-200'
@@ -136,7 +147,8 @@ export default function TabBar() {
           >
             <button
               onClick={() => activateTab(tab.filePath)}
-              className="flex items-center gap-1 px-3 py-2 min-w-0 flex-1"
+              className="flex h-full items-center gap-1 px-3 min-w-0 flex-1"
+              title={tab.filePath}
             >
               {getFileIcon(tab.title)}
               <span className="truncate text-sm font-medium">{tab.title}</span>
@@ -150,10 +162,10 @@ export default function TabBar() {
             </button>
             <button
               onClick={() => requestCloseTab(tab.filePath)}
-              className="p-1 rounded mr-1 "
+              className={`${INLINE_ICON_BUTTON} mr-1`}
               title="Close tab"
             >
-              <X width={12} height={12} className="text-gray-500 hover:text-gray-700" />
+              <X width={12} height={12} />
             </button>
           </div>
         ))}
@@ -164,7 +176,7 @@ export default function TabBar() {
           className="flex items-center gap-1 px-3 shrink-0 border-l border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-100"
           title="리스트 보기 (닫은 List 탭 다시 열기)"
         >
-          <ListOrdered width={14} height={14} />
+          <ListOrdered width={16} height={16} />
           List
         </button>
       )}

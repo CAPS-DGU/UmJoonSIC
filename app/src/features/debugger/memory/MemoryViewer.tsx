@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import {
-  AddressColumn,
+  addressDigits,
+  gridWidth,
   ROW_HEIGHT,
   ROW_SIZE,
-  ValueColumn,
+} from '@/features/debugger/memory/gridLayout';
+import {
+  MemoryRows,
   type MemoryCellValue,
   type MemoryLabel,
 } from '@/features/debugger/memory/MemoryGrid';
@@ -13,6 +16,7 @@ import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import '@/features/debugger/memory/searchAnimation.css';
+import { FORM_FIELD } from '@/lib/controls';
 
 /** Bytes read above and below the rows on screen, so that short scrolls show values at once. */
 const MARGIN = 512;
@@ -97,6 +101,18 @@ export default function MemoryViewer() {
   // At first, and whenever the address space changes (mode switch).
   useEffect(showRowsOnScreen, [showRowsOnScreen]);
 
+  // When the viewer changes size (window, bottom panel, divider), other rows are on screen.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(showRowsOnScreen, SCROLL_DEBOUNCE_MS);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [showRowsOnScreen]);
+
   // On scroll (debounced).
   useEffect(() => {
     const container = containerRef.current;
@@ -146,25 +162,27 @@ export default function MemoryViewer() {
   }, [isRunning, pc, totalMemorySize, hasScrolledToPc, scrollToAddress]);
 
   const totalRows = Math.ceil(totalMemorySize / ROW_SIZE);
+  const digits = addressDigits(totalMemorySize);
 
   return (
-    <section className="flex flex-col px-2">
+    <section className="flex flex-1 min-h-0 flex-col px-2">
       <div className="flex justify-between items-center">
-        <h2 className="text-md font-bold">메모리 뷰어</h2>
+        <h2 className="text-sm font-semibold">메모리 뷰어</h2>
       </div>
 
-      <div className="flex items-center mt-2 space-x-2">
+      <div className="mt-2 flex items-center gap-2">
         <input
           type="text"
           value={searchAddress}
           onChange={e => setSearchAddress(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
           placeholder="memory address"
-          className="border border-gray-300 p-1 rounded text-sm w-48 font-mono"
+          className={`${FORM_FIELD} min-w-0 flex-1 font-mono text-sm`}
         />
         <button
           onClick={handleSearch}
-          className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-500 text-white transition-colors hover:bg-blue-600"
+          title="이 주소로 이동"
         >
           <Search size={16} />
         </button>
@@ -172,23 +190,21 @@ export default function MemoryViewer() {
 
       <div
         ref={containerRef}
-        className="w-full mt-2 flex justify-start items-start px-2 overflow-y-auto flex-1 min-h-0 h-full max-h-[700px]"
+        className="slim-scroll mt-2 flex-1 min-h-0 overflow-y-auto font-mono text-sm"
       >
         <div
-          className="flex border-r border-gray-300 pr-1 text-green-500"
-          style={{ height: `${totalRows * ROW_HEIGHT}px` }}
+          className="relative"
+          style={{ height: totalRows * ROW_HEIGHT, minWidth: gridWidth(digits) }}
         >
-          <AddressColumn totalRows={totalRows} visibleRowRange={visibleRowRange} />
-          <div className="flex flex-col text-black">
-            <ValueColumn
-              totalRows={totalRows}
-              visibleRowRange={visibleRowRange}
-              labels={labels}
-              cellAt={cellAt}
-              changedNodes={changedNodes}
-              searchedNodes={searchedNodes}
-            />
-          </div>
+          <MemoryRows
+            totalRows={totalRows}
+            visibleRowRange={visibleRowRange}
+            digits={digits}
+            labels={labels}
+            cellAt={cellAt}
+            changedNodes={changedNodes}
+            searchedNodes={searchedNodes}
+          />
         </div>
       </div>
     </section>

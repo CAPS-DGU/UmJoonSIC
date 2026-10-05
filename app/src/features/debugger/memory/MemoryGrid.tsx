@@ -1,12 +1,7 @@
-// The memory viewer's grid: an address column and rows of bytes. Only the rows in
-// `visibleRowRange` are rendered; each is positioned absolutely inside a tall container.
-
-/** Bytes per row. */
-export const ROW_SIZE = 8;
-/** Row height in px. */
-export const ROW_HEIGHT = 32;
-/** Width of one byte cell in px (w-6). */
-const CELL_WIDTH = 24;
+// The memory viewer's grid: rows of an address and 8 bytes. Only the rows in
+// `visibleRowRange` are rendered; each is positioned absolutely inside a container as tall as
+// all rows. Sizes: gridLayout.ts.
+import { CELL_CH, ROW_HEIGHT, ROW_SIZE } from '@/features/debugger/memory/gridLayout';
 
 /** What a cell shows: two hex digits, or 'ER' if reading the byte failed. */
 export interface MemoryCellValue {
@@ -43,135 +38,115 @@ interface MemoryCellProps {
 }
 
 function MemoryCell({ cell, labelHighlight, isChanged, isSearched }: MemoryCellProps) {
+  // The cell takes an eighth of the row; the byte keeps its 3 characters in the middle.
   return (
-    <span
-      className={`font-mono text-sm px-1 w-6 text-center rounded
+    <span className="flex justify-center">
+      <span
+        className={`w-[3ch] shrink-0 text-center rounded
       ${labelHighlight ? '!text-orange-500 font-semibold' : ''}
       ${isChanged ? 'memory-flash' : ''}
       ${isSearched ? 'search-flash' : ''}
       ${cell.isLoading ? 'bg-gray-200 animate-pulse' : ''}
       `}
-    >
-      {cell.value}
+      >
+        {cell.value}
+      </span>
     </span>
   );
 }
 
-interface AddressColumnProps {
+interface MemoryRowsProps {
   totalRows: number;
   visibleRowRange: RowRange;
-}
-
-export function AddressColumn({ totalRows, visibleRowRange }: AddressColumnProps) {
-  return (
-    <div className="flex flex-col gap-2 pr-4 relative">
-      {visibleRowIndexes(visibleRowRange, totalRows).map(rowIndex => (
-        <p
-          key={rowIndex}
-          className="text-sm font-normal font-mono flex items-center"
-          style={{
-            height: `${ROW_HEIGHT}px`,
-            position: 'absolute',
-            top: `${rowIndex * ROW_HEIGHT - 6}px`,
-            right: `-15px`,
-          }}
-        >
-          {(rowIndex * ROW_SIZE).toString(16).toUpperCase().padStart(4, '0')}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-interface ValueColumnProps {
-  totalRows: number;
-  visibleRowRange: RowRange;
+  /** Digits of an address (addressDigits). */
+  digits: number;
   labels: MemoryLabel[];
   cellAt: (address: number) => MemoryCellValue;
   changedNodes: ReadonlySet<number>;
   searchedNodes: ReadonlySet<number>;
 }
 
-export function ValueColumn({
+/** The width of one cell: an eighth of the cells' area (the row minus its 0.5rem padding). */
+const CELL = `((100% - 0.5rem) / ${ROW_SIZE})`;
+/** How far a byte's 3 characters are from its cell's edges. */
+const CELL_INSET = `((${CELL} - ${CELL_CH}ch) / 2)`;
+
+/** The rows on screen. Must sit in a monospace container as tall as all rows (relative). */
+export function MemoryRows({
   totalRows,
   visibleRowRange,
+  digits,
   labels,
   cellAt,
   changedNodes,
   searchedNodes,
-}: ValueColumnProps) {
-  return (
-    <div className="flex flex-col gap-2 pl-4 relative">
-      {visibleRowIndexes(visibleRowRange, totalRows).map(rowIndex => {
-        const rowStartAddr = rowIndex * ROW_SIZE;
-        const rowEndAddr = Math.min(rowStartAddr + ROW_SIZE - 1, totalRows * ROW_SIZE - 1);
+}: MemoryRowsProps) {
+  return visibleRowIndexes(visibleRowRange, totalRows).map(rowIndex => {
+    const rowStartAddr = rowIndex * ROW_SIZE;
+    const rowEndAddr = Math.min(rowStartAddr + ROW_SIZE - 1, totalRows * ROW_SIZE - 1);
 
-        // Labels that touch this row, clipped to it and expressed as column indexes.
-        const rowLabels = labels
-          .filter(l => l.end >= rowStartAddr && l.start <= rowEndAddr)
-          .map(l => ({
-            name: l.name,
-            start: Math.max(l.start, rowStartAddr) - rowStartAddr,
-            end: Math.min(l.end, rowEndAddr) - rowStartAddr,
-            /** The range begins on this row (its name is shown here). */
-            beginsHere: l.start >= rowStartAddr,
-          }));
+    // Labels that touch this row, clipped to it and expressed as column indexes.
+    const rowLabels = labels
+      .filter(l => l.end >= rowStartAddr && l.start <= rowEndAddr)
+      .map(l => ({
+        name: l.name,
+        start: Math.max(l.start, rowStartAddr) - rowStartAddr,
+        end: Math.min(l.end, rowEndAddr) - rowStartAddr,
+        /** The range begins on this row (its name is shown here). */
+        beginsHere: l.start >= rowStartAddr,
+      }));
 
-        return (
-          <div
-            key={rowIndex}
-            className="flex flex-col space-y-1 relative"
-            style={{
-              height: `${ROW_HEIGHT}px`,
-              position: 'absolute',
-              top: `${rowIndex * ROW_HEIGHT}px`,
-            }}
-          >
-            <div className="flex relative mb-2">
-              {Array.from({ length: ROW_SIZE }, (_, column) => {
-                const address = rowStartAddr + column;
-                return (
-                  <MemoryCell
-                    key={column}
-                    cell={cellAt(address)}
-                    labelHighlight={rowLabels.some(l => column >= l.start && column <= l.end)}
-                    isChanged={changedNodes.has(address)}
-                    isSearched={searchedNodes.has(address)}
-                  />
-                );
-              })}
+    return (
+      <div
+        key={rowIndex}
+        data-memory-row={rowStartAddr}
+        className="absolute inset-x-0 flex"
+        style={{ top: rowIndex * ROW_HEIGHT, height: ROW_HEIGHT }}
+      >
+        <span
+          className="shrink-0 border-r border-gray-300 pr-2 text-right text-green-600"
+          style={{ width: `calc(${digits}ch + 0.5rem + 1px)` }}
+        >
+          {rowStartAddr.toString(16).toUpperCase().padStart(digits, '0')}
+        </span>
+        <div className="relative grid h-5 flex-1 grid-cols-8 pl-2">
+          {Array.from({ length: ROW_SIZE }, (_, column) => {
+            const address = rowStartAddr + column;
+            return (
+              <MemoryCell
+                key={column}
+                cell={cellAt(address)}
+                labelHighlight={rowLabels.some(l => column >= l.start && column <= l.end)}
+                isChanged={changedNodes.has(address)}
+                isSearched={searchedNodes.has(address)}
+              />
+            );
+          })}
 
-              {/* a line beneath each labelled range */}
-              {rowLabels.map((label, idx) => (
+          {/* a line beneath each labelled range, and its name where the range starts */}
+          {rowLabels.map((label, idx) => (
+            <div
+              key={idx}
+              className="absolute top-full"
+              // from the first byte's characters to the last's, a little inside them
+              style={{
+                left: `calc(0.5rem + ${label.start} * ${CELL} + ${CELL_INSET} + 0.25ch)`,
+                width: `calc(${label.end - label.start + 1} * ${CELL} - 2 * ${CELL_INSET} - 0.5ch)`,
+              }}
+            >
+              <div className="border-t-2 border-orange-500" />
+              {label.beginsHere && (
                 <div
-                  key={`line-${idx}`}
-                  className="absolute -bottom-0.5 border-t-2 border-orange-500"
-                  style={{
-                    left: label.start * CELL_WIDTH + 4,
-                    width: (label.end - label.start + 1) * CELL_WIDTH - 8,
-                  }}
-                />
-              ))}
-
-              {/* the name, only on the row where the range starts */}
-              {rowLabels
-                .filter(label => label.beginsHere)
-                .map((label, idx) => (
-                  <div
-                    key={`name-${idx}`}
-                    className="absolute -bottom-4 text-xs text-orange-500 text-center font-mono"
-                    style={{
-                      left: label.start * CELL_WIDTH + 4,
-                      width: (label.end - label.start + 1) * CELL_WIDTH - 8,
-                    }}
-                  >
-                    {label.name}
-                  </div>
-                ))}
+                  className="whitespace-nowrap text-center text-xs leading-[10px] text-orange-500"
+                  title={label.name}
+                >
+                  {label.name}
+                </div>
+              )}
             </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+          ))}
+        </div>
+      </div>
+    );
+  });
 }

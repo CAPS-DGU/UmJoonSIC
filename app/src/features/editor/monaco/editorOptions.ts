@@ -2,7 +2,8 @@ import type * as monaco_editor from 'monaco-editor';
 
 /** Options applied to the code editor once its font has loaded. */
 export const editorOptions: monaco_editor.editor.IStandaloneEditorConstructionOptions = {
-  glyphMargin: true,
+  // Nothing is drawn beside the line numbers (errors are underlined and their lines tinted).
+  glyphMargin: false,
   lineNumbers: 'on',
   folding: true,
   minimap: { enabled: true },

@@ -1,6 +1,6 @@
 .syntax-error-line {
   background-color: rgba(255, 0, 0, 0.2);
-  font-style: italic; /* 이건 이제 적용됨 */
+  font-style: italic;
   color: red;
 }
 

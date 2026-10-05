@@ -1,27 +1,36 @@
 import { useShallow } from 'zustand/react/shallow';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useInfoModalStore } from '@/stores/infoModalStore';
 
+/** A message with an OK button (open file failed, linker error, ...), like the other dialogs. */
 export function InfoModal() {
   const { isOpen, title, message, close } = useInfoModalStore(
     useShallow(s => ({ isOpen: s.isOpen, title: s.title, message: s.message, close: s.close })),
   );
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-        <h2 className="text-lg font-semibold mb-2">{title}</h2>
-        <p className="text-gray-700 mb-4 whitespace-pre-line">{message}</p>
-        <div className="flex justify-end">
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            onClick={close}
-          >
+    <Dialog open={isOpen} onOpenChange={open => !open && close()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader className="min-w-0">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="whitespace-pre-line [overflow-wrap:anywhere]">
+            {message}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button autoFocus onClick={close}>
             확인
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
