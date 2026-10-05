@@ -13,15 +13,39 @@ import { toProjectRelativePath } from '@/lib/projectPath';
 import { useInfoModalStore } from '@/stores/infoModalStore';
 
 const DEFAULT_DELAY_MS = 1000;
+/** The longest delay a timer can wait (about 24 days); a longer one would run at once. */
+const MAX_DELAY_MS = 2 ** 31 - 1;
+
+/** The delay setting is kept for the next start of the app (it is the user's, not the project's). */
+const DELAY_STORAGE_KEY = 'umjoonsic.delayTime';
+
+function readSavedDelay() {
+  try {
+    const saved = parseFloat(localStorage.getItem(DELAY_STORAGE_KEY) ?? '');
+    return Number.isFinite(saved) && saved >= 0 ? Math.min(saved, MAX_DELAY_MS) : DEFAULT_DELAY_MS;
+  } catch {
+    return DEFAULT_DELAY_MS;
+  }
+}
+
+function saveDelay(delayMs: number) {
+  try {
+    localStorage.setItem(DELAY_STORAGE_KEY, String(delayMs));
+  } catch (error) {
+    console.warn('The delay setting could not be saved:', error);
+  }
+}
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface RunningState {
   /** A program is loaded in the simulator and the debugger toolbar is showing. */
   isRunning: boolean;
+  /** A program is being assembled and loaded (Run was clicked). */
+  isStarting: boolean;
   /** Auto-play is not advancing (the program waits for Step or Continue). */
   isPaused: boolean;
-  /** Delay between instructions while auto-playing, in ms. */
+  /** Delay between instructions while auto-playing, in ms; kept across app starts. */
   delayTime: number;
   setDelayTime: (delayTime: number) => void;
   /** Save the open tabs, assemble the project and load it. False if that failed. */
@@ -181,6 +205,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
   /** Load the program and show it, stopped at its first instruction. False if that failed. */
   const start = () => {
     starting ??= (async () => {
+      set({ isStarting: true });
       try {
         const forRun = ++runId;
         if (!(await get().loadProgram())) return false;
@@ -190,6 +215,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
         return true;
       } finally {
         starting = null;
+        set({ isStarting: false });
       }
     })();
     return starting;
@@ -197,10 +223,15 @@ export const useRunningStore = create<RunningState>((set, get) => {
 
   return {
     isRunning: false,
+    isStarting: false,
     isPaused: true,
-    delayTime: DEFAULT_DELAY_MS,
+    delayTime: readSavedDelay(),
 
-    setDelayTime: delayTime => set({ delayTime }),
+    setDelayTime: delayMs => {
+      const delayTime = Math.min(delayMs, MAX_DELAY_MS);
+      set({ delayTime });
+      saveDelay(delayTime);
+    },
 
     loadProgram: async () => {
       const forRun = runId;
