@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
 import {
   addressDigits,
   gridWidth,
@@ -16,6 +15,7 @@ import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import '@/features/debugger/memory/searchAnimation.css';
+import { useStrings } from '@/i18n';
 import { FORM_FIELD } from '@/lib/controls';
 
 /** Bytes read above and below the rows on screen, so that short scrolls show values at once. */
@@ -139,14 +139,30 @@ export default function MemoryViewer() {
     [showRowsOnScreen],
   );
 
-  const handleSearch = () => {
-    if (!containerRef.current || !searchAddress) return;
+  const t = useStrings();
+  const [searchError, setSearchError] = useState('');
 
-    const address = parseInt(searchAddress, 16);
+  /**
+   * An address in hex (with or without 0x), or a label of the loaded program (its variables).
+   * A wrong entry is said under the field (it was a browser alert).
+   */
+  const handleSearch = () => {
+    if (!containerRef.current) return;
+    const text = searchAddress.trim();
+    if (!text) return;
+    const variable = useWatchStore
+      .getState()
+      .watch.find(v => v.name.toUpperCase() === text.toUpperCase());
+    const address = variable
+      ? variable.address
+      : /^(0x)?[0-9a-f]+$/i.test(text)
+        ? parseInt(text.replace(/^0x/i, ''), 16)
+        : NaN;
     if (isNaN(address) || address < 0 || address >= totalMemorySize) {
-      alert('유효하지 않은 메모리 주소입니다.');
+      setSearchError(t.memory.invalid(text));
       return;
     }
+    setSearchError('');
     scrollToAddress(address);
   };
 
@@ -167,26 +183,36 @@ export default function MemoryViewer() {
   return (
     <section className="flex flex-1 min-h-0 flex-col px-2">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-semibold">메모리 뷰어</h2>
+        <h2 className="text-sm font-semibold">{t.memory.title}</h2>
       </div>
 
       <div className="mt-2 flex items-center gap-2">
         <input
           type="text"
           value={searchAddress}
-          onChange={e => setSearchAddress(e.target.value)}
+          onChange={e => {
+            setSearchAddress(e.target.value);
+            setSearchError('');
+          }}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          placeholder="memory address"
+          placeholder={t.memory.placeholder}
+          aria-label={t.memory.placeholder}
+          aria-invalid={!!searchError}
           className={`${FORM_FIELD} min-w-0 flex-1 font-mono text-sm`}
         />
         <button
           onClick={handleSearch}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-500 text-white transition-colors hover:bg-blue-600"
-          title="이 주소로 이동"
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded-md bg-blue-600 px-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          title={t.memory.goTitle}
         >
-          <Search size={16} />
+          {t.memory.go}
         </button>
       </div>
+      {searchError && (
+        <p className="mt-1 text-xs text-red-700" role="alert">
+          {searchError}
+        </p>
+      )}
 
       <div
         ref={containerRef}

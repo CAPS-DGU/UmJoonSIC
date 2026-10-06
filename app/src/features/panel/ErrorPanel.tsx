@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
-import { File, ChevronRight, Settings, List, CircleX } from 'lucide-react';
+import { File, FileCode, ChevronRight, Settings, List, CircleX } from 'lucide-react';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { CompileError } from '@/features/panel/errorStore';
+import { translateAssemblerMessage } from '@/i18n/assemblerMessages';
+import { useStrings } from '@/i18n';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { PANEL_HEADER } from '@/lib/controls';
 
 /** One error as a row of the panel. */
@@ -20,10 +23,13 @@ const getFileName = (filePath: string) => {
 };
 
 const getFileIcon = (fileName: string) => {
-  if (fileName === 'project.sic') return <Settings className="text-gray-500 mr-2 w-4 h-4" />;
+  if (fileName === 'project.sic') return <Settings className="text-gray-600 mr-2 w-4 h-4" />;
   if (fileName.toLowerCase().endsWith('.lst'))
-    return <List className="text-gray-500 mr-2 w-4 h-4" />;
-  return <File className="text-gray-500 mr-2 w-4 h-4" />;
+    return <List className="text-gray-600 mr-2 w-4 h-4" />;
+  // The same icon as in the file tree, the tabs and the Watch.
+  if (fileName.toLowerCase().endsWith('.asm'))
+    return <FileCode className="text-green-700 mr-2 w-4 h-4" />;
+  return <File className="text-gray-600 mr-2 w-4 h-4" />;
 };
 
 /** Panel rows per file, keyed by the file's project-relative path. */
@@ -42,7 +48,11 @@ const groupErrorsByFile = (errors: { [fileName: string]: CompileError[] }) => {
 };
 
 export default function ErrorPanel() {
-  const [openFiles, setOpenFiles] = useState<Set<string>>(new Set());
+  const t = useStrings();
+  const language = usePreferencesStore(s => s.language);
+  // Files are expanded: the errors are what the panel is for (a click collapses one).
+  const [closedFiles, setClosedFiles] = useState<Set<string>>(new Set());
+  const isOpen = (fileName: string) => !closedFiles.has(fileName);
   const errors = useErrorStore(state => state.errors);
   const openTab = useEditorTabStore(state => state.openTab);
 
@@ -51,7 +61,7 @@ export default function ErrorPanel() {
   const totalErrorCount = Object.values(errorsByFile).reduce((sum, list) => sum + list.length, 0);
 
   const toggleFile = (fileName: string) => {
-    setOpenFiles(prev => {
+    setClosedFiles(prev => {
       const newSet = new Set(prev);
       if (newSet.has(fileName)) newSet.delete(fileName);
       else newSet.add(fileName);
@@ -66,20 +76,20 @@ export default function ErrorPanel() {
   };
 
   return (
-    <div className="bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 flex flex-col h-full overflow-hidden">
-      {/* Panel Header */}
-      <div className={PANEL_HEADER}>
-        <span className="font-semibold text-sm">Errors</span>
-        <div className="ml-auto flex items-center">
-          <CircleX className="text-red-500 mr-1 w-4 h-4" />
-          <span className="text-sm font-semibold">{totalErrorCount}</span>
+    <div className="bg-gray-100 text-gray-900 flex flex-col h-full overflow-hidden">
+      {/* The count, when there are errors (with none, the body says so once). */}
+      {totalErrorCount > 0 && (
+        <div className={PANEL_HEADER}>
+          <span className="text-sm font-semibold text-red-700">
+            {t.panel.errorCount(totalErrorCount)}
+          </span>
         </div>
-      </div>
+      )}
 
       {/* errors, grouped by file */}
       <div className="slim-scroll flex-1 overflow-auto p-2">
         {fileNames.length === 0 ? (
-          <p className="text-gray-400 text-sm mt-2 ml-2">No Error found.</p>
+          <p className="text-gray-600 text-sm mt-2 ml-2">{t.panel.noErrors}</p>
         ) : (
           fileNames.map(fileName => {
             const fileErrors = errorsByFile[fileName] ?? [];
@@ -88,20 +98,21 @@ export default function ErrorPanel() {
             return (
               <div key={fileName} className="mb-1">
                 <div
-                  className="flex items-center p-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors duration-150 ease-in-out"
+                  className="flex items-center p-2 cursor-pointer hover:bg-gray-200 rounded transition-colors duration-150 ease-in-out"
                   onClick={() => toggleFile(fileName)}
                 >
                   <ChevronRight
                     className={`text-gray-500 mr-2 transition-transform duration-200 w-4 h-4 ${
-                      openFiles.has(fileName) ? 'transform rotate-90' : ''
+                      isOpen(fileName) ? 'transform rotate-90' : ''
                     }`}
                   />
                   {getFileIcon(fileErrors[0]?.file ?? 'Unknown')}
                   <p className="text-sm">
-                    <span className="font-semibold">{fileErrors[0]?.file ?? 'Unknown'}</span>
-                    <span className="text-gray-400 text-xs ml-1 italic">
-                      ({fileErrors[0]?.filePath ?? 'Unknown'})
-                    </span>
+                    <span className="font-semibold">{fileErrors[0]?.file ?? ''}</span>
+                    {/* The folder, only when the file is not at the project's root. */}
+                    {fileErrors[0] && fileErrors[0].filePath !== fileErrors[0].file && (
+                      <span className="text-gray-600 text-xs ml-1">({fileErrors[0].filePath})</span>
+                    )}
                   </p>
                   <div className="ml-auto flex items-center">
                     <CircleX className="text-red-500 mr-1 w-4 h-4" />
@@ -109,19 +120,21 @@ export default function ErrorPanel() {
                   </div>
                 </div>
 
-                {openFiles.has(fileName) && (
+                {isOpen(fileName) && (
                   <div className="pl-8 text-sm">
                     {fileErrors.map((item, index) => (
                       <div
                         key={index}
-                        className="p-1 flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        className="p-1 flex items-center cursor-pointer hover:bg-gray-200 rounded"
                         onClick={() => handleErrorClick(item)}
                       >
                         <CircleX className="text-red-500 mr-2 flex-shrink-0 w-4 h-4" />
                         <span>
-                          {item.message}
+                          {translateAssemblerMessage(item.message, language)}
                           {item.line && (
-                            <span className="text-gray-500 ml-2">{`[Ln ${item.line}] [Col ${item.col}]`}</span>
+                            <span className="text-gray-600 ml-2">
+                              {t.status.lineCol(item.line, item.col ?? 1)}
+                            </span>
                           )}
                         </span>
                       </div>

@@ -1,30 +1,42 @@
-// Download a file into the simulator data directory, showing a progress window.
+// Download files into the simulator data directory, showing their progress in one window
+// for the whole preparation (the JRE, then simulator.jar).
 import path from 'path';
 import fs from 'fs';
 import { BrowserWindow } from 'electron';
+import { texts } from '../i18n';
 import { staticPage } from '../paths';
+import { getPreferences } from '../preferences';
 import { getSplashWindow } from '../windows/splashWindow';
 import { getSimulatorDataDir } from './paths';
 
-/** The page's scripts get this long to start before the window is shown. */
-const PAGE_SETTLE_MS = 200;
 /** Progress messages are sent at most this often (and whenever the percentage changes). */
 const PROGRESS_INTERVAL_MS = 150;
-const CLOSE_AFTER_SUCCESS_MS = 1000;
-const CLOSE_AFTER_FAILURE_MS = 3000;
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+interface ProgressState {
+  heading?: string;
+  percent?: number;
+  status?: string;
+  failed?: boolean;
+}
+
+let progressWindow: BrowserWindow | null = null;
+let shown: Promise<void> | null = null;
 
 /**
- * The small window that shows a download's progress (public/progress.html). It belongs to
- * the splash: it stays in front of it, without staying in front of other programs.
+ * The progress window (public/progress.html), opened at the first download and kept for the
+ * next one. It belongs to the splash: in front of it, not in front of other programs.
  */
-async function openProgressWindow(title: string) {
-  const window = new BrowserWindow({
+function openProgressWindow(title: string) {
+  if (progressWindow && !progressWindow.isDestroyed()) {
+    progressWindow.setTitle(title);
+    return shown!;
+  }
+  const { theme } = getPreferences();
+  progressWindow = new BrowserWindow({
     title,
     parent: getSplashWindow() ?? undefined,
     width: 400,
-    height: 200,
+    height: 132,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -32,38 +44,55 @@ async function openProgressWindow(title: string) {
     modal: false,
     autoHideMenuBar: true,
     frame: false,
+    backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
   });
-  const loaded = new Promise<void>(resolve => window.webContents.once('did-finish-load', () => resolve()));
-  window.loadFile(staticPage('progress.html'));
-  await loaded;
-  await sleep(PAGE_SETTLE_MS);
-  if (!window.isDestroyed()) window.show();
+  const window = progressWindow;
+  window.on('closed', () => {
+    if (progressWindow === window) progressWindow = null;
+  });
+  // Shown by the first setProgress, with its text: shown at load, it was a blank card first.
+  shown = new Promise<void>(resolve => {
+    window.webContents.once('did-finish-load', () => resolve());
+  });
+  void window.loadFile(staticPage('progress.html'), { query: { theme } });
+  return shown;
+}
 
-  /** Show a percentage and a message; does nothing once the window is gone. */
-  const update = async (percent: number, status: string) => {
-    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
-    try {
-      await window.webContents.executeJavaScript(
-        `window.updateProgress?.(${JSON.stringify(percent)}, ${JSON.stringify(status)})`,
-      );
-    } catch (error) {
-      console.warn('Progress update failed:', error);
-    }
-  };
-  const closeAfter = (ms: number) =>
-    setTimeout(() => {
-      if (!window.isDestroyed()) window.close();
-    }, ms);
-  return { update, closeAfter };
+async function setProgress(state: ProgressState) {
+  const window = progressWindow;
+  if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+  try {
+    await window.webContents.executeJavaScript(`window.setProgress?.(${JSON.stringify(state)})`);
+    if (!window.isDestroyed() && !window.isVisible()) window.show();
+  } catch (error) {
+    console.warn('Progress update failed:', error);
+  }
+}
+
+/** Close the progress window (all downloads are done, or one failed and an error box follows). */
+export function closeProgressWindow() {
+  if (progressWindow && !progressWindow.isDestroyed()) progressWindow.close();
+  progressWindow = null;
+}
+
+/** One file of the preparation: its place in the sequence and what it is. */
+export interface DownloadStep {
+  index: number;
+  total: number;
+  /** What is being downloaded, in words ("the Java runtime"). */
+  label: string;
 }
 
 /** Download `url` to `relativePath` in the simulator data directory. Throws if it fails. */
-export async function downloadFile(relativePath: string, url: string) {
+export async function downloadFile(relativePath: string, url: string, step: DownloadStep) {
+  const t = texts();
   // The directory does not exist on a first start on Linux (on Windows and macOS it is
   // Electron's own userData directory, whose name differs only in case).
   fs.mkdirSync(getSimulatorDataDir(), { recursive: true });
   const filePath = path.join(getSimulatorDataDir(), relativePath);
-  const progress = await openProgressWindow(`Downloading ${relativePath}`);
+  await openProgressWindow(`UmJoonSIC — ${relativePath}`);
+  const heading = t.downloadHeading(step.index, step.total);
+  await setProgress({ heading, percent: 0, status: step.label, failed: false });
 
   try {
     const response = await fetch(url);
@@ -89,19 +118,21 @@ export async function downloadFile(relativePath: string, url: string) {
       if (percent !== lastPercent || now - lastUpdateAt > PROGRESS_INTERVAL_MS) {
         lastPercent = percent;
         lastUpdateAt = now;
-        await progress.update(percent, `다운로드 중... ${percent}% (${(received / 1024 / 1024).toFixed(1)}MB)`);
+        await setProgress({
+          percent,
+          status: `${step.label} ${t.downloadProgress(percent, (received / 1024 / 1024).toFixed(1))}`,
+        });
       }
     }
 
-    await progress.update(100, '파일을 저장하는 중...');
+    await setProgress({ percent: 100, status: `${step.label} ${t.downloadSaving}` });
     fs.writeFileSync(filePath, Buffer.concat(chunks));
-    await progress.update(100, '다운로드 완료!');
-    progress.closeAfter(CLOSE_AFTER_SUCCESS_MS);
+    await setProgress({ percent: 100, status: `${step.label} ${t.downloadDone}` });
   } catch (error) {
     console.error('Download failed:', error);
-    const message = error instanceof Error ? error.message : '알 수 없는 오류';
-    await progress.update(0, `다운로드 실패: ${message}`);
-    progress.closeAfter(CLOSE_AFTER_FAILURE_MS);
+    const reason = error instanceof Error ? error.message : t.unknownError;
+    // The heading says it failed too (it said "preparing" while the status said "failed").
+    await setProgress({ heading: t.downloadFailedHeading, status: t.downloadFailed(reason), failed: true });
     throw error;
   }
 }

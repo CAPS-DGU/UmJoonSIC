@@ -1,5 +1,14 @@
 import type { MouseEvent } from 'react';
-import { ChevronDown, ChevronRight, File, Folder, List, Settings } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  File,
+  FileCode,
+  FileText,
+  Folder,
+  ScrollText,
+  Settings,
+} from 'lucide-react';
 import type { FileStructure } from '@/features/fileTree/types';
 
 const ICON_SIZE = 16;
@@ -7,17 +16,32 @@ const ICON_SIZE = 16;
 /** Folders holding build output are tinted. */
 const OUTPUT_FOLDERS = ['.out', 'linker'];
 
-/** Colour of an entry: blue for files that belong to the project, orange for output folders. */
+/**
+ * Colour of an entry: blue for files assembled by the project (its asm list), muted grey for
+ * build-output folders (they were orange, which read as a warning and had poor contrast).
+ */
 function colorClasses(item: FileStructure, projectFiles: string[]) {
-  const projectFile = projectFiles.includes(item.relativePath) ? 'text-blue-600' : '';
+  const projectFile = projectFiles.includes(item.relativePath) ? 'text-blue-700' : '';
   const outputFolder =
-    item.type === 'folder' && OUTPUT_FOLDERS.includes(item.name) ? 'text-orange-600' : '';
+    item.type === 'folder' && OUTPUT_FOLDERS.includes(item.name)
+      ? 'text-gray-600 font-normal italic'
+      : '';
   return [projectFile, outputFolder].join(' ');
 }
 
+/** One icon per kind of file: settings, assembly source, listing, text. */
 function FileIcon({ fileName }: { fileName: string }) {
   const lower = fileName.toLowerCase();
-  const Icon = lower === 'project.sic' ? Settings : lower.endsWith('.lst') ? List : File;
+  const Icon =
+    lower === 'project.sic'
+      ? Settings
+      : lower.endsWith('.asm')
+        ? FileCode
+        : lower.endsWith('.lst')
+          ? ScrollText
+          : lower.endsWith('.txt')
+            ? FileText
+            : File;
   return <Icon width={ICON_SIZE} height={ICON_SIZE} className="shrink-0" />;
 }
 
@@ -32,19 +56,20 @@ interface FileTreeItemProps {
   onContextMenu: (e: MouseEvent, item: FileStructure) => void;
   /** Project-relative paths of the files listed in project.sic. */
   projectFiles: string[];
-  /** Path of the entry that has keyboard focus. */
+  /** Path of the entry that has keyboard focus; marked only while the tree has the focus. */
   focusPath: string;
+  showFocus: boolean;
 }
 
 /** One file or folder of the tree; a folder renders its children when expanded. */
 export function FileTreeItem(props: FileTreeItemProps) {
   const { item, expanded, toggleFolder, selected, onSelect, onOpenFile, onContextMenu } = props;
-  const { projectFiles, focusPath } = props;
+  const { projectFiles, focusPath, showFocus } = props;
 
   const color = colorClasses(item, projectFiles);
   const stateClasses = `
-            ${selected?.relativePath === item.relativePath ? 'bg-gray-100' : ''}
-            ${focusPath === item.relativePath ? 'bg-blue-100' : ''}
+            ${selected?.relativePath === item.relativePath ? 'bg-gray-200' : ''}
+            ${showFocus && focusPath === item.relativePath ? 'bg-blue-100' : ''}
           `;
 
   if (item.type === 'folder') {
@@ -69,7 +94,7 @@ export function FileTreeItem(props: FileTreeItemProps) {
           </span>
         </div>
         {isOpen && (
-          <div className="ml-6">
+          <div className="ml-4">
             {item.children.map(child => (
               <FileTreeItem key={child.relativePath} {...props} item={child} />
             ))}

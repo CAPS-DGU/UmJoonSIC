@@ -61,7 +61,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
       const { values } = await simulator.memory(start, end - 1);
       return values;
     } catch (error) {
-      console.error(`메모리 범위 ${start}-${end} 로드 실패:`, error);
+      console.error(`Memory ${start}-${end} could not be loaded:`, error);
       set(state => {
         const failed = new Set(state.failed);
         for (let address = start; address < end; address++) failed.add(address);

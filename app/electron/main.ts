@@ -1,9 +1,11 @@
 // Main process entry: application lifecycle.
-import { app, BrowserWindow, dialog, Menu } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import { electronApp } from '@electron-toolkit/utils';
 import { checkUpdate } from './appUpdate';
+import { texts } from './i18n';
 import { registerIpcHandlers } from './ipc';
-import { menuList } from './menu';
+import { installMenu } from './menu';
+import { applyNativeTheme, onPreferencesChange } from './preferences';
 import {
   cancelPendingDispatch,
   findSicPathInArgs,
@@ -12,6 +14,7 @@ import {
   sendPendingProjectPath,
   setInitialProjectPath,
 } from './project/openQueue';
+import { closeProgressWindow } from './simulator/download';
 import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
 import { checkJreExists, downloadJre } from './simulator/jre';
 import { simulatorProcess } from './simulator/process';
@@ -29,23 +32,32 @@ registerIpcHandlers();
 /** Make sure a JRE and simulator.jar are present and current. Throws if either is missing. */
 async function prepareSimulator() {
   await checkUpdate();
+  const t = texts();
 
-  if (!checkJreExists()) {
-    await downloadJre().catch(error => {
-      console.error('JRE 다운로드 실패:', error);
+  // One progress window for the whole preparation: "(1/2) the Java runtime", "(2/2) …".
+  const needJre = !checkJreExists();
+  const needJar = !checkServerExists();
+  const total = Number(needJre) + Number(needJar);
+  let index = 0;
+  let failure: unknown = null;
+  if (needJre) {
+    await downloadJre({ index: ++index, total, label: t.downloadJre }).catch(error => {
+      console.error('JRE download failed:', error);
+      failure = error;
     });
   }
-  if (!checkServerExists()) {
-    await downloadServer().catch(error => {
-      console.error('Server 다운로드 실패:', error);
+  if (needJar && !failure) {
+    await downloadServer({ index: ++index, total, label: t.downloadSimulator }).catch(error => {
+      console.error('simulator.jar download failed:', error);
+      failure = error;
     });
   }
-  await checkJARUpdate();
+  if (!failure) await checkJARUpdate();
+  closeProgressWindow();
 
   if (!checkJreExists() || !checkServerExists()) {
-    throw new Error(
-      'Java 실행 환경 또는 simulator.jar 를 준비하지 못했습니다. 인터넷 연결을 확인한 뒤 다시 실행하세요.',
-    );
+    const detail = failure instanceof Error ? failure.message : '';
+    throw new Error(detail ? `${t.notPrepared}\n(${detail})` : t.notPrepared);
   }
 }
 
@@ -73,20 +85,30 @@ function createWindow(): void {
       // Stopped by the quit, not a failure.
       if (cancelled) return;
       // The error box comes alone (destroy() does not count as the user closing the splash).
+      // A message box, not showErrorBox: it does not block the main process, and its title
+      // and button follow the interface language.
+      closeProgressWindow();
       if (!splash.isDestroyed()) splash.destroy();
-      dialog.showErrorBox(
-        '시뮬레이터 오류',
-        `시뮬레이터를 시작하지 못해 앱을 종료합니다.\n${error instanceof Error ? error.message : String(error)}`,
-      );
+      const t = texts();
+      await dialog.showMessageBox({
+        type: 'error',
+        title: t.simulatorErrorTitle,
+        message: t.simulatorErrorMessage,
+        detail: t.simulatorErrorDetail(error instanceof Error ? error.message : String(error)),
+        buttons: [t.ok],
+        defaultId: 0,
+        noLink: true,
+      });
       app.quit();
       return;
     }
     if (cancelled) return;
     started = true;
+    // The main window first, then the splash goes: never a moment without a window.
+    getMainWindow()?.show();
     if (!splash.isDestroyed()) {
       splash.close();
     }
-    getMainWindow()?.show();
   });
 
   mainWindow.webContents.on('did-finish-load', sendPendingProjectPath);
@@ -119,7 +141,10 @@ if (!app.requestSingleInstanceLock()) {
     // Windows: application user model id (taskbar grouping, notifications).
     electronApp.setAppUserModelId('com.electron');
 
-    Menu.setApplicationMenu(Menu.buildFromTemplate(menuList));
+    applyNativeTheme();
+    installMenu();
+    // The menu is in the interface language and shows the chosen language and theme.
+    onPreferencesChange(() => installMenu());
 
     // @electron-toolkit's optimizer.watchWindowShortcuts is deliberately not used:
     // it interfered with the zoom shortcuts.

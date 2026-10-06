@@ -5,7 +5,7 @@
     <!-- A static local page: nothing is loaded from elsewhere. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'unsafe-inline'"
+      content="default-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>About</title>
@@ -20,6 +20,28 @@
         --primary: #2563eb; /* blue-600 */
         --ring: rgba(37, 99, 235, 0.25);
         --divider: rgba(15, 23, 42, 0.08);
+      }
+      :root.dark {
+        color-scheme: dark; /* scroll bars and form controls follow */
+        --bg: #111827;
+        --bg-grad-1: rgba(59, 130, 246, 0.12);
+        --bg-grad-2: rgba(99, 102, 241, 0.1);
+        --card: #1f2937;
+        --text: #f3f4f6;
+        --muted: #cbd5e1;
+        --primary: #93c5fd;
+        --ring: rgba(147, 197, 253, 0.35);
+        --divider: rgba(243, 244, 246, 0.12);
+      }
+      /* Only the interface language's texts (lang="ko" / lang="en" on the elements). */
+      html[lang='ko'] [lang='en'],
+      html[lang='en'] [lang='ko'] {
+        display: none !important;
+      }
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
       }
 
       * {
@@ -36,6 +58,7 @@
           radial-gradient(900px 500px at 90% 10%, var(--bg-grad-2), transparent), var(--bg);
         color: var(--text);
         font-family:
+          'Pretendard Variable',
           ui-sans-serif,
           system-ui,
           -apple-system,
@@ -68,7 +91,8 @@
 
       .header {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
         border-bottom: 1px solid var(--divider);
@@ -148,27 +172,150 @@
       <main class="card" role="main" aria-labelledby="about-title">
         <header class="header">
           <h1 id="about-title">
-            About UmJoonSIC <span class="badge">v1.0.4</span> <span class="badge">BSD-2</span>
+            UmJoonSIC <span class="badge">v1.0.4</span> <span class="badge">BSD-2</span>
           </h1>
+          <p class="subtitle">
+            <span lang="ko"
+              >SIC/SIC-XE 어셈블리 실습을 위한 개발 환경 · 동국대학교 시스템소프트웨어</span
+            >
+            <span lang="en"
+              >A development environment for SIC/SIC-XE assembly · Dongguk University, System
+              Software</span
+            >
+          </p>
         </header>
 
-        <section class="section" aria-labelledby="tos">
-          <h3 id="tos">이용약관</h3>
+        <section class="section" aria-labelledby="mentors">
+          <h3 id="mentors"><span lang="ko">개발 지도</span><span lang="en">Advisors</span></h3>
           <div class="content">
-            <p>
+            <p lang="ko">동국대학교 컴퓨터·AI학부 교수 정준호</p>
+            <p lang="ko">동국대학교 컴퓨터·AI학부 교수 한인</p>
+            <p lang="en">Prof. 정준호, Division of Computer Science and AI, Dongguk University</p>
+            <p lang="en">Prof. 한인, Division of Computer Science and AI, Dongguk University</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="contributors">
+          <h3 id="contributors">
+            <span lang="ko">개발 총괄 및 참여</span><span lang="en">Development</span>
+          </h3>
+          <div class="content">
+            <ul>
+              <li lang="ko">
+                <span class="badge">개발 총괄</span> 컴퓨터공학과 20학번 정상원, 약학과 23학번
+                원종인, 컴퓨터·AI학부 24학번 송윤석, 컴퓨터공학과 24학번 안지민
+              </li>
+              <li lang="en">
+                <span class="badge">Lead</span> 정상원 (Computer Engineering, '20), 원종인
+                (Pharmacy, '23), 송윤석 (Computer Science and AI, '24), 안지민 (Computer
+                Engineering, '24)
+              </li>
+              <li lang="ko">
+                <span class="badge">검수</span> 중앙동아리 CAPS 여름 프로젝트형 스터디 참가자 일동
+              </li>
+              <li lang="en">
+                <span class="badge">Review</span> the members of the CAPS summer project study
+              </li>
+              <li lang="ko">
+                <span class="badge">참여</span> 통계학과 24학번 전가희, 컴퓨터공학전공 24학번
+                박예진, 컴퓨터AI학부 25학번 원종호, 컴퓨터AI학부 22학번 서동건, 통계학과 23학번
+                박서연, 컴퓨터AI학부 24학번 노혜륜, 경찰행정학부 20학번 조준용, 경영정보학과 23학번
+                최지인, 컴퓨터AI학부 25학번 김영주, 기계로봇에너지공학과 24학번 채건, 컴퓨터AI학부
+                22학번 김민설, 컴퓨터공학전공 23학번 김예원, 컴퓨터AI학부 23학번 신효환,
+                컴퓨터AI학부 23학번 이정은, 컴퓨터공학과 24학번 윤재필, 멀티미디어소프트웨어공학전공
+                23학번 이서연, 컴퓨터AI학부 21학번 장길빈, 컴퓨터공학전공 23학번 박준홍,
+                정보통신공학과 20학번 한병헌, 컴퓨터AI학부 25학번 심현서, 컴퓨터AI학부 25학번
+                강성찬, 수학과 24학번 성준영, 컴퓨터AI학부 25학번 박재관, 통계학과 25학번 김주혜
+              </li>
+              <li lang="en">
+                <span class="badge">Contributors</span> 전가희 (Statistics, '24), 박예진 (Computer
+                Engineering, '24), 원종호 (Computer Science and AI, '25), 서동건 (Computer Science
+                and AI, '22), 박서연 (Statistics, '23), 노혜륜 (Computer Science and AI, '24),
+                조준용 (Police Administration, '20), 최지인 (Management Information Systems, '23),
+                김영주 (Computer Science and AI, '25), 채건 (Mechanical, Robotics and Energy
+                Engineering, '24), 김민설 (Computer Science and AI, '22), 김예원 (Computer
+                Engineering, '23), 신효환 (Computer Science and AI, '23), 이정은 (Computer Science
+                and AI, '23), 윤재필 (Computer Engineering, '24), 이서연 (Multimedia Software
+                Engineering, '23), 장길빈 (Computer Science and AI, '21), 박준홍 (Computer
+                Engineering, '23), 한병헌 (Information and Communication Engineering, '20), 심현서
+                (Computer Science and AI, '25), 강성찬 (Computer Science and AI, '25), 성준영
+                (Mathematics, '24), 박재관 (Computer Science and AI, '25), 김주혜 (Statistics, '25)
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="issues">
+          <h3 id="issues">
+            <span lang="ko">오류 제보 및 이용 안내</span><span lang="en">Feedback</span>
+          </h3>
+          <div class="content">
+            <p lang="ko">
+              오류 제보는 자유롭게 Issues로 등록해 주세요. BSD-2-Clause 라이선스를 준수하는 범위에서
+              자유로운 이용과 파생 작업을 환영합니다.
+            </p>
+            <p lang="en">
+              Please report problems as Issues on GitHub. Use and derived works are welcome under
+              the BSD-2-Clause licence.
+            </p>
+            <p lang="ko">
+              함께해 주신 스터디원들과 정준호 교수님, 한 인 교수님께 깊이 감사드립니다.
+            </p>
+            <p lang="en">
+              Our thanks to the members of the study and to Prof. 정준호 and Prof. 한인.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="references">
+          <h3 id="references"><span lang="ko">참고 문헌</span><span lang="en">References</span></h3>
+          <div class="content">
+            <ul>
+              <li>
+                Leland L. Beck, System Software: An Introduction to Systems Programming, 3rd ed.,
+                Addison-Wesley, 1997.
+              </li>
+              <li>
+                Jurij Mihelič, Tomaž Dobravec, “SicSim: A simulator of the educational SIC/XE
+                computer for a system-software course,” Computer Applications in Engineering
+                Education, 23(1):137–146, 2015. doi:10.1002/cae.21585
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="tos">
+          <h3 id="tos"><span lang="ko">이용약관</span><span lang="en">Licence</span></h3>
+          <div class="content">
+            <p lang="ko">
               본 프로젝트는 BSD-2-Clause 라이선스로 배포됩니다. 자세한 내용은 저장소의
               <code>LICENSE</code> 파일을 참조하세요.
             </p>
-            <p>
+            <p lang="en">
+              This project is distributed under the BSD-2-Clause licence. See the
+              <code>LICENSE</code> file of the repository.
+            </p>
+            <p lang="ko">
               이 저장소에는 <code>jurem/SicTools</code>의 일부 코드 및 아이디어가 Git subtree 형태로
               포함될 수 있습니다. 해당 부분은 원저작권자 및 라이선스 고지(BSD-2-Clause)를 그대로
               상속합니다.
             </p>
-            <p>
+            <p lang="en">
+              The repository may include code and ideas of <code>jurem/SicTools</code> as a Git
+              subtree. That part keeps its original copyright and licence notice (BSD-2-Clause).
+            </p>
+            <p lang="ko">
               BSD-2-Clause 조건에 따라, 원저작권 고지 및 면책 조항은 소스/바이너리 재배포 시 반드시
               함께 제공되어야 합니다.
             </p>
-            <p><strong>이하는 BSD2 라이선스 전문입니다.</strong></p>
+            <p lang="en">
+              Under the BSD-2-Clause terms, the copyright notice and the disclaimer must accompany
+              every redistribution in source or binary form.
+            </p>
+            <p>
+              <strong lang="ko">이하는 BSD2 라이선스 전문입니다.</strong
+              ><strong lang="en">The full BSD-2 licence:</strong>
+            </p>
             <p>
               Copyright (c) 2025, COPYRIGHT CAPS<br />
               All rights reserved.
@@ -203,68 +350,6 @@
           </div>
         </section>
 
-        <section class="section" aria-labelledby="references">
-          <h3 id="references">참고 문헌</h3>
-          <div class="content">
-            <ul>
-              <li>
-                Leland L. Beck, System Software: An Introduction to Systems Programming, 3rd ed.,
-                Addison-Wesley, 1997.
-              </li>
-              <li>
-                Jurij Mihelič, Tomaž Dobravec, “SicSim: A simulator of the educational SIC/XE
-                computer for a system-software course,” Computer Applications in Engineering
-                Education, 23(1):137–146, 2015. doi:10.1002/cae.21585
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="section" aria-labelledby="mentors">
-          <h3 id="mentors">개발 지도</h3>
-          <div class="content">
-            <p>동국대학교 컴퓨터·AI학부 교수 정준호</p>
-            <p>동국대학교 컴퓨터·AI학부 교수 한인</p>
-          </div>
-        </section>
-
-        <section class="section" aria-labelledby="contributors">
-          <h3 id="contributors">개발 총괄 및 참여</h3>
-          <div class="content">
-            <ul>
-              <li>
-                <span class="badge">개발 총괄</span> 컴퓨터공학과 20학번 정상원, 약학과 23학번
-                원종인, 컴퓨터·AI학부 24학번 송윤석, 컴퓨터공학과 24학번 안지민
-              </li>
-              <li>
-                <span class="badge">검수</span> 중앙동아리 CAPS 여름 프로젝트형 스터디 참가자 일동
-              </li>
-              <li>
-                <span class="badge">참여</span> 통계학과 24학번 전가희, 컴퓨터공학전공 24학번
-                박예진, 컴퓨터AI학부 25학번 원종호, 컴퓨터AI학부 22학번 서동건, 통계학과 23학번
-                박서연, 컴퓨터AI학부 24학번 노혜륜, 경찰행정학부 20학번 조준용, 경영정보학과 23학번
-                최지인, 컴퓨터AI학부 25학번 김영주, 기계로봇에너지공학과 24학번 채건, 컴퓨터AI학부
-                22학번 김민설, 컴퓨터공학전공 23학번 김예원, 컴퓨터AI학부 23학번 신효환,
-                컴퓨터AI학부 23학번 이정은, 컴퓨터공학과 24학번 윤재필, 멀티미디어소프트웨어공학전공
-                23학번 이서연, 컴퓨터AI학부 21학번 장길빈, 컴퓨터공학전공 23학번 박준홍,
-                정보통신공학과 20학번 한병헌, 컴퓨터AI학부 25학번 심현서, 컴퓨터AI학부 25학번
-                강성찬, 수학과 24학번 성준영, 컴퓨터AI학부 25학번 박재관, 통계학과 25학번 김주혜
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="section" aria-labelledby="issues">
-          <h3 id="issues">오류 제보 및 이용 안내</h3>
-          <div class="content">
-            <p>
-              오류 제보는 자유롭게 Issues로 등록해 주세요. BSD-2-Clause 라이선스를 준수하는 범위에서
-              자유로운 이용과 파생 작업을 환영합니다.
-            </p>
-            <p>함께해 주신 스터디원들과 정준호 교수님, 한 인 교수님께 깊이 감사드립니다.</p>
-          </div>
-        </section>
-
         <footer class="footer" aria-label="meta">
           <span>© Dongguk University</span>
           <span>•</span>
@@ -272,5 +357,11 @@
         </footer>
       </main>
     </div>
+    <script>
+      // ?lang=ko|en&theme=light|dark (aboutWindow.ts): the page in the app's language and theme.
+      const params = new URLSearchParams(location.search);
+      document.documentElement.lang = params.get('lang') === 'en' ? 'en' : 'ko';
+      if (params.get('theme') === 'dark') document.documentElement.classList.add('dark');
+    </script>
   </body>
 </html>

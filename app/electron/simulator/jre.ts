@@ -4,7 +4,7 @@ import fs from 'fs';
 import { pipeline } from 'stream/promises';
 import * as tar from 'tar';
 import AdmZip from 'adm-zip';
-import { downloadFile } from './download';
+import { downloadFile, type DownloadStep } from './download';
 import { getJavaPath, getSimulatorDataDir } from './paths';
 
 const TEMURIN_RELEASE =
@@ -29,16 +29,16 @@ export function checkJreExists() {
 }
 
 /** Download the JRE for this platform and unpack it into the simulator data directory. */
-export async function downloadJre() {
+export async function downloadJre(step: DownloadStep) {
   const archive = JRE_ARCHIVES[process.platform]?.[process.arch];
   if (!archive) {
     throw new Error(`Unsupported architecture: ${process.arch} for platform: ${process.platform}`);
   }
   const archiveName = process.platform === 'win32' ? 'jre.zip' : 'jre.tar.gz';
-  console.log(`JRE 다운로드 시작 (${process.platform}, ${process.arch})`);
-  await downloadFile(archiveName, `${TEMURIN_RELEASE}/${archive}`);
+  console.log(`Downloading the JRE (${process.platform}, ${process.arch})`);
+  await downloadFile(archiveName, `${TEMURIN_RELEASE}/${archive}`, step);
 
-  console.log('JRE 압축 해제 시작');
+  console.log('Unpacking the JRE');
   const dataDir = getSimulatorDataDir();
   const archivePath = path.join(dataDir, archiveName);
   fs.mkdirSync(dataDir, { recursive: true });

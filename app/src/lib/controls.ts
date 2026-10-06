@@ -1,6 +1,6 @@
-// One size per kind of control, so that controls of a kind look the same everywhere
-// (see documentations/08_layout). Heights: bars 40 px (top) and 32 px (panel headers);
-// controls in them 28 px; small icon buttons inside rows 24 px.
+// One size per kind of control, so that controls of a kind look the same everywhere (see
+// the screen layout section of app/README.md). Heights: bars 40 px (top) and 32 px (panel
+// headers); controls in them 28 px; small icon buttons inside rows 24 px.
 
 /** An icon button in a bar (file actions, run toolbar): 28 px square. */
 export const BAR_ICON_BUTTON =
@@ -19,4 +19,4 @@ export const FORM_BUTTON =
 
 /** A panel's header bar (Errors, Watch, Server): 32 px high. */
 export const PANEL_HEADER =
-  'flex h-8 shrink-0 items-center justify-between gap-2 border-b border-gray-300 px-2 dark:border-gray-700';
+  'flex h-8 shrink-0 items-center justify-between gap-2 border-b border-gray-300 px-2';

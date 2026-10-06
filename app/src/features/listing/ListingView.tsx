@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import TabBar from '@/features/editor/TabBar';
@@ -49,6 +49,12 @@ export default function ListingView() {
   }, [PC, listingCount]);
 
   const listing = listingOfTab(listings, activePath);
+  const listingPath = listing?.filePath;
+  // Stable, so that the memoised rows are not all drawn again on every render.
+  const onBreakpointToggle = useCallback(
+    (index: number) => listingPath && toggleBreakpoint(listingPath, index),
+    [listingPath, toggleBreakpoint],
+  );
 
   return (
     <div className="flex flex-col flex-1 w-full h-full">
@@ -56,7 +62,7 @@ export default function ListingView() {
       <ListingTable
         rows={listing?.rows ?? []}
         breakpoints={listing?.breakpoints ?? []}
-        onBreakpointToggle={index => listing && toggleBreakpoint(listing.filePath, index)}
+        onBreakpointToggle={onBreakpointToggle}
       />
     </div>
   );

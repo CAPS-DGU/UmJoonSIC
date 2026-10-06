@@ -1,5 +1,7 @@
 import { BrowserWindow, shell } from 'electron';
+import { texts } from '../i18n';
 import { staticPage } from '../paths';
+import { getPreferences } from '../preferences';
 
 export function openAboutWindow() {
   const aboutWindow = new BrowserWindow({
@@ -7,10 +9,12 @@ export function openAboutWindow() {
     height: 600,
     resizable: false,
     autoHideMenuBar: true,
-    title: 'About UmJoonSIC',
+    title: texts().about,
     parent: BrowserWindow.getFocusedWindow() ?? undefined,
+    backgroundColor: getPreferences().theme === 'dark' ? '#111827' : '#ffffff',
   });
-  aboutWindow.loadFile(staticPage('about.html'));
+  const { language, theme } = getPreferences();
+  aboutWindow.loadFile(staticPage('about.html'), { query: { lang: language, theme } });
   // Links in the page open in the system browser.
   aboutWindow.webContents.on('will-navigate', (event, url) => {
     event.preventDefault();

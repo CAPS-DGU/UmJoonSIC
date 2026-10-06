@@ -2,7 +2,8 @@ import { useEffect, type MutableRefObject } from 'react';
 import type * as monaco from 'monaco-editor';
 import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { checkSyntax, isProjectAsmFile } from '@/features/editor/lib/syntaxCheck';
-import { useInfoModalStore } from '@/stores/infoModalStore';
+import { strings } from '@/i18n';
+import { showError } from '@/stores/dialogStore';
 
 /**
  * Delay between Ctrl+S and saving. It gives an input-method composition in progress
@@ -32,9 +33,7 @@ export function useEditorShortcuts(
         }
         void saveTab(filePath).then(saved => {
           if (!saved) {
-            useInfoModalStore
-              .getState()
-              .show('저장 실패', `${tab.title} 을(를) 저장하지 못했습니다.`);
+            void showError(strings().messages.saveFailed(tab.title));
           }
         });
       }, SAVE_DELAY_MS);

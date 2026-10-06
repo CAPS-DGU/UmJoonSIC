@@ -1,4 +1,5 @@
 import * as monaco from 'monaco-editor';
+import { TabFocus } from 'monaco-editor/esm/vs/editor/browser/config/tabFocus.js';
 import { autoIndentLine } from '@/features/editor/lib/autoIndentLine';
 
 type Editor = monaco.editor.IStandaloneCodeEditor;
@@ -90,6 +91,9 @@ export function attachAutoIndentation(editor: Editor, isEnabled: () => boolean) 
 
     switch (e.code) {
       case 'Tab': {
+        // Monaco's "Tab moves focus" (Ctrl+M, as in VS Code): Tab leaves the editor, the
+        // way out for keyboard users.
+        if (TabFocus.getTabFocusMode()) break;
         // Tab never inserts a tab character: it steps to the next column.
         e.preventDefault();
         e.stopPropagation();

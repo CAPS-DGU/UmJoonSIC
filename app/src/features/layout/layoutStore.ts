@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { BOTTOM_PANEL, DEBUG_COLUMN, FILES_COLUMN } from '@/features/layout/columns';
+import { DEBUG_COLUMN, FILES_COLUMN } from '@/features/layout/columns';
 
 /** The sizes the user chose; the layout fits them into the window (see columns.ts). */
 interface LayoutState {
@@ -20,7 +20,8 @@ function readSaved() {
   const defaults = {
     filesWidth: FILES_COLUMN.default,
     debugWidth: DEBUG_COLUMN.default,
-    panelHeight: BOTTOM_PANEL.default,
+    // 0: the bottom panel follows the window (App.tsx) until the user drags it.
+    panelHeight: 0,
   };
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');

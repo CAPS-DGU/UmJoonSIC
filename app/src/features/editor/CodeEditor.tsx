@@ -21,6 +21,8 @@ import { modelPath } from '@/features/editor/monaco/models';
 import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 import '@/features/editor/monaco/setupMonaco';
 import { useErrorStore } from '@/features/panel/errorStore';
+import { useStrings } from '@/i18n';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import '@/features/editor/syntaxError.css';
 
@@ -45,7 +47,17 @@ function applyRevealRequest(editor: MonacoEditor, request: RevealRequest | null)
  * file (see monaco/models.ts), so switching tabs keeps each file's text, undo history,
  * cursor and scroll position.
  */
+/** The field guides (label, opcode, operand) of assembly files; other files get none. */
+const rulersFor = (filePath: string | null) =>
+  filePath?.toLowerCase().endsWith('.asm') ? editorOptions.rulers : [];
+const optionsFor = () => ({
+  ...editorOptions,
+  rulers: rulersFor(useEditorTabStore.getState().activePath),
+});
+
 export default function CodeEditor() {
+  const t = useStrings();
+  const theme = usePreferencesStore(s => s.theme);
   const activeTab = useEditorTabStore(selectActiveTab);
   const revealRequest = useEditorTabStore(state => state.revealRequest);
   const projectPath = useProjectStore(state => state.projectPath);
@@ -63,6 +75,11 @@ export default function CodeEditor() {
     if (editorRef.current) applyRevealRequest(editorRef.current, revealRequest);
   }, [revealRequest, activePath]);
 
+  // The column guides are for assembly; a .txt file gets none.
+  useEffect(() => {
+    editorRef.current?.updateOptions({ rulers: rulersFor(activePath) });
+  }, [activePath]);
+
   const handleEditorDidMount = (editor: MonacoEditor) => {
     editorRef.current = editor;
     editor.onDidDispose(() => {
@@ -73,12 +90,12 @@ export default function CodeEditor() {
     (async () => {
       try {
         await document.fonts.load(`12px "JetBrains Mono"`);
-        editor.updateOptions(editorOptions);
+        editor.updateOptions(optionsFor());
         // measure again on the next tick, with the font in place
         setTimeout(() => editor.layout(), 50);
       } catch (error) {
         console.error('Font loading failed:', error);
-        editor.updateOptions(editorOptions);
+        editor.updateOptions(optionsFor());
       }
     })();
 
@@ -120,9 +137,9 @@ export default function CodeEditor() {
 
   if (!activeTab) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
-        <p className="text-sm text-gray-500">파일을 열어 새로운 탭을 만드세요</p>
+      <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
+        <h1 className="text-lg font-semibold text-gray-800">{t.editor.noFile}</h1>
+        <p className="text-sm text-gray-600">{t.editor.noFileHint}</p>
       </div>
     );
   }
@@ -134,6 +151,7 @@ export default function CodeEditor() {
         path={modelPath(projectPath, activeTab.filePath)}
         defaultValue={activeTab.content}
         defaultLanguage={SICXE_LANGUAGE_ID}
+        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
         keepCurrentModel
         onMount={handleEditorDidMount}
       />

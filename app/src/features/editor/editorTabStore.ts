@@ -9,7 +9,8 @@ import { disposeModel, modelPath } from '@/features/editor/monaco/models';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import { moveItem } from '@/lib/moveItem';
-import { useInfoModalStore } from '@/stores/infoModalStore';
+import { strings } from '@/i18n';
+import { showError } from '@/stores/dialogStore';
 
 export interface CursorPosition {
   line: number;
@@ -118,6 +119,17 @@ let lastOpenRequest = 0;
 /** Changes when all tabs are closed (another project), so that a late file read is dropped. */
 let tabsEpoch = 0;
 
+/**
+ * The tabs in the order they were last active (most recent last). When the active tab
+ * closes, the one used before it comes back, not whichever tab is last in the strip (the
+ * settings tab came forward when a run's List tab closed).
+ */
+let activeHistory: string[] = [];
+const noteActive = (filePath: string | null) => {
+  if (!filePath) return;
+  activeHistory = [...activeHistory.filter(p => p !== filePath), filePath].slice(-30);
+};
+
 export const useEditorTabStore = create<EditorTabState>((set, get) => {
   const patchTab = (filePath: string, patch: (tab: EditorTab) => Partial<EditorTab>) =>
     set(state => ({
@@ -134,7 +146,7 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
     } catch (error) {
       message = String(error);
     }
-    useInfoModalStore.getState().show('파일 열기 실패', `${filePath}\n${message}`);
+    void showError(strings().messages.openFileFailed(filePath), undefined, message);
     return null;
   };
 
@@ -145,10 +157,12 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
     if (closing.length === 0) return;
     const remaining = tabs.filter(tab => !shouldClose(tab));
     const activeStays = remaining.some(tab => tab.filePath === activePath);
-    set({
-      tabs: remaining,
-      activePath: activeStays ? activePath : (remaining.at(-1)?.filePath ?? null),
-    });
+    const previous = [...activeHistory]
+      .reverse()
+      .find(p => remaining.some(tab => tab.filePath === p));
+    const nextActive = activeStays ? activePath : (previous ?? remaining.at(-1)?.filePath ?? null);
+    activeHistory = activeHistory.filter(p => remaining.some(tab => tab.filePath === p));
+    set({ tabs: remaining, activePath: nextActive });
     const { projectPath } = useProjectStore.getState();
     closing
       .filter(tab => tabKind(tab.filePath) === 'source')
@@ -257,11 +271,11 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
       try {
         const res = await window.api.saveFile(absolutePath(filePath), content);
         if (!res.success) {
-          console.error(`파일 저장 실패: ${filePath}`, res.message);
+          console.error(`Saving ${filePath} failed:`, res.message);
           return false;
         }
       } catch (error) {
-        console.error(`파일 저장 중 오류 발생: ${filePath}`, error);
+        console.error(`Saving ${filePath} failed:`, error);
         return false;
       }
       // Typing may have gone on while the file was written: compare with what was saved.
@@ -282,4 +296,9 @@ export const useEditorTabStore = create<EditorTabState>((set, get) => {
       return { success: failedCount === 0, savedCount, totalCount: modified.length, failedCount };
     },
   };
+});
+
+// Every activation is remembered (see activeHistory).
+useEditorTabStore.subscribe((state, prev) => {
+  if (state.activePath !== prev.activePath) noteActive(state.activePath);
 });

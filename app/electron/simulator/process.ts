@@ -1,5 +1,6 @@
 // The simulator process: `java -jar simulator.jar <port>`, serving HTTP on SIMULATOR_PORT.
 // The app runs one at a time: started at launch, restarted from the Server panel, killed on quit.
+import { texts } from '../i18n';
 import { BrowserWindow } from 'electron';
 import { type ChildProcess, spawn } from 'child_process';
 import net from 'node:net';
@@ -172,7 +173,7 @@ class SimulatorProcess {
   private async launch() {
     const javaPath = getJavaPath();
     if (!javaPath) {
-      throw new Error('Java 경로를 찾을 수 없습니다.');
+      throw new Error(texts().javaNotFound);
     }
     await waitForPortRelease(SIMULATOR_PORT, PORT_RELEASE_TIMEOUT_MS);
     if (await isListening(SIMULATOR_PORT)) {
@@ -181,7 +182,7 @@ class SimulatorProcess {
       console.warn(`Port ${SIMULATOR_PORT} is in use; using the simulator that answers there.`);
       await beginSimulation().catch(error => {
         throw new Error(
-          `포트 ${SIMULATOR_PORT} 을(를) 다른 프로그램이 쓰고 있어 시뮬레이터를 시작할 수 없습니다 (${String(error)}).`,
+          texts().portInUse(SIMULATOR_PORT, String(error)),
         );
       });
       return;
@@ -204,7 +205,7 @@ class SimulatorProcess {
       logServerOutput('error', text);
     });
     child.on('close', code => {
-      const message = `서버 종료: ${code}`;
+      const message = `Server stopped: ${code}`;
       console.log(message);
       logServerOutput('out', message);
       if (this.child === child) {
@@ -216,7 +217,7 @@ class SimulatorProcess {
     let gaveUp = false;
     const failed = new Promise<never>((_, reject) => {
       child.once('error', reject);
-      child.once('exit', code => reject(new Error(`시뮬레이터가 시작 중에 종료되었습니다 (코드 ${code}).`)));
+      child.once('exit', code => reject(new Error(texts().exitedWhileStarting(String(code)))));
     });
     // Ready means: the first /begin succeeds. Before that, the port is closed or the
     // routes are not registered yet, so keep trying until the deadline.
@@ -230,7 +231,7 @@ class SimulatorProcess {
           if (gaveUp) return;
           if (Date.now() > deadline) {
             throw new Error(
-              `시뮬레이터가 ${START_TIMEOUT_MS / 1000}초 안에 시작되지 않았습니다 (${String(error)}).`,
+              texts().startTimeout(START_TIMEOUT_MS / 1000, String(error)),
             );
           }
           await sleep(POLL_MS);

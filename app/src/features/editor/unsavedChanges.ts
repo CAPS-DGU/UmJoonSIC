@@ -1,6 +1,26 @@
 import { tabKind, useEditorTabStore } from '@/features/editor/editorTabStore';
+import type { UnsavedChangesChoice } from '@shared/ipc';
 import { useProjectStore } from '@/features/project/projectStore';
-import { useInfoModalStore } from '@/stores/infoModalStore';
+import { strings } from '@/i18n';
+import { ask, showError } from '@/stores/dialogStore';
+
+/** The app's dialog: save, don't save, or cancel (Escape). */
+function askAboutChanges(fileNames: string[]): Promise<UnsavedChangesChoice> {
+  const t = strings();
+  return ask<UnsavedChangesChoice>({
+    title: t.unsaved.title,
+    message:
+      fileNames.length === 1 ? t.unsaved.one(fileNames[0]) : t.unsaved.many(fileNames.length),
+    detail: `${fileNames.length > 1 ? fileNames.join('\n') + '\n\n' : ''}${t.unsaved.detail}`,
+    tone: 'warning',
+    buttons: [
+      { label: t.common.cancel, value: 'cancel', variant: 'plain' },
+      { label: t.unsaved.dontSave, value: 'discard', variant: 'plain' },
+      { label: t.unsaved.save, value: 'save', variant: 'primary' },
+    ],
+    cancelValue: 'cancel',
+  });
+}
 
 /** A question is on screen; another request to close waits for no second question. */
 let asking = false;
@@ -20,9 +40,10 @@ export async function resolveUnsavedChanges(filePaths?: string[]): Promise<boole
   if (asking) return false;
 
   asking = true;
+  // A window close waits for the answer (the main process would otherwise close after 3 s).
+  window.api.setAsking(true);
   try {
-    const res = await window.api.confirmUnsavedChanges(modified.map(tab => tab.title));
-    const choice = res.success ? res.data : 'cancel';
+    const choice = await askAboutChanges(modified.map(tab => tab.title));
     if (choice === 'cancel') return false;
 
     const { saveTab, setModified } = useEditorTabStore.getState();
@@ -37,7 +58,7 @@ export async function resolveUnsavedChanges(filePaths?: string[]): Promise<boole
       const saved = isSettings ? (await saveSettings()).success : await saveTab(tab.filePath);
       if (!saved) {
         // Nothing is closed, so nothing is lost; the user can try again or not save.
-        useInfoModalStore.getState().show('저장 실패', `${tab.title} 을(를) 저장하지 못했습니다.`);
+        void showError(strings().messages.saveFailed(tab.title));
         return false;
       }
       if (isSettings) setModified(tab.filePath, false);
@@ -45,6 +66,7 @@ export async function resolveUnsavedChanges(filePaths?: string[]): Promise<boole
     return true;
   } finally {
     asking = false;
+    window.api.setAsking(false);
   }
 }
 

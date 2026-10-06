@@ -1,4 +1,5 @@
 import { registerFileHandlers } from './files';
+import { registerPreferenceHandlers } from './preferences';
 import { registerProjectHandlers } from './project';
 import { registerServerHandlers } from './server';
 import { registerWindowHandlers } from './window';
@@ -9,4 +10,5 @@ export function registerIpcHandlers() {
   registerFileHandlers();
   registerServerHandlers();
   registerWindowHandlers();
+  registerPreferenceHandlers();
 }

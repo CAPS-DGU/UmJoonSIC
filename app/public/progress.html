@@ -8,57 +8,96 @@
       content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'"
     />
     <style>
+      /* The window is the card: no frame around it. Light or dark, as the app (?theme=). */
+      :root {
+        --bg: #ffffff;
+        --text: #111827;
+        --muted: #4b5563;
+        --track: #e5e7eb;
+        --bar: #2563eb;
+        --fail: #dc2626;
+      }
+      :root.dark {
+        color-scheme: dark; /* scroll bars and form controls follow */
+        --bg: #1f2937;
+        --text: #f9fafb;
+        --muted: #d1d5db;
+        --track: #374151;
+        --bar: #60a5fa;
+        --fail: #f87171;
+      }
+      html,
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        padding: 20px;
-        background: #f5f5f5;
+        height: 100%;
         margin: 0;
       }
-      .container {
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      body {
+        font-family:
+          'Pretendard Variable',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Malgun Gothic',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+        padding: 0 24px;
+        box-sizing: border-box;
+        -webkit-app-region: drag;
+        user-select: none;
       }
-      .title {
-        font-size: 16px;
+      #heading {
+        font-size: 15px;
         font-weight: 600;
-        margin-bottom: 15px;
-        color: #333;
       }
-      .progress-container {
-        width: 100%;
-        background: #e0e0e0;
+      .track {
+        height: 8px;
+        background: var(--track);
         border-radius: 4px;
         overflow: hidden;
-        margin-bottom: 10px;
       }
-      .progress-bar {
-        height: 20px;
-        background: linear-gradient(90deg, #007aff, #5856d6);
+      #bar {
+        height: 100%;
         width: 0%;
-        transition: width 0.3s ease;
-        border-radius: 4px;
+        background: var(--bar);
+        transition: width 0.2s ease;
       }
-      .status {
-        font-size: 14px;
-        color: #666;
-        text-align: center;
+      #status {
+        font-size: 13px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      body.failed #heading,
+      body.failed #status {
+        color: var(--fail);
+      }
+      body.failed #bar {
+        width: 100% !important;
+        background: var(--fail);
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div class="title">다운로드 중...</div>
-      <div class="progress-container">
-        <div class="progress-bar" id="progressBar"></div>
-      </div>
-      <div class="status" id="status">다운로드를 시작합니다...</div>
-    </div>
+    <div id="heading"></div>
+    <div class="track"><div id="bar"></div></div>
+    <div id="status"></div>
     <script>
-      window.updateProgress = function (percent, status) {
-        document.getElementById('progressBar').style.width = percent + '%';
-        document.getElementById('status').textContent = status;
+      if (new URLSearchParams(location.search).get('theme') === 'dark') {
+        document.documentElement.classList.add('dark');
+      }
+      /** Called by the main process: { heading, percent, status, failed }. */
+      window.setProgress = function (state) {
+        if (state.heading !== undefined)
+          document.getElementById('heading').textContent = state.heading;
+        if (state.percent !== undefined)
+          document.getElementById('bar').style.width = state.percent + '%';
+        if (state.status !== undefined)
+          document.getElementById('status').textContent = state.status;
+        document.body.classList.toggle('failed', !!state.failed);
       };
     </script>
   </body>

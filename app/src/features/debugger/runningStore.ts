@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import path from 'path-browserify';
 import { simulator } from '@/api/simulator';
-import type { LoadedFile } from '@/api/types';
+import type { LoadedFile, Registers } from '@/api/types';
+import { deviceHex, devicesUsed } from '@/features/debugger/lib/deviceUse';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
@@ -11,54 +12,90 @@ import {
   listingTabPath,
   useListingStore,
 } from '@/features/listing/listingStore';
+import { useConsoleStore } from '@/features/panel/consoleStore';
 import { useErrorStore } from '@/features/panel/errorStore';
+import { usePanelStore } from '@/features/panel/panelStore';
 import { useWatchStore } from '@/features/panel/watchStore';
+import { usableDevicePaths } from '@/features/project/devicePaths';
 import { useProjectStore } from '@/features/project/projectStore';
-import { toProjectRelativePath } from '@/lib/projectPath';
-import { useInfoModalStore } from '@/stores/infoModalStore';
+import { strings } from '@/i18n';
+import { resolveInProject, toProjectRelativePath } from '@/lib/projectPath';
+import { ask, showError } from '@/stores/dialogStore';
+import { notify } from '@/stores/toastStore';
 
-const DEFAULT_DELAY_MS = 1000;
+/** 100 ms: ten instructions a second, slow enough to follow, fast enough for a loop. */
+export const DEFAULT_INTERVAL_MS = 100;
 /** The longest delay a timer can wait (about 24 days); a longer one would run at once. */
 const MAX_DELAY_MS = 2 ** 31 - 1;
+/**
+ * Below this interval the run is "fast": the screen is not redrawn after every instruction
+ * (registers at most every FAST_REGISTERS_MS, memory and variables every FAST_VIEWS_MS), so
+ * that the simulator, not the drawing, sets the speed. The program is still checked after
+ * every instruction for a breakpoint or its end.
+ */
+const FAST_BELOW_MS = 20;
+const FAST_REGISTERS_MS = 50;
+const FAST_VIEWS_MS = 250;
+/** How often the instructions-per-second figure of the status bar is updated. */
+const RATE_WINDOW_MS = 500;
 
-/** The delay setting is kept for the next start of the app (it is the user's, not the project's). */
-const DELAY_STORAGE_KEY = 'umjoonsic.delayTime';
+/** The interval is kept for the next start of the app (it is the user's, not the project's). */
+const INTERVAL_STORAGE_KEY = 'umjoonsic.runInterval';
 
-function readSavedDelay() {
+function readSavedInterval() {
   try {
-    const saved = parseFloat(localStorage.getItem(DELAY_STORAGE_KEY) ?? '');
-    return Number.isFinite(saved) && saved >= 0 ? Math.min(saved, MAX_DELAY_MS) : DEFAULT_DELAY_MS;
+    const saved = parseFloat(localStorage.getItem(INTERVAL_STORAGE_KEY) ?? '');
+    return Number.isFinite(saved) && saved >= 0
+      ? Math.min(saved, MAX_DELAY_MS)
+      : DEFAULT_INTERVAL_MS;
   } catch {
-    return DEFAULT_DELAY_MS;
+    return DEFAULT_INTERVAL_MS;
   }
 }
 
-function saveDelay(delayMs: number) {
+function saveInterval(ms: number) {
   try {
-    localStorage.setItem(DELAY_STORAGE_KEY, String(delayMs));
+    localStorage.setItem(INTERVAL_STORAGE_KEY, String(ms));
   } catch (error) {
-    console.warn('The delay setting could not be saved:', error);
+    console.warn('The interval could not be saved:', error);
   }
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const formatAddress = (pc: number) => `0x${pc.toString(16).toUpperCase().padStart(6, '0')}`;
+
+/** Why the program is not advancing (shown in the status bar). */
+export type StopReason = 'start' | 'pause' | 'step' | 'breakpoint' | 'halt';
 
 interface RunningState {
-  /** A program is loaded in the simulator and the debugger toolbar is showing. */
+  /** A program is loaded in the simulator (also after it halted, until Stop). */
   isRunning: boolean;
-  /** A program is being assembled and loaded (Run was clicked). */
+  /** A program is being assembled and loaded. */
   isStarting: boolean;
-  /** Auto-play is not advancing (the program waits for Step or Continue). */
+  /** Auto-play is not advancing (the program waits for Step or Continue, or it halted). */
   isPaused: boolean;
-  /** Delay between instructions while auto-playing, in ms; kept across app starts. */
+  /** The program ended (it jumps to itself). Its final state stays on screen until Stop. */
+  isHalted: boolean;
+  stopReason: StopReason;
+  /** Instructions executed since the program was loaded. */
+  stepCount: number;
+  /** Instructions per second while auto-playing (0 otherwise). */
+  rate: number;
+  /** The last Run or Step did not start: the program has errors (shown while they remain). */
+  loadFailed: boolean;
+  /** Time between instructions while auto-playing, in ms; changes apply at once. */
   delayTime: number;
   setDelayTime: (delayTime: number) => void;
-  /** Save the open tabs, assemble the project and load it. False if that failed. */
+  /** Save the open tabs, check the project, assemble and load it. False if that failed. */
   loadProgram: () => Promise<boolean>;
   /** Load the program and stop at its first instruction. */
   run: () => Promise<void>;
-  /** Load the program and auto-play it with the delay setting. */
+  /** Load the program and run it at the interval. */
   runWithDelay: () => Promise<void>;
+  /** F5: run (nothing loaded, or halted), or continue (paused). */
+  startOrContinue: () => Promise<void>;
+  /** F10: one instruction (paused), or load and stop at the first one (nothing loaded). */
+  stepOrStart: () => Promise<void>;
   /** Auto-play from where the program stands (Continue). */
   resume: () => void;
   pause: () => void;
@@ -72,18 +109,38 @@ interface RunningState {
   showListings: () => Promise<void>;
 }
 
+/**
+ * Devices the user chose to run without (their file cannot be used on this computer); the
+ * simulator gets them as unconnected, so it creates no file named like their path.
+ */
+let skippedDevices = new Set<number>();
+
+/** Device files may be relative to the project (portable between computers) or absolute. */
+function absoluteDevices() {
+  const { settings, projectPath } = useProjectStore.getState();
+  return settings.filedevices
+    .filter(device => !skippedDevices.has(device.index))
+    .map(device => ({
+      ...device,
+      filename: resolveInProject(projectPath, device.filename),
+    }));
+}
+
 /** Restart the simulation in the current machine mode with the project's file devices. */
 function beginSimulation() {
   const { mode } = useMemoryViewStore.getState();
-  const { settings } = useProjectStore.getState();
-  return simulator.begin(mode, settings.filedevices);
+  return simulator.begin(mode, absoluteDevices());
 }
 
 /** The tab that shows the listing of a loaded file (named as the simulator names it). */
 const listingTab = (fileName: string) => ({
-  title: `List: ${fileName.split('/').pop()!}`,
+  title: strings().tabs.listing(fileName.split('/').pop()!),
   filePath: listingTabPath(fileName),
 });
+
+/** Open the project settings tab (from a message's button). */
+const openSettings = () =>
+  useEditorTabStore.getState().openTab({ title: 'project.sic', filePath: 'project.sic' });
 
 /** Open a List tab for every loaded file and register its listing and watch variables. */
 function publishLoadedFiles(files: LoadedFile[]) {
@@ -101,6 +158,7 @@ function publishLoadedFiles(files: LoadedFile[]) {
 /** Record the assembler errors, show a linker error if any, and open the first failing file. */
 function publishLoadErrors(files: LoadedFile[], projectPath: string) {
   const { setErrors } = useErrorStore.getState();
+  const t = strings();
   files.forEach(file => {
     if (file.assemblerErrors?.length) {
       setErrors(
@@ -115,9 +173,11 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
       );
     }
     if (file.linkerError) {
-      useInfoModalStore
-        .getState()
-        .show('링커 에러', `[에러 발생 단계: ${file.linkerError.phase}]\n${file.linkerError.msg}`);
+      void showError(
+        t.messages.linkerError,
+        file.linkerError.msg,
+        t.messages.linkerPhase(file.linkerError.phase),
+      );
     }
   });
 
@@ -134,6 +194,96 @@ function publishLoadErrors(files: LoadedFile[], projectPath: string) {
 }
 
 /**
+ * Before assembling: files the project lists must exist (otherwise the simulator reports a
+ * raw "ENOENT"), and device files should (a path from another computer makes the simulator
+ * create a stray file). False if the user should fix the project first.
+ */
+async function checkProjectFiles(): Promise<boolean> {
+  const t = strings();
+  const { settings, projectPath } = useProjectStore.getState();
+
+  if (settings.asm.length === 0) {
+    const choice = await ask<'close' | 'settings'>({
+      title: t.messages.missingAsmTitle,
+      message: t.messages.noAsm,
+      tone: 'error',
+      buttons: [
+        { label: t.common.close, value: 'close', variant: 'plain' },
+        { label: t.messages.openSettings, value: 'settings', variant: 'primary' },
+      ],
+      cancelValue: 'close',
+    });
+    if (choice === 'settings') void openSettings();
+    return false;
+  }
+
+  const asmExists = await window.api.pathExists(
+    settings.asm.map(file => path.join(projectPath, file)),
+  );
+  const missing = settings.asm.filter(
+    (_, i) => asmExists.success && asmExists.data && !asmExists.data[i],
+  );
+  if (missing.length > 0) {
+    const choice = await ask<'close' | 'settings'>({
+      title: t.messages.missingAsmTitle,
+      message: t.messages.missingAsm(missing.join(', ')),
+      tone: 'error',
+      buttons: [
+        { label: t.common.close, value: 'close', variant: 'plain' },
+        { label: t.messages.openSettings, value: 'settings', variant: 'primary' },
+      ],
+      cancelValue: 'close',
+    });
+    if (choice === 'settings') void openSettings();
+    return false;
+  }
+
+  skippedDevices = new Set();
+  const devices = absoluteDevices().filter(d => d.filename);
+  const usable = await usableDevicePaths(
+    projectPath,
+    devices.map(d => d.filename),
+  );
+  const unusable = devices.filter((_, i) => !usable[i]);
+  if (unusable.length > 0) {
+    const first = unusable[0];
+    const choice = await ask<'cancel' | 'settings' | 'run'>({
+      title: t.messages.deviceTitle,
+      message: t.messages.deviceFileMissing(deviceHex(first.index), first.filename),
+      tone: 'warning',
+      buttons: [
+        { label: t.common.cancel, value: 'cancel', variant: 'plain' },
+        { label: t.messages.runWithoutDevice, value: 'run', variant: 'plain' },
+        { label: t.messages.openSettings, value: 'settings', variant: 'primary' },
+      ],
+      cancelValue: 'cancel',
+    });
+    if (choice === 'settings') void openSettings();
+    if (choice !== 'run') return false;
+    skippedDevices = new Set(unusable.map(d => d.index));
+  }
+  return true;
+}
+
+/** After loading: a device the program uses but the project does not connect (warning only). */
+function warnUnconnectedDevices(files: LoadedFile[]) {
+  const connected = new Set(useProjectStore.getState().settings.filedevices.map(d => d.index));
+  const unconnected = [
+    ...new Set(
+      devicesUsed(files.map(f => f.listing.rows))
+        .filter(u => !connected.has(u.device))
+        .map(u => u.device),
+    ),
+  ];
+  if (unconnected.length === 0) return;
+  const t = strings();
+  notify('warning', t.messages.unmappedDevice(unconnected.map(deviceHex).join(', ')), {
+    label: t.messages.openSettings,
+    run: () => void openSettings(),
+  });
+}
+
+/**
  * Read the memory the views show (the memory viewer and the watch list) again. With
  * `markChanges`, the memory viewer flashes the bytes that changed (after a step).
  */
@@ -146,81 +296,216 @@ function refreshMemoryViews({ markChanges }: { markChanges: boolean }) {
 }
 
 /**
- * Identifies the current run. Starting or stopping a run changes it, so that work begun for
- * an earlier run (a step, a load, an auto-play loop) ends without touching the new one.
+ * Identifies the current auto-play loop or step sequence. Pause, Continue, Stop and a new run
+ * change it, so that a loop begun earlier ends without driving the new one.
  */
 let runId = 0;
 
-/** Steps run one after another, also when Step is clicked faster than the simulator answers. */
+/**
+ * Identifies the loaded program. Only loading and Stop change it: a step that answers after
+ * one of those belongs to a program that is gone, and its result is dropped. (A step that
+ * answers after Pause still belongs to the program on screen, and is shown.)
+ */
+let loadId = 0;
+
+/**
+ * The simulator's PC after the last instruction it executed (or after loading), which the
+ * screen may not show yet in fast mode. The program has halted when an instruction leaves
+ * the PC where it was (it jumps to itself).
+ */
+let simulatorPC = 0;
+
+/**
+ * Every instruction goes through this queue, in auto-play and from Step alike, so that the
+ * simulator never gets two at once (Step clicked faster than it answers, or Step right after
+ * Pause while a fast-mode instruction is still on its way).
+ */
 let lastStep: Promise<unknown> = Promise.resolve();
+
+function enqueueStep<T>(work: () => Promise<T>): Promise<T> {
+  const step = lastStep.then(work);
+  lastStep = step.catch(() => {});
+  return step;
+}
+
+type StepResult = { ok: true; registers: Registers; halted: boolean } | { ok: false };
+
+/** Execute one instruction in the simulator. Only call it from a queued step (enqueueStep). */
+async function simulatorStep(): Promise<StepResult> {
+  const data = await simulator.step();
+  if (!data.ok) return { ok: false };
+  const halted = data.registers.PC === simulatorPC;
+  simulatorPC = data.registers.PC;
+  return { ok: true, registers: data.registers, halted };
+}
 
 /** A program being loaded; Run clicked again meanwhile waits for it instead of loading twice. */
 let starting: Promise<boolean> | null = null;
 
 export const useRunningStore = create<RunningState>((set, get) => {
+  /** The program ended: keep everything on screen and say so (status bar, listing). */
+  const enterHalted = async () => {
+    runId++;
+    set({ isPaused: true, isHalted: true, stopReason: 'halt', rate: 0 });
+    useConsoleStore
+      .getState()
+      .addRunLine(
+        strings().state.logHalted(formatAddress(useRegisterStore.getState().PC), get().stepCount),
+      );
+    await refreshMemoryViews({ markChanges: true });
+  };
+
   /**
-   * Execute one instruction of the run `forRun` and refresh the views. When the program has
-   * halted (the PC did not move), the run is stopped. Resolves to false if the run cannot go on.
+   * Execute one instruction of the run `forRun` and refresh the views. Resolves to false if
+   * the run cannot go on (it halted, failed or was stopped).
    */
-  const executeStep = (forRun: number): Promise<boolean> => {
-    const step = lastStep.then(async () => {
-      if (forRun !== runId || !get().isRunning) return false;
-      const result = await useRegisterStore.getState().step();
-      if (forRun !== runId) return false;
-      if (result === 'failed') return false;
-      if (result === 'halted') {
-        await get().stopRunning();
+  const executeStep = (forRun: number): Promise<boolean> =>
+    enqueueStep(async () => {
+      if (forRun !== runId || !get().isRunning || get().isHalted) return false;
+      const forLoad = loadId;
+      const result = await simulatorStep();
+      if (forLoad !== loadId || !result.ok) return false;
+      // Shown even if the user paused meanwhile: it is where the program now stands.
+      useRegisterStore.getState().setAll(result.registers);
+      set(state => ({ stepCount: state.stepCount + 1 }));
+      if (result.halted) {
+        await enterHalted();
         return false;
       }
       await refreshMemoryViews({ markChanges: true });
       return forRun === runId;
     });
-    lastStep = step.catch(() => {});
-    return step;
-  };
 
   /**
-   * Execute an instruction every `delayMs` until the user pauses or stops. The program pauses
-   * when the PC reaches a row with a breakpoint, before that row is executed.
+   * Auto-play: an instruction every interval until the user pauses or stops, the program
+   * reaches a breakpoint (before that row runs) or halts. The interval is read before every
+   * instruction, so a change applies at once; below FAST_BELOW_MS the screen is redrawn
+   * only now and then (see there).
    */
-  const autoPlay = async (delayMs: number) => {
+  const autoPlay = async () => {
     const forRun = ++runId;
-    const isCurrent = () => forRun === runId && get().isRunning && !get().isPaused;
-    set({ isPaused: false });
+    const forLoad = loadId;
+    const isCurrent = () =>
+      forRun === runId && get().isRunning && !get().isPaused && !get().isHalted;
+    set({ isPaused: false, stopReason: 'start' });
+
+    let registers: Registers = useRegisterStore.getState();
+    let lastStepAt = Date.now();
+    let lastRegistersAt = 0;
+    let lastViewsAt = Date.now();
+    let rateSince = Date.now();
+    let rateSteps = 0;
+    let unpublished = 0;
+
+    /** Show what fast mode has not shown yet. */
+    const publish = async () => {
+      if (unpublished > 0) {
+        useRegisterStore.getState().setAll(registers);
+        set(state => ({ stepCount: state.stepCount + unpublished }));
+        unpublished = 0;
+      }
+    };
+    const stopAt = async (reason: StopReason) => {
+      await publish();
+      set({ isPaused: true, stopReason: reason, rate: 0 });
+      await refreshMemoryViews({ markChanges: true });
+    };
+
     try {
-      // The delay is counted from the start of one step to the start of the next.
-      let nextStepAt = Date.now() + delayMs;
       while (isCurrent()) {
-        await sleep(Math.max(0, nextStepAt - Date.now()));
-        if (!isCurrent()) return;
-        nextStepAt = Date.now() + delayMs;
-        const stepped = await executeStep(forRun);
-        if (!isCurrent()) return;
-        if (!stepped) {
-          // The step failed (the run itself goes on): stop auto-playing.
-          set({ isPaused: true });
-          return;
+        const interval = get().delayTime;
+        if (interval >= FAST_BELOW_MS) {
+          // Slow: every instruction is shown as it happens.
+          await publish();
+          // Wait out the interval, read again as it passes: a shorter one chosen meanwhile
+          // applies at once, not after the longer wait already begun.
+          while (isCurrent() && Date.now() < lastStepAt + get().delayTime) {
+            await sleep(Math.min(50, lastStepAt + get().delayTime - Date.now()));
+          }
+          if (!isCurrent()) return;
+          lastStepAt = Date.now();
+          const stepped = await executeStep(forRun);
+          if (!isCurrent()) return;
+          if (!stepped) {
+            // The step failed (the run itself goes on): stop auto-playing.
+            if (!get().isHalted) set({ isPaused: true, stopReason: 'pause', rate: 0 });
+            return;
+          }
+          registers = useRegisterStore.getState();
+        } else {
+          // Fast: the screen catches up now and then.
+          if (interval > 0) await sleep(interval);
+          if (!isCurrent()) break;
+          lastStepAt = Date.now();
+          const result = await enqueueStep(() => simulatorStep());
+          // Stopped, or another program loaded: this answer belongs to a program that is gone.
+          if (forLoad !== loadId) return;
+          if (!result.ok) {
+            if (forRun === runId) await stopAt('pause');
+            else await publish();
+            return;
+          }
+          registers = result.registers;
+          unpublished++;
+          if (result.halted) {
+            await publish();
+            await enterHalted();
+            return;
+          }
+          // Paused (or continued in a new loop) while this instruction was on its way: show it.
+          if (forRun !== runId) break;
+          const now = Date.now();
+          if (now - lastRegistersAt >= FAST_REGISTERS_MS) {
+            lastRegistersAt = now;
+            await publish();
+          }
+          if (now - lastViewsAt >= FAST_VIEWS_MS) {
+            lastViewsAt = now;
+            void refreshMemoryViews({ markChanges: false });
+          }
         }
-        if (breakpointAt(useListingStore.getState().listings, useRegisterStore.getState().PC)) {
-          set({ isPaused: true });
+        rateSteps++;
+        const elapsed = Date.now() - rateSince;
+        if (elapsed >= RATE_WINDOW_MS) {
+          set({ rate: Math.round((rateSteps * 1000) / elapsed) });
+          rateSince = Date.now();
+          rateSteps = 0;
+        }
+        if (breakpointAt(useListingStore.getState().listings, registers.PC)) {
+          await stopAt('breakpoint');
           return;
         }
       }
+      // Paused by the user (not stopped, not halted): show where the program stands.
+      if (forLoad === loadId && get().isRunning && !get().isHalted && unpublished > 0) {
+        await publish();
+        await refreshMemoryViews({ markChanges: false });
+      }
     } catch (error) {
       console.error('Auto-play stopped:', error);
-      if (forRun === runId) set({ isPaused: true });
+      if (forRun === runId) await stopAt('pause');
     }
   };
 
   /** Load the program and show it, stopped at its first instruction. False if that failed. */
   const start = () => {
     starting ??= (async () => {
-      set({ isStarting: true });
+      set({ isStarting: true, loadFailed: false });
       try {
         const forRun = ++runId;
+        loadId++;
+        // An instruction still on its way must not run in the program loaded next.
+        await Promise.race([lastStep, sleep(2000)]);
         if (!(await get().loadProgram())) return false;
         if (forRun !== runId) return false;
-        set({ isRunning: true, isPaused: true });
+        set({
+          isRunning: true,
+          isPaused: true,
+          isHalted: false,
+          stopReason: 'start',
+          stepCount: 0,
+          rate: 0,
+        });
         await refreshMemoryViews({ markChanges: false });
         return true;
       } finally {
@@ -235,30 +520,38 @@ export const useRunningStore = create<RunningState>((set, get) => {
     isRunning: false,
     isStarting: false,
     isPaused: true,
-    delayTime: readSavedDelay(),
+    isHalted: false,
+    stopReason: 'start',
+    stepCount: 0,
+    rate: 0,
+    loadFailed: false,
+    delayTime: readSavedInterval(),
 
     setDelayTime: delayMs => {
-      const delayTime = Math.min(delayMs, MAX_DELAY_MS);
+      const delayTime = Math.max(0, Math.min(delayMs, MAX_DELAY_MS));
       set({ delayTime });
-      saveDelay(delayTime);
+      saveInterval(delayTime);
     },
 
     loadProgram: async () => {
       const forRun = runId;
       const { projectPath, settings } = useProjectStore.getState();
+      const t = strings();
+
+      // Unsaved edits first, so that the check and the assembler see what is on screen.
+      const { success } = await useEditorTabStore.getState().saveAllTabs();
+      if (!success) return false;
+      if (!(await checkProjectFiles())) return false;
+      if (forRun !== runId) return false;
 
       const begun = await beginSimulation();
       if (!begun.ok) {
         // For example a file device that cannot be opened (project.sic edited by hand).
-        useInfoModalStore
-          .getState()
-          .show('시뮬레이터 오류', begun.message ?? '시뮬레이션을 시작하지 못했습니다.');
+        void showError(t.messages.simulatorError, begun.message ?? t.messages.simulatorErrorDetail);
         return false;
       }
       // The memory of an earlier run is gone from the simulator; stop showing it.
       await useMemoryViewStore.getState().reload();
-      const { success } = await useEditorTabStore.getState().saveAllTabs();
-      if (!success) return false;
 
       const data = await simulator.load({
         filePaths: settings.asm.map(file => path.join(projectPath, file)),
@@ -271,38 +564,71 @@ export const useRunningStore = create<RunningState>((set, get) => {
       // This load's errors replace those of the last one.
       useErrorStore.getState().clearErrors(undefined, 'load');
       if (!data.ok) {
-        publishLoadErrors(data.files, projectPath);
+        if (Array.isArray(data.files)) {
+          publishLoadErrors(data.files, projectPath);
+          usePanelStore.getState().setActiveTab('errors');
+        } else {
+          // No per-file result: the simulator could not even assemble (it says why).
+          void showError(
+            t.messages.simulatorError,
+            data.message ?? t.messages.simulatorErrorDetail,
+          );
+        }
         await get().stopRunning();
+        set({ loadFailed: true });
         return false;
       }
       useRegisterStore.getState().setAll(data.registers);
+      simulatorPC = data.registers.PC;
       publishLoadedFiles(data.files);
+      // While a program runs, the variables are what to watch.
+      usePanelStore.getState().setActiveTab('watch');
+      useConsoleStore.getState().addRunLine(t.state.logLoaded(settings.asm.join(', ')));
+      warnUnconnectedDevices(data.files);
       return true;
     },
 
     run: async () => {
+      if (get().isRunning) await get().stopRunning();
       await start();
     },
 
     runWithDelay: async () => {
+      if (get().isRunning) await get().stopRunning();
       if (await start()) {
-        void autoPlay(get().delayTime);
+        void autoPlay();
       }
     },
 
+    startOrContinue: async () => {
+      const { isRunning, isHalted, isPaused, isStarting } = get();
+      if (isStarting) return;
+      if (!isRunning || isHalted) await get().runWithDelay();
+      else if (isPaused) get().resume();
+    },
+
+    stepOrStart: async () => {
+      const { isRunning, isHalted, isPaused, isStarting } = get();
+      if (isStarting || isHalted) return;
+      if (!isRunning) await get().run();
+      else if (isPaused) await get().stepOnce();
+    },
+
     resume: () => {
-      if (get().isRunning) {
-        void autoPlay(get().delayTime);
+      if (get().isRunning && !get().isHalted) {
+        void autoPlay();
       }
     },
 
     pause: () => {
+      if (!get().isRunning || get().isPaused) return;
       runId++;
-      set({ isPaused: true });
+      set({ isPaused: true, stopReason: 'pause', rate: 0 });
     },
 
     stepOnce: async () => {
-      if (get().isRunning && get().isPaused) {
+      if (get().isRunning && get().isPaused && !get().isHalted) {
+        set({ stopReason: 'step' });
         await executeStep(runId);
       }
     },
@@ -314,11 +640,12 @@ export const useRunningStore = create<RunningState>((set, get) => {
 
     stopRunning: async () => {
       runId++;
+      loadId++;
       // Whatever the simulator answers, the run is over for the user.
       useListingStore.getState().clearListings();
       useEditorTabStore.getState().closeListingTabs();
       useWatchStore.getState().clearWatch();
-      set({ isPaused: true, isRunning: false });
+      set({ isPaused: true, isRunning: false, isHalted: false, stopReason: 'start', rate: 0 });
       try {
         const data = await beginSimulation();
         if (!data.ok) console.error('Failed to reset the simulation:', data.message);

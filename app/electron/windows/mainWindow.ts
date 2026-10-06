@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import { is } from '@electron-toolkit/utils';
 import { AppEvent } from '../../shared/ipc';
 import { PRELOAD_PATH, rendererFile } from '../paths';
+import { getPreferences } from '../preferences';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -75,6 +76,8 @@ export function createMainWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     autoHideMenuBar: false,
+    // The page's background, so that nothing flashes white in the dark theme.
+    backgroundColor: getPreferences().theme === 'dark' ? '#111827' : '#ffffff',
     webPreferences: {
       preload: PRELOAD_PATH,
       // The preload is an ES module, which a sandboxed preload cannot be. Node stays out of
@@ -91,6 +94,11 @@ export function createMainWindow(): BrowserWindow {
     event.preventDefault();
     quitPending = quitRequested;
     quitRequested = false;
+    // The question is asked in the page: a minimised or hidden window must come forward,
+    // or the app waits on a dialog nobody can see (quit from the dock or the taskbar).
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
     window.webContents.send(AppEvent.closeRequested);
     // A page that lost its handlers (a crashed React tree) never asks: do not keep the
     // window (and the app) from closing for good.
@@ -105,6 +113,23 @@ export function createMainWindow(): BrowserWindow {
   window.webContents.on('did-start-loading', forgetChanges);
   window.on('unresponsive', () => (isUnresponsive = true));
   window.on('responsive', () => (isUnresponsive = false));
+
+  // Keys a menu item cannot carry (one accelerator per item): Ctrl+Tab and Ctrl+Shift+Tab
+  // switch tabs, Ctrl+= and the numpad's + and - zoom (the View menu has Ctrl++ and Ctrl+-).
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt) return;
+    const contents = window.webContents;
+    if (input.key === 'Tab') {
+      event.preventDefault();
+      contents.send(input.shift ? AppEvent.previousTab : AppEvent.nextTab);
+    } else if ((input.key === '=' && !input.shift) || input.code === 'NumpadAdd') {
+      event.preventDefault();
+      contents.setZoomLevel(Math.min(contents.getZoomLevel() + 0.5, 9));
+    } else if (input.code === 'NumpadSubtract') {
+      event.preventDefault();
+      contents.setZoomLevel(Math.max(contents.getZoomLevel() - 0.5, -8));
+    }
+  });
 
   // Links open in the system browser, never in a new app window.
   window.webContents.setWindowOpenHandler(details => {

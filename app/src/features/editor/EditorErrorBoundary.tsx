@@ -1,4 +1,5 @@
 import React from 'react';
+import { strings } from '@/i18n';
 
 interface EditorErrorBoundaryProps {
   children: React.ReactNode;
@@ -31,8 +32,8 @@ export default class EditorErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '1rem', color: 'red' }}>
-          <h2>에디터에서 오류가 발생했습니다 😢</h2>
+        <div className="p-4 text-red-600">
+          <h2 className="font-semibold">{strings().editor.crashed}</h2>
           {this.state.error && (
             <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error.message}</pre>
           )}

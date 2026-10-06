@@ -2,7 +2,8 @@
 import fs from 'fs';
 import { createHash } from 'crypto';
 import { app } from 'electron';
-import { downloadFile } from './download';
+import { texts } from '../i18n';
+import { downloadFile, type DownloadStep } from './download';
 import { getServerPath } from './paths';
 
 const RELEASES_API = 'https://api.github.com/repos/CAPS-DGU/UmJoonSIC/releases';
@@ -36,15 +37,15 @@ export function checkServerExists() {
 }
 
 /** Download simulator.jar of this app version's release. */
-export async function downloadServer() {
+export async function downloadServer(step: DownloadStep) {
   const fromRelease = await releaseAssets('current')
     .then(assets => assetUrl(assets, JAR_NAME))
     .catch(() => undefined);
   const url =
     fromRelease ??
     `https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v${app.getVersion()}/${JAR_NAME}`;
-  console.log('server 다운로드');
-  return downloadFile(JAR_NAME, url);
+  console.log('Downloading simulator.jar');
+  return downloadFile(JAR_NAME, url, step);
 }
 
 /**
@@ -60,17 +61,17 @@ export async function checkJARUpdate() {
     const hasLocal = checkServerExists();
     const res = await fetch(release.hashUrl, { headers: { Accept: 'text/plain' } });
     if (!res.ok) {
-      console.warn('원격 해시 파일을 가져오지 못했습니다:', res.status);
+      console.warn('The remote hash file could not be read:', res.status);
       // Without the hash, a JAR on disk is kept.
-      if (!hasLocal) await downloadFile(JAR_NAME, release.jarUrl);
+      if (!hasLocal) await downloadFile(JAR_NAME, release.jarUrl, { index: 1, total: 1, label: texts().downloadSimulator });
       return;
     }
     const remoteHash = ((await res.text()).trim().split(/\s+/)[0] ?? '').toLowerCase();
     if (!hasLocal || (await sha256(getServerPath())) !== remoteHash) {
-      await downloadFile(JAR_NAME, release.jarUrl);
+      await downloadFile(JAR_NAME, release.jarUrl, { index: 1, total: 1, label: texts().downloadSimulator });
     }
   } catch (error) {
-    console.warn('checkJARUpdate 실패:', error);
+    console.warn('checkJARUpdate failed:', error);
   }
 }
 
@@ -87,7 +88,7 @@ async function findReleaseJar(): Promise<{ jarUrl: string; hashUrl: string } | n
     const hashUrl = assetUrl(assets, HASH_NAME);
     if (jarUrl && hashUrl) return { jarUrl, hashUrl };
   }
-  console.warn('릴리즈에서 simulator.jar 또는 simulator-hash.txt를 찾지 못했습니다.');
+  console.warn('The release has no simulator.jar or simulator-hash.txt.');
   return null;
 }
 

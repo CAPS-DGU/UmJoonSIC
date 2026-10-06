@@ -67,22 +67,23 @@ body {
   display: none;
 }
 
-/* A memory byte that changed flashes. */
+/* A memory byte that changed flashes: a translucent amber, so that the byte stays readable in
+   both themes (solid yellow under orange label text was 2.4:1, and 1.1:1 in the dark theme). */
 @keyframes memory-flash {
   0% {
     background-color: transparent;
     transform: scale(1);
   }
   25% {
-    background-color: #fbbf24; /* yellow-400 */
+    background-color: rgb(245 158 11 / 0.22);
     transform: scale(1.1);
   }
   50% {
-    background-color: #f59e0b; /* yellow-500 */
+    background-color: rgb(245 158 11 / 0.3);
     transform: scale(1.05);
   }
   75% {
-    background-color: #fbbf24; /* yellow-400 */
+    background-color: rgb(245 158 11 / 0.22);
     transform: scale(1.02);
   }
   100% {
@@ -141,8 +142,10 @@ body {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* Primary buttons are the app's blue (like the settings' Save button) in both themes:
+     the palette variables they read are redefined for the dark theme below. */
+  --primary: var(--color-blue-600);
+  --primary-foreground: var(--color-white);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -152,7 +155,7 @@ body {
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: var(--color-blue-500);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -168,15 +171,17 @@ body {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* The dialogs' surface in the dark theme: the app's blue-grey (gray-100, text gray-900 of the
+   palette below), not shadcn's near-black, which stood out against every other surface. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --background: #232933;
+  --foreground: #eff1f4;
+  --card: #232933;
+  --card-foreground: #eff1f4;
+  --popover: #232933;
+  --popover-foreground: #eff1f4;
+  --primary: var(--color-blue-600);
+  --primary-foreground: var(--color-white);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -186,7 +191,7 @@ body {
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: var(--color-blue-500);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -202,23 +207,74 @@ body {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * Dark theme (the `dark` class on <html>, preferencesStore.ts). The app's colours are Tailwind
+ * palette classes (bg-gray-100, text-gray-500, ...), which read these variables: redefining
+ * the palette here turns every screen dark without a `dark:` variant on each class. Greys are
+ * inverted (surfaces dark, text light); light tints (selections, error lines) become dark
+ * tints; the accent text colours get lighter so that they keep their contrast.
+ */
+.dark {
+  --color-white: #181c23;
+  /* Black stays black: it is only the dialogs' backdrop, which must darken in both themes. */
+  --color-gray-50: #1d222b;
+  --color-gray-100: #232933;
+  --color-gray-200: #2e3542;
+  --color-gray-300: #3c4454;
+  --color-gray-400: #8b95a5;
+  --color-gray-500: #a7b0bf;
+  --color-gray-600: #c2c9d4;
+  --color-gray-700: #d5dae2;
+  --color-gray-800: #e4e7ec;
+  --color-gray-900: #eff1f4;
+  --color-gray-950: #f7f8fa;
+  --color-blue-50: #172338;
+  --color-blue-100: #1c3150;
+  --color-blue-200: #234068;
+  --color-blue-300: #3b5f94;
+  --color-blue-600: #6ea8ff;
+  --color-blue-700: #8fbcff;
+  --color-red-50: #3a1d22;
+  --color-red-100: #4a2127;
+  --color-red-200: #6b2a33;
+  --color-red-600: #ff8a8a;
+  --color-red-700: #ffa3a3;
+  --color-green-50: #17301f;
+  --color-green-600: #4ade80;
+  --color-green-800: #86efac;
+  --color-green-700: #6ee7a0;
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdae6b;
+  --color-orange-800: #fdba74;
+  --color-amber-700: #fcd34d;
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    /* Pretendard's contextual alternates draw the x of 0x000018 as a multiplication sign. */
+    font-variant-ligatures: no-contextual;
+  }
+  /* Where the keyboard is: every control shows it the same way. Zero specificity, so a
+     control with its own focus style (outline-none + ring) keeps it. */
+  :where(:focus-visible) {
+    outline: 2px solid var(--color-blue-500);
+    outline-offset: 1px;
   }
 }
 
-/* A register that changed flashes. */
+/* A register that changed flashes (a translucent amber, readable in both themes). */
 @keyframes register-flash {
   0%,
   100% {
-    background-color: #cb601529;
+    background-color: var(--color-white);
   }
   50% {
-    background-color: #f59e0b;
+    background-color: rgb(245 158 11 / 0.45);
   }
 }
 

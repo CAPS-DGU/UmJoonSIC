@@ -43,7 +43,7 @@ function MemoryCell({ cell, labelHighlight, isChanged, isSearched }: MemoryCellP
     <span className="flex justify-center">
       <span
         className={`w-[3ch] shrink-0 text-center rounded
-      ${labelHighlight ? '!text-orange-500 font-semibold' : ''}
+      ${labelHighlight ? '!text-orange-800 font-semibold' : ''}
       ${isChanged ? 'memory-flash' : ''}
       ${isSearched ? 'search-flash' : ''}
       ${cell.isLoading ? 'bg-gray-200 animate-pulse' : ''}
@@ -104,7 +104,7 @@ export function MemoryRows({
         style={{ top: rowIndex * ROW_HEIGHT, height: ROW_HEIGHT }}
       >
         <span
-          className="shrink-0 border-r border-gray-300 pr-2 text-right text-green-600"
+          className="shrink-0 whitespace-nowrap border-r border-gray-300 pr-2 text-right text-green-800"
           style={{ width: `calc(${digits}ch + 0.5rem + 1px)` }}
         >
           {rowStartAddr.toString(16).toUpperCase().padStart(digits, '0')}
@@ -134,10 +134,17 @@ export function MemoryRows({
                 width: `calc(${label.end - label.start + 1} * ${CELL} - 2 * ${CELL_INSET} - 0.5ch)`,
               }}
             >
-              <div className="border-t-2 border-orange-500" />
+              <div className="border-t-2 border-orange-600" />
               {label.beginsHere && (
                 <div
-                  className="whitespace-nowrap text-center text-xs leading-[10px] text-orange-500"
+                  // Near the right edge the name ends at the range's end instead of being
+                  // centred under it (it was cut by the column: "ZER").
+                  className={`whitespace-nowrap text-xs leading-[10px] text-orange-700 ${
+                    label.start >= ROW_SIZE - 2 ? 'text-right' : 'text-center'
+                  }`}
+                  style={
+                    label.start >= ROW_SIZE - 2 ? { position: 'absolute', right: 0 } : undefined
+                  }
                   title={label.name}
                 >
                   {label.name}
