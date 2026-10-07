@@ -61,6 +61,10 @@ export type UiTheme = 'light' | 'dark';
 export interface UiPreferences {
   language: UiLanguage;
   theme: UiTheme;
+  /** The code font size (editor and listing), in px. */
+  editorFontSize: number;
+  /** The simulator's port; a change applies at the next start. */
+  simulatorPort: number;
 }
 
 /** A project the user opened before (the welcome screen lists them). */
@@ -91,6 +95,8 @@ export const IpcChannel = {
   abortClose: 'abortClose',
   getUiPreferences: 'getUiPreferences',
   setUiPreferences: 'setUiPreferences',
+  simulatorPortInUse: 'simulatorPortInUse',
+  relaunchApp: 'relaunchApp',
   getRecentProjects: 'getRecentProjects',
   renamePath: 'renamePath',
   showInFolder: 'showInFolder',
@@ -108,6 +114,7 @@ export const AppEvent = {
   createNewProject: 'create-new-project',
   openProject: 'open-project',
   openRequest: 'open-request',
+  openPreferences: 'open-preferences',
   closeProject: 'close-project',
   /** The window is about to close but the renderer reported unsaved changes. */
   closeRequested: 'close-requested',
@@ -157,8 +164,12 @@ export interface RendererApi {
   /** A file chosen in the system's dialog (an Open dialog, or a Save dialog with `save`). */
   pickFile(options?: PickFileOptions): Promise<IpcResult<string>>;
   restartServer(): Promise<IpcResult>;
-  /** Resolves once the simulator accepts requests (waits while it starts or restarts). */
-  waitForSimulator(): Promise<IpcResult>;
+  /** The simulator's port, once it accepts requests (waits while it starts or restarts). */
+  waitForSimulator(): Promise<IpcResult<number>>;
+  /** The port the simulator was started on (a changed preference applies after a restart). */
+  simulatorPortInUse(): number;
+  /** Start the app again (after a change that needs it), asking about unsaved work first. */
+  relaunchApp(): void;
   /** The simulator output so far (the most recent lines), oldest first. */
   getServerLog(): Promise<IpcResult<ServerLogPayload[]>>;
   /** Tell the main process whether closing the window would lose changes. */

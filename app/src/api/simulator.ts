@@ -1,6 +1,6 @@
-// Client for the simulator: the Java server that the main process starts on
-// port 9090 (electron/simulator/paths.ts holds the same number). Every endpoint
-// is a POST with a JSON body.
+// Client for the simulator: the Java server that the main process starts on the port of the
+// preferences (9090 by default; electron/simulator/paths.ts). Every endpoint is a POST with a
+// JSON body.
 import type { FileDevice } from '@shared/ipc';
 import type {
   LoadRequest,
@@ -13,21 +13,23 @@ import type {
 } from '@/api/types';
 
 // 127.0.0.1, as the simulator binds IPv4 only ('localhost' may try IPv6 first).
-const BASE_URL = 'http://127.0.0.1:9090';
+const HOST = 'http://127.0.0.1';
 
 /**
  * Resolves once the main process has said the simulator accepts requests. Kept: asking before
  * every request was an IPC round trip per request (hundreds a second in a fast run). Asked
  * again after a request could not reach the simulator.
  */
-let ready: Promise<void> | null = null;
+let ready: Promise<number> | null = null;
 
-function simulatorReady(): Promise<void> {
+/** The simulator's port, once it accepts requests. */
+function simulatorReady(): Promise<number> {
   if (!ready) {
     const asked = window.api.waitForSimulator().then(res => {
-      if (!res.success) {
+      if (!res.success || res.data === undefined) {
         throw new Error(`Simulator is not available: ${res.message ?? 'unknown error'}`);
       }
+      return res.data;
     });
     ready = asked;
     // A failed wait is not kept: the next request asks again.
@@ -45,8 +47,8 @@ function simulatorReady(): Promise<void> {
  */
 async function post<T>(route: string, body: unknown): Promise<T> {
   const send = async () => {
-    await simulatorReady();
-    return fetch(`${BASE_URL}${route}`, {
+    const port = await simulatorReady();
+    return fetch(`${HOST}:${port}${route}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

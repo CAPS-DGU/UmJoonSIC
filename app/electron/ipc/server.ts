@@ -1,6 +1,7 @@
 // IPC: the simulator process.
 import { ipcMain } from 'electron';
 import { IpcChannel, type IpcResult } from '../../shared/ipc';
+import { simulatorPort } from '../simulator/paths';
 import { logServerOutput, serverLogHistory, simulatorProcess } from '../simulator/process';
 import { ipcResult, toErrorMessage } from './result';
 
@@ -18,8 +19,13 @@ export function registerServerHandlers() {
     }
   });
 
-  // Resolves when the simulator accepts requests; waits while it is (re)starting.
-  ipcMain.handle(IpcChannel.waitForSimulator, () => ipcResult(() => simulatorProcess.whenReady()));
+  // Resolves with the port when the simulator accepts requests; waits while it is (re)starting.
+  ipcMain.handle(IpcChannel.waitForSimulator, () =>
+    ipcResult(async () => {
+      await simulatorProcess.whenReady();
+      return simulatorPort();
+    }),
+  );
 
   ipcMain.handle(IpcChannel.getServerLog, () => ipcResult(() => serverLogHistory()));
 }

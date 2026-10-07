@@ -1,9 +1,19 @@
 // Where the app keeps the simulator (JRE + simulator.jar) on this machine.
 import path from 'path';
 import { app } from 'electron';
+import { getPreferences } from '../preferences';
 
-/** Port the simulator listens on. The renderer uses the same number (src/api/simulator.ts). */
-export const SIMULATOR_PORT = 9090;
+let portAtStart: number | null = null;
+
+/**
+ * The port the simulator listens on: the preference as it was when the app started (a change
+ * applies at the next start). The renderer asks for it (waitForSimulator), so both sides
+ * always use the same number.
+ */
+export function simulatorPort(): number {
+  portAtStart ??= getPreferences().simulatorPort;
+  return portAtStart;
+}
 
 /** <appData>/umjoonsic: JRE, simulator.jar and downloaded archives live here. */
 export function getSimulatorDataDir() {

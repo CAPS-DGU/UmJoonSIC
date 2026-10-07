@@ -1,3 +1,4 @@
+import { INTERVALS_MS } from '@/features/debugger/intervals';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,6 @@ import { useRunningStore } from '@/features/debugger/runningStore';
 import { useStrings } from '@/i18n';
 
 /** The intervals offered (ms); the Run menu offers the same (electron/menu.ts). */
-const INTERVALS_MS = [0, 10, 50, 100, 250, 500, 1000];
 const CUSTOM = 'custom';
 
 /**

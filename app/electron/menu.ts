@@ -76,6 +76,9 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         mainWindowCommand(t.closeProject, undefined, AppEvent.closeProject),
         { type: 'separator' },
         mainWindowCommand(t.newFile, 'CmdOrCtrl+N', AppEvent.newFile),
+        { type: 'separator' },
+        mainWindowCommand(t.preferences, 'CmdOrCtrl+,', AppEvent.openPreferences),
+        { type: 'separator' },
         {
           label: t.closeTab,
           accelerator: 'CmdOrCtrl+W',

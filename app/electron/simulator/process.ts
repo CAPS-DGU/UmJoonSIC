@@ -1,4 +1,4 @@
-// The simulator process: `java -jar simulator.jar <port>`, serving HTTP on SIMULATOR_PORT.
+// The simulator process: `java -jar simulator.jar <port>`, serving HTTP on the simulator port (paths.ts).
 // The app runs one at a time: started at launch, restarted from the Server panel, killed on quit.
 import { texts } from '../i18n';
 import { BrowserWindow } from 'electron';
@@ -6,7 +6,7 @@ import { type ChildProcess, spawn } from 'child_process';
 import net from 'node:net';
 import { AppEvent, type ServerLogPayload } from '../../shared/ipc';
 import { checkJARUpdate } from './jar';
-import { getJavaPath, getServerPath, SIMULATOR_PORT } from './paths';
+import { getJavaPath, getServerPath, simulatorPort } from './paths';
 
 const HOST = '127.0.0.1';
 /** How long the JVM may take until the simulator accepts connections. */
@@ -64,7 +64,7 @@ async function waitForPortRelease(port: number, timeoutMs: number) {
 
 /** Put the simulator into SIC mode. Fails while it is not (yet) accepting requests. */
 async function beginSimulation() {
-  const res = await fetch(`http://${HOST}:${SIMULATOR_PORT}/begin`, {
+  const res = await fetch(`http://${HOST}:${simulatorPort()}/begin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'sic' }),
@@ -175,21 +175,21 @@ class SimulatorProcess {
     if (!javaPath) {
       throw new Error(texts().javaNotFound);
     }
-    await waitForPortRelease(SIMULATOR_PORT, PORT_RELEASE_TIMEOUT_MS);
-    if (await isListening(SIMULATOR_PORT)) {
+    await waitForPortRelease(simulatorPort(), PORT_RELEASE_TIMEOUT_MS);
+    if (await isListening(simulatorPort())) {
       // Most likely the simulator of an earlier session that ended abnormally. A second one
       // could not open the port; use that one if it answers (it is not ours to stop).
-      console.warn(`Port ${SIMULATOR_PORT} is in use; using the simulator that answers there.`);
+      console.warn(`Port ${simulatorPort()} is in use; using the simulator that answers there.`);
       await beginSimulation().catch(error => {
         throw new Error(
-          texts().portInUse(SIMULATOR_PORT, String(error)),
+          texts().portInUse(simulatorPort(), String(error)),
         );
       });
       return;
     }
 
     // windowsHide: no console window for java.exe on Windows.
-    const child = spawn(javaPath, ['-jar', getServerPath(), String(SIMULATOR_PORT)], {
+    const child = spawn(javaPath, ['-jar', getServerPath(), String(simulatorPort())], {
       windowsHide: true,
     });
     this.child = child;

@@ -52,6 +52,8 @@ const rulersFor = (filePath: string | null) =>
   filePath?.toLowerCase().endsWith('.asm') ? editorOptions.rulers : [];
 const optionsFor = () => ({
   ...editorOptions,
+  // The code font size of the preferences.
+  fontSize: usePreferencesStore.getState().editorFontSize,
   rulers: rulersFor(useEditorTabStore.getState().activePath),
 });
 
@@ -74,6 +76,12 @@ export default function CodeEditor() {
   useEffect(() => {
     if (editorRef.current) applyRevealRequest(editorRef.current, revealRequest);
   }, [revealRequest, activePath]);
+
+  // The code font size follows the preferences at once.
+  const fontSize = usePreferencesStore(s => s.editorFontSize);
+  useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize });
+  }, [fontSize]);
 
   // The column guides are for assembly; a .txt file gets none.
   useEffect(() => {

@@ -43,12 +43,23 @@ function defaultLanguage(): UiPreferences['language'] {
   return locale.toLowerCase().startsWith('ko') ? 'ko' : 'en';
 }
 
+/** The editor's size before the setting existed. */
+export const DEFAULT_EDITOR_FONT_SIZE = 12;
+export const DEFAULT_SIMULATOR_PORT = 9090;
+
+const intIn = (value: unknown, min: number, max: number, fallback: number) =>
+  Number.isInteger(value) && (value as number) >= min && (value as number) <= max
+    ? (value as number)
+    : fallback;
+
 export function getPreferences(): UiPreferences {
   const saved = load().preferences ?? {};
   return {
     language:
       saved.language === 'en' || saved.language === 'ko' ? saved.language : defaultLanguage(),
     theme: saved.theme === 'dark' || saved.theme === 'light' ? saved.theme : 'light',
+    editorFontSize: intIn(saved.editorFontSize, 10, 28, DEFAULT_EDITOR_FONT_SIZE),
+    simulatorPort: intIn(saved.simulatorPort, 1024, 65535, DEFAULT_SIMULATOR_PORT),
   };
 }
 

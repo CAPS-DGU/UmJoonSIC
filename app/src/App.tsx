@@ -27,6 +27,7 @@ import ProjectSettings from '@/features/project/ProjectSettings';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useProjectEvents } from '@/features/project/useProjectEvents';
 import NewProjectDialog from '@/features/project/NewProjectDialog';
+import PreferencesDialog from '@/features/preferences/PreferencesDialog';
 import NoProjectPanel from '@/features/project/NoProjectPanel';
 import WelcomeScreen from '@/features/project/WelcomeScreen';
 import { useStrings } from '@/i18n';
@@ -43,6 +44,7 @@ function Overlays() {
   return (
     <>
       <NewProjectDialog />
+      <PreferencesDialog />
       <AppDialog />
       <Toasts />
     </>

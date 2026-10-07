@@ -66,6 +66,7 @@ const en = {
       'The folder and everything in it are deleted from the disk. This cannot be undone.',
   },
   tabs: {
+    listingTab: 'Listing',
     close: 'Close tab (Ctrl+W)',
     listing: (name: string) => `List: ${name}`,
     showListing: 'Listing',
@@ -102,6 +103,7 @@ const en = {
     sicxe: 'SIC/XE',
   },
   state: {
+    showPcTitle: 'Click: show this place in the listing',
     ready: 'Ready',
     assembling: 'Assembling…',
     running: (ips: string) => `Running · ${ips} instructions/s`,
@@ -132,6 +134,10 @@ const en = {
     } as Record<string, string>,
   },
   memory: {
+    lastWrite: (address: string, size: number) => `Last write: ${address} (${size} B)`,
+    lastWriteTitle: (instruction: string, pc: string) =>
+      `Show the bytes the last store instruction wrote (${instruction} at ${pc})`,
+    gridTitle: 'Double-click a byte: show its line in the listing',
     title: 'Memory',
     placeholder: 'Address (hex) or label',
     go: 'Go',
@@ -171,6 +177,25 @@ const en = {
     runNeedsProjectTitle: 'Running needs a project',
     runNeedsProject:
       'A program is assembled from a project: project.sic says which files, in which order, and which devices. Create a project for this file to run it.',
+  },
+  preferences: {
+    title: 'Preferences',
+    language: 'Language',
+    theme: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
+    interval: 'Run interval',
+    fastest: 'Fastest',
+    intervalHint: "The run toolbar's interval; kept after a restart.",
+    fontSize: 'Code font size',
+    smaller: 'Smaller',
+    larger: 'Larger',
+    port: 'Simulator port',
+    portHint: (port: number) => `In use: ${port}. A change applies at the next start.`,
+    badPort: 'Enter a port from 1024 to 65535.',
+    restartNeeded: (port: number) => `Port ${port} applies after a restart.`,
+    restartNow: 'Restart now',
+    kept: 'Preferences are saved at once and kept after a restart.',
   },
   devices: {
     empty: 'Devices appear here when a loaded program uses RD, WD or TD.',
@@ -218,6 +243,8 @@ const en = {
     writtenLabel: 'written',
   },
   panel: {
+    watchRowTitle:
+      'Double-click: show it in the listing (while running) or the source, and in memory',
     devices: 'Devices',
     watch: 'Watch',
     errors: 'Errors',
@@ -237,6 +264,14 @@ const en = {
     watchChar: 'CHAR',
   },
   listing: {
+    files: 'Files of the listing',
+    pcHere: 'The PC is in this file',
+    rowTitle: 'Double-click: show this line in the source',
+    symbolTitle: 'Go to its definition (and its bytes in memory)',
+    closeTitle: 'Close the listing and stop the run?',
+    closeMessage: 'The listing belongs to the run: closing it stops the program.',
+    closeAndStop: 'Stop and close',
+    showInListing: 'Show in Listing',
     address: 'Address',
     rawHex: 'Object Code',
     label: 'Label',
@@ -346,6 +381,7 @@ const en = {
     deviceTitle: 'Device',
   },
   status: {
+    preferences: 'Preferences (Ctrl+,)',
     lineCol: (line: number, col: number) => `Ln ${line}, Col ${col}`,
     language: 'Interface language',
     themeToDark: 'Dark theme',
@@ -422,6 +458,7 @@ const ko: Strings = {
     deleteFolder: '폴더와 그 안의 모든 파일이 디스크에서 삭제됩니다. 되돌릴 수 없습니다.',
   },
   tabs: {
+    listingTab: '리스트파일',
     close: '탭 닫기 (Ctrl+W)',
     listing: name => `리스트파일: ${name}`,
     showListing: '리스트파일',
@@ -459,6 +496,7 @@ const ko: Strings = {
     sicxe: 'SIC/XE',
   },
   state: {
+    showPcTitle: '클릭하면 리스트파일에서 이 위치를 표시합니다.',
     ready: '준비',
     assembling: '어셈블 중…',
     running: ips => `실행 중 · 초당 명령어 ${ips}개`,
@@ -487,6 +525,10 @@ const ko: Strings = {
     },
   },
   memory: {
+    lastWrite: (address, size) => `마지막 쓰기: ${address} (${size}바이트)`,
+    lastWriteTitle: (instruction, pc) =>
+      `마지막 저장 명령어(${pc}의 ${instruction})가 쓴 바이트를 표시합니다.`,
+    gridTitle: '바이트를 두 번 클릭하면 리스트파일에서 그 줄을 표시합니다.',
     title: '메모리',
     placeholder: '주소(16진수) 또는 레이블',
     go: '이동',
@@ -526,6 +568,25 @@ const ko: Strings = {
     runNeedsProjectTitle: '실행하려면 프로젝트가 필요합니다',
     runNeedsProject:
       '프로그램은 프로젝트 단위로 어셈블합니다. 어셈블할 파일과 순서, 사용할 장치는 project.sic 파일에 적습니다. 실행하려면 이 파일로 프로젝트를 만드세요.',
+  },
+  preferences: {
+    title: '환경 설정',
+    language: '표시 언어',
+    theme: '테마',
+    light: '밝게',
+    dark: '어둡게',
+    interval: '실행 간격',
+    fastest: '최고속',
+    intervalHint: '실행 도구 모음의 간격입니다. 다시 시작해도 유지됩니다.',
+    fontSize: '코드 글꼴 크기',
+    smaller: '작게',
+    larger: '크게',
+    port: '시뮬레이터 포트',
+    portHint: port => `사용 중: ${port}. 바꾸면 다음 시작부터 적용됩니다.`,
+    badPort: '1024부터 65535까지의 포트를 입력하세요.',
+    restartNeeded: port => `포트 ${port}은(는) 다시 시작하면 적용됩니다.`,
+    restartNow: '지금 다시 시작',
+    kept: '환경 설정은 바로 저장되며 다시 시작해도 유지됩니다.',
   },
   devices: {
     empty: '불러온 프로그램이 RD, WD, TD를 사용하면 여기에 장치가 표시됩니다.',
@@ -571,6 +632,7 @@ const ko: Strings = {
     writtenLabel: '쓰기',
   },
   panel: {
+    watchRowTitle: '두 번 클릭하면 리스트파일(실행 중) 또는 소스와 메모리에서 표시합니다.',
     devices: '장치',
     watch: '변수',
     errors: '오류',
@@ -590,6 +652,14 @@ const ko: Strings = {
     watchChar: '문자',
   },
   listing: {
+    files: '리스트파일의 파일',
+    pcHere: 'PC가 이 파일에 있습니다',
+    rowTitle: '두 번 클릭하면 소스의 이 줄로 이동합니다.',
+    symbolTitle: '정의한 곳으로 이동(메모리에서도 표시)',
+    closeTitle: '리스트파일을 닫고 실행을 중지할까요?',
+    closeMessage: '리스트파일은 실행과 함께 열려 있습니다. 닫으면 프로그램 실행이 중지됩니다.',
+    closeAndStop: '중지하고 닫기',
+    showInListing: '리스트파일에서 보기',
     address: '주소',
     rawHex: '목적 코드',
     label: '레이블',
@@ -696,6 +766,7 @@ const ko: Strings = {
     deviceTitle: '장치',
   },
   status: {
+    preferences: '환경 설정 (Ctrl+,)',
     lineCol: (line, col) => `줄 ${line}, 열 ${col}`,
     language: '표시 언어',
     themeToDark: '어두운 테마',

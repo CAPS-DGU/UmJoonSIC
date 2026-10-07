@@ -46,6 +46,8 @@ const api: RendererApi = {
   // Synchronous: the page applies the language and theme before its first paint.
   getUiPreferences: () => ipcRenderer.sendSync(IpcChannel.getUiPreferences) as UiPreferences,
   setUiPreferences: change => ipcRenderer.send(IpcChannel.setUiPreferences, change),
+  simulatorPortInUse: () => ipcRenderer.sendSync(IpcChannel.simulatorPortInUse) as number,
+  relaunchApp: () => ipcRenderer.send(IpcChannel.relaunchApp),
   getRecentProjects: () => ipcRenderer.invoke(IpcChannel.getRecentProjects),
   renamePath: (projectPath, relativePath, newName) =>
     ipcRenderer.invoke(IpcChannel.renamePath, { projectPath, relativePath, newName }),
@@ -84,6 +86,7 @@ for (const event of [
   AppEvent.moveTabRight,
   AppEvent.moveTabLeft,
   AppEvent.newFile,
+  AppEvent.openPreferences,
   AppEvent.runStart,
   AppEvent.runPause,
   AppEvent.runStep,

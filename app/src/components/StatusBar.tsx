@@ -1,10 +1,10 @@
-import { CircleStop, CircleX, Moon, PauseCircle, PlayCircle, Sun } from 'lucide-react';
+import { CircleStop, CircleX, Moon, PauseCircle, PlayCircle, Settings2, Sun } from 'lucide-react';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { formatAddress, useRunningStore } from '@/features/debugger/runningStore';
 import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useStrings } from '@/i18n';
-import { usePreferencesStore } from '@/stores/preferencesStore';
+import { openPreferences, usePreferencesStore } from '@/stores/preferencesStore';
 
 /** What the run is doing, in words, with its colour (status bar, left). */
 function RunState() {
@@ -111,6 +111,15 @@ export default function StatusBar() {
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         >
           {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+        </button>
+        <button
+          type="button"
+          className="rounded p-1 hover:bg-gray-200"
+          title={t.status.preferences}
+          aria-label={t.status.preferences}
+          onClick={openPreferences}
+        >
+          <Settings2 className="size-3.5" />
         </button>
       </div>
     </div>

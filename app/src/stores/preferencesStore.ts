@@ -4,7 +4,12 @@
 import { create } from 'zustand';
 import { AppEvent, type UiLanguage, type UiPreferences, type UiTheme } from '@shared/ipc';
 
-const FALLBACK: UiPreferences = { language: 'ko', theme: 'light' };
+const FALLBACK: UiPreferences = {
+  language: 'ko',
+  theme: 'light',
+  editorFontSize: 12,
+  simulatorPort: 9090,
+};
 
 function readInitial(): UiPreferences {
   try {
@@ -24,6 +29,9 @@ function apply({ language, theme }: UiPreferences) {
 interface PreferencesState extends UiPreferences {
   setLanguage: (language: UiLanguage) => void;
   setTheme: (theme: UiTheme) => void;
+  setEditorFontSize: (size: number) => void;
+  /** Applies at the next start (the simulator keeps its port while it runs). */
+  setSimulatorPort: (port: number) => void;
 }
 
 const initial = readInitial();
@@ -34,12 +42,24 @@ export const usePreferencesStore = create<PreferencesState>(() => ({
   // The main process saves the change and announces it back (AppEvent.uiPreferences).
   setLanguage: language => window.api.setUiPreferences({ language }),
   setTheme: theme => window.api.setUiPreferences({ theme }),
+  setEditorFontSize: editorFontSize => window.api.setUiPreferences({ editorFontSize }),
+  setSimulatorPort: simulatorPort => window.api.setUiPreferences({ simulatorPort }),
 }));
+
+/** Open the preferences dialog (also File > Preferences, Ctrl+,). */
+export function openPreferences() {
+  window.dispatchEvent(new CustomEvent(AppEvent.openPreferences));
+}
 
 if (typeof window !== 'undefined') {
   window.addEventListener(AppEvent.uiPreferences, event => {
     const next = (event as CustomEvent<UiPreferences>).detail;
     apply(next);
-    usePreferencesStore.setState({ language: next.language, theme: next.theme });
+    usePreferencesStore.setState({
+      language: next.language,
+      theme: next.theme,
+      editorFontSize: next.editorFontSize,
+      simulatorPort: next.simulatorPort,
+    });
   });
 }
