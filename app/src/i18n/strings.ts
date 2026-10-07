@@ -447,7 +447,8 @@ const ko: Strings = {
     stop: '중지하고 실행 끝내기 (Shift+F5)',
     interval: '간격',
     intervalTitle: '실행 중 명령어 사이의 시간(바꾸면 바로 적용)',
-    fastest: '최고 속도',
+    // In the 4.5rem interval list "최고 속도" was cut ("최고 속…"); the Run menu keeps "최고 속도(0 ms)".
+    fastest: '최고속',
     custom: '직접 입력…',
     customTitle: '명령어 사이의 간격',
     customLabel: '밀리초(0 = 최고 속도)',
