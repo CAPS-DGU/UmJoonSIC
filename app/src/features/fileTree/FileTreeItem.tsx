@@ -165,7 +165,11 @@ export function FileTreeItem(props: FileTreeItemProps) {
         >
           <Chevron width={ICON_SIZE} height={ICON_SIZE} className="shrink-0" />
           <Folder width={ICON_SIZE} height={ICON_SIZE} className={`shrink-0 ${color}`} />
-          <span className={`min-w-0 truncate font-semibold ${color}`} title={item.relativePath}>
+          {/* pr-0.5: an italic name (.out) leans past its box; its last letter was cut. */}
+          <span
+            className={`min-w-0 truncate pr-0.5 font-semibold ${color}`}
+            title={item.relativePath}
+          >
             {item.name}
           </span>
         </div>

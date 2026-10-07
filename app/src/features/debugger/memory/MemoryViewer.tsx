@@ -266,7 +266,8 @@ export default function MemoryViewer() {
           data-last-write={lastWrite.address}
         >
           <PenLine className="size-3.5 shrink-0 text-orange-700" aria-hidden />
-          <span className="truncate">
+          {/* pr-0.5: the closing ")" leans past the box and was cut (Korean). */}
+          <span className="truncate pr-0.5">
             {t.memory.lastWrite(
               lastWrite.indirect
                 ? `@${formatAddress(lastWrite.address)}`

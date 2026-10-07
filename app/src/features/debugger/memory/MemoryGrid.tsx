@@ -173,7 +173,8 @@ export function MemoryRows({
             <div
               key={`name-${label.start}`}
               data-memory-label={label.name}
-              className="min-w-0 justify-self-start overflow-hidden text-ellipsis whitespace-nowrap text-xs text-orange-700"
+              // Clipped across only: in the 12 px line, the tails of g, p, y reach below it.
+              className="min-w-0 justify-self-start [overflow-x:clip] [overflow-y:visible] text-ellipsis whitespace-nowrap text-xs text-orange-700"
               style={{
                 gridRow: 3,
                 gridColumn: `1 / ${ROW_SIZE + 1}`,

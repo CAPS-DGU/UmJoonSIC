@@ -229,7 +229,8 @@ export default function TabBar() {
               {getFileIcon(tab.filePath)}
               {/* A file from outside the project: in italics, as editors show files not in it. */}
               <span
-                className={`truncate text-sm font-medium ${isOutsideFile(tab.filePath) ? 'italic' : ''}`}
+                // pr-0.5: an italic name's last letter leans past its box and was cut.
+                className={`truncate text-sm font-medium ${isOutsideFile(tab.filePath) ? 'pr-0.5 italic' : ''}`}
               >
                 {tabLabel(tab.title, tab.filePath)}
               </span>
