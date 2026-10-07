@@ -345,7 +345,7 @@ The launcher it writes decides at every start:
 
 ### Windows
 
-Package with `pnpm package` on Windows, then build the installer from `win-installer/inno-setup.iss` with Inno Setup. It registers `.sic` and `.asm` as "Open With" choices only, never as their default (other tools open `.asm` too). The Squirrel installer from `pnpm make` registers no file associations.
+Package with `pnpm package` on Windows, then build the installer from `win-installer/inno-setup.iss` with Inno Setup 6, in the GUI or on the command line (`ISCC.exe win-installer\inno-setup.iss`). The paths in the script are relative to its folder; the result is `win-installer\out\UmJoonSIC-win32-x64-<version>.exe` (ignored by git). It registers `.sic` and `.asm` as "Open With" choices only, never as their default (other tools open `.asm` too). The Squirrel installer from `pnpm make` registers no file associations.
 
 ### macOS
 
