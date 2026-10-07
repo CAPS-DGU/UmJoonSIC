@@ -49,14 +49,19 @@ type Tone = 'done' | 'fresh' | 'next' | 'unread' | 'discarded' | 'discardedFresh
 const TONE_CLASSES: Record<Tone, string> = {
   done: '',
   fresh: CHANGED_CLASSES,
-  next: 'rounded-sm bg-blue-50 outline outline-1 outline-blue-600',
+  // A block cursor, as in a terminal: dark on the light theme, light on the dark one (the
+  // dark theme swaps the greys and white).
+  next: 'rounded-[2px] bg-gray-900 text-white',
   unread: 'text-gray-500',
   discarded: 'text-gray-600 line-through decoration-gray-500',
   discardedFresh: `text-gray-600 line-through decoration-gray-500 ${CHANGED_CLASSES}`,
 };
 
 /** A run of bytes drawn alike, from `start` (the offset in the stream), or the end-of-file mark. */
-type Piece = { tone: Tone; start: number; bytes: number[] } | { eof: true; start: number };
+/** A run of bytes drawn alike, or the end-of-file mark (with the cursor when all is read). */
+type Piece =
+  | { tone: Tone; start: number; bytes: number[] }
+  | { eof: true; start: number; cursor: boolean };
 
 const isPrintable = (b: number) => b >= 0x20 && b < 0x7f;
 const hex2 = (b: number) => b.toString(16).toUpperCase().padStart(2, '0');
@@ -104,6 +109,17 @@ function textOf(bytes: number[]): ReactNode[] {
     i = j;
   }
   return out;
+}
+
+/**
+ * The byte under the cursor as one cell of text, in the cursor's own colours: a character, ↵
+ * (the line break follows the cursor), ␀, or its two hex digits.
+ */
+function cursorGlyph(b: number) {
+  if (isPrintable(b)) return String.fromCharCode(b);
+  if (b === 0x0a) return '↵';
+  if (b === 0) return '␀';
+  return <span className="text-[10px]">{hex2(b)}</span>;
 }
 
 /** What a copy of the bytes holds: Text as the view shows it (other bytes as \xHH), or Hex. */
@@ -164,7 +180,7 @@ function piecesOf(
   const pieces: Piece[] = [];
   for (let k = 0; k + 1 < sorted.length; k++) {
     const [from, to] = [sorted[k], sorted[k + 1]];
-    if (from === eofAt) pieces.push({ eof: true, start: from });
+    if (from === eofAt) pieces.push({ eof: true, start: from, cursor: true });
     const isFresh = from >= freshFrom;
     const tone: Tone = discarded
       ? isFresh
@@ -180,7 +196,9 @@ function piecesOf(
     const rest = input.slice(count + 1, count + 1 + DRAWN_BYTES);
     if (rest.length) pieces.push({ tone: 'unread', start: count + 1, bytes: rest });
   }
-  if (input && count <= input.length) pieces.push({ eof: true, start: input.length });
+  if (input && count <= input.length) {
+    pieces.push({ eof: true, start: input.length, cursor: count === input.length });
+  }
   return { pieces, hidden: drawnFrom };
 }
 
@@ -191,27 +209,34 @@ function TextPieces({ pieces }: { pieces: Piece[] }) {
     'eof' in piece ? (
       <span
         key={`eof-${piece.start}`}
-        className="mx-0.5 rounded border border-gray-400 px-1 align-[1px] text-[10px] leading-none text-gray-600"
+        className={`mx-0.5 rounded px-1 align-[1px] text-[10px] leading-none ${
+          piece.cursor ? 'bg-gray-900 text-white' : 'border border-gray-400 text-gray-600'
+        }`}
         title={t.devices.pastEnd}
         data-eof
+        data-follow={piece.cursor || undefined}
       >
         {t.devices.endOfFile}
       </span>
+    ) : piece.tone === 'next' ? (
+      <Fragment key={`next-${piece.start}`}>
+        <span className={TONE_CLASSES.next} title={t.devices.nextByte} data-follow>
+          {cursorGlyph(piece.bytes[0])}
+        </span>
+        {piece.bytes[0] === 0x0a && '\n'}
+      </Fragment>
     ) : (
       <span
         // A new run of fresh bytes is a new element: its flash plays.
         key={`${piece.tone}-${piece.start}`}
         className={TONE_CLASSES[piece.tone]}
         title={
-          piece.tone === 'next'
-            ? t.devices.nextByte
-            : piece.tone === 'unread'
-              ? t.devices.notReadYet
-              : piece.tone.startsWith('discarded')
-                ? t.devices.discardedTitle
-                : undefined
+          piece.tone === 'unread'
+            ? t.devices.notReadYet
+            : piece.tone.startsWith('discarded')
+              ? t.devices.discardedTitle
+              : undefined
         }
-        data-follow={piece.tone === 'next' ? true : undefined}
       >
         {textOf(piece.bytes)}
       </span>
@@ -224,9 +249,12 @@ function HexPieces({ pieces }: { pieces: Piece[] }) {
   const t = useStrings();
   const cells = new Map<number, { byte: number; tone: Tone }>();
   let eofAt: number | null = null;
+  let eofCursor = false;
   for (const piece of pieces) {
-    if ('eof' in piece) eofAt = piece.start;
-    else piece.bytes.forEach((byte, i) => cells.set(piece.start + i, { byte, tone: piece.tone }));
+    if ('eof' in piece) {
+      eofAt = piece.start;
+      eofCursor = piece.cursor;
+    } else piece.bytes.forEach((byte, i) => cells.set(piece.start + i, { byte, tone: piece.tone }));
   }
   const offsets = [...cells.keys()].sort((a, b) => a - b);
   // The bytes before the end of the file, its mark, the bytes read after it (00s).
@@ -284,7 +312,14 @@ function HexPieces({ pieces }: { pieces: Piece[] }) {
       <div key="before">{rows(before)}</div>
       {eofAt !== null && (
         <div className="text-[11px] text-gray-600 select-none" title={t.devices.pastEnd} data-eof>
-          ── {t.devices.endOfFile} ──
+          ──{' '}
+          <span
+            className={eofCursor ? 'rounded-[2px] bg-gray-900 px-1 text-white' : ''}
+            data-follow={eofCursor || undefined}
+          >
+            {t.devices.endOfFile}
+          </span>{' '}
+          ──
         </div>
       )}
       <div key="after">{rows(after)}</div>
