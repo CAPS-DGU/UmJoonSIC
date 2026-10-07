@@ -76,7 +76,8 @@ const en = {
   downloadHeading: (step: number, total: number) => `Preparing UmJoonSIC (${step}/${total})`,
   downloadJre: 'Downloading the Java runtime…',
   downloadSimulator: 'Downloading the simulator…',
-  downloadProgress: (percent: number, mb: string) => `${percent}% (${mb} MB)`,
+  // No-break spaces: the line never breaks inside "8% (3.6 MB)".
+  downloadProgress: (percent: number, mb: string) => `${percent}%\u00a0(${mb}\u00a0MB)`,
   downloadSaving: 'Saving…',
   startingSimulator: 'Starting the simulator…',
   downloadDone: 'Done',
@@ -164,7 +165,7 @@ const ko: Texts = {
   downloadHeading: (step, total) => `UmJoonSIC 준비 중(${step}/${total})`,
   downloadJre: 'Java 실행 환경 다운로드 중…',
   downloadSimulator: '시뮬레이터 다운로드 중…',
-  downloadProgress: (percent, mb) => `${percent}% (${mb} MB)`,
+  downloadProgress: (percent, mb) => `${percent}%\u00a0(${mb}\u00a0MB)`,
   downloadSaving: '저장 중…',
   startingSimulator: '시뮬레이터 시작 중…',
   downloadDone: '완료',
