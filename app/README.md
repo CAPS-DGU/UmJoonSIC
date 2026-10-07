@@ -167,7 +167,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 | assembler / linker / loader | 어셈블러 / 링커 / 로더 | symbol               | 기호(symbol)         |
 | instruction                 | 명령어                 | label                | 레이블               |
 | mnemonic                    | 니모닉                 | operand              | 피연산자             |
-| directive                   | 어셈블러 지시어        | object code          | 목적 코드            |
+| directive                   | 어셈블러 지시어        | object code          | 목적코드(OBJCODE)    |
 | listing                     | 리스트파일             | location counter     | 위치 카운터 (LOCCTR) |
 | control section             | 제어 섹션              | addressing mode      | 주소 지정 방식       |
 | accumulator (A)             | 누산기                 | index register (X)   | 인덱스 레지스터      |
