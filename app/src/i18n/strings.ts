@@ -138,6 +138,40 @@ const en = {
     goTitle: 'Show this address',
     invalid: (text: string) => `"${text}" is not an address or a label of the loaded program.`,
   },
+  /** Files opened from outside the app that are not part of the open project (or no project). */
+  outside: {
+    tabTitle: (path: string) =>
+      `${path}\nNot part of the project: edited and saved in place, never assembled.`,
+    banner: 'Not part of this project: the file is edited and saved in place, but never assembled.',
+    bannerNoProject:
+      'Opened without a project: you can edit and save it. To assemble and run it, create a project for it or open one.',
+    copyIntoProject: 'Copy into this project',
+    openItsProject: (project: string) => `Open its project (${project})`,
+    noProjectTitle: 'No project',
+    noProjectText:
+      'This file is not in an UmJoonSIC project (no project.sic in its folder or the folders above). It is open for editing only.',
+    createProject: 'Create a project here',
+    createProjectHint: (folder: string) =>
+      `Writes project.sic in ${folder}, with this file as the program. Nothing is moved.`,
+    openProject: 'Open a project…',
+    closeFiles: 'Close',
+    otherProjectTitle: (file: string) => `Open the project of ${file}?`,
+    otherProject: (file: string, project: string, current: string) =>
+      `${file} belongs to the project ${project}. Opening that project closes ${current}.`,
+    runWillStop: 'The running program will be stopped.',
+    openOther: (project: string) => `Open ${project}`,
+    editOnly: 'Edit the file only',
+    notAssembled: (file: string) => `${file} is not one of the assembled files of this project.`,
+    copied: (name: string) => `Copied into the project as ${name}. The original is unchanged.`,
+    createConfirmTitle: 'Create a project for this file?',
+    createConfirm: (folder: string, current: string) =>
+      `This writes project.sic in ${folder} and opens it there, closing ${current}.`,
+    created: (folder: string) => `Created the project in ${folder}.`,
+    createFailed: 'The project could not be created.',
+    runNeedsProjectTitle: 'Running needs a project',
+    runNeedsProject:
+      'A program is assembled from a project: project.sic says which files, in which order, and which devices. Create a project for this file to run it.',
+  },
   devices: {
     empty: 'Devices appear here when a loaded program uses RD, WD or TD.',
     none: 'This program uses no device (RD, WD or TD).',
@@ -457,6 +491,39 @@ const ko: Strings = {
     go: '이동',
     goTitle: '이 주소 보기',
     invalid: text => `"${text}" 은(는) 주소도, 불러온 프로그램의 레이블도 아닙니다.`,
+  },
+  outside: {
+    tabTitle: path =>
+      `${path}\n프로젝트에 속하지 않음: 그 자리에서 고치고 저장하지만 어셈블하지 않습니다.`,
+    banner: '이 프로젝트에 속하지 않은 파일: 그 자리에서 고치고 저장하지만 어셈블하지 않습니다.',
+    bannerNoProject:
+      '프로젝트 없이 열었습니다: 고치고 저장할 수 있습니다. 어셈블하고 실행하려면 프로젝트를 만들거나 여세요.',
+    copyIntoProject: '이 프로젝트로 복사',
+    openItsProject: project => `이 파일의 프로젝트 열기 (${project})`,
+    noProjectTitle: '프로젝트 없음',
+    noProjectText:
+      '이 파일은 UmJoonSIC 프로젝트에 들어 있지 않습니다 (그 폴더와 위 폴더에 project.sic 이 없음). 고치기만 할 수 있게 열었습니다.',
+    createProject: '여기에 프로젝트 만들기',
+    createProjectHint: folder =>
+      `${folder} 에 project.sic 를 만들고 이 파일을 프로그램으로 넣습니다. 파일은 옮기지 않습니다.`,
+    openProject: '프로젝트 열기…',
+    closeFiles: '닫기',
+    otherProjectTitle: file => `${file} 의 프로젝트를 열까요?`,
+    otherProject: (file, project, current) =>
+      `${file} 은(는) 프로젝트 ${project} 에 속합니다. 그 프로젝트를 열면 ${current} 이(가) 닫힙니다.`,
+    runWillStop: '실행 중인 프로그램은 중지됩니다.',
+    openOther: project => `${project} 열기`,
+    editOnly: '파일만 고치기',
+    notAssembled: file => `${file} 은(는) 이 프로젝트의 어셈블 파일이 아닙니다.`,
+    copied: name => `프로젝트에 ${name} 로 복사했습니다. 원래 파일은 그대로입니다.`,
+    createConfirmTitle: '이 파일로 프로젝트를 만들까요?',
+    createConfirm: (folder, current) =>
+      `${folder} 에 project.sic 를 만들고 그 프로젝트를 엽니다. ${current} 은(는) 닫힙니다.`,
+    created: folder => `${folder} 에 프로젝트를 만들었습니다.`,
+    createFailed: '프로젝트를 만들지 못했습니다.',
+    runNeedsProjectTitle: '실행하려면 프로젝트가 필요합니다',
+    runNeedsProject:
+      '프로그램은 프로젝트에서 어셈블합니다: project.sic 에 어떤 파일을 어떤 순서로, 어떤 장치와 쓰는지 적습니다. 실행하려면 이 파일로 프로젝트를 만드세요.',
   },
   devices: {
     empty: '불러온 프로그램이 RD, WD, TD 를 쓰면 장치가 여기에 나옵니다.',

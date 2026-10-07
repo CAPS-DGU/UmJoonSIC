@@ -5,22 +5,23 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppEvent,
   IpcChannel,
+  type OpenRequest,
   type RendererApi,
   type ServerLogPayload,
   type UiPreferences,
 } from '../shared/ipc';
 
-// A project path from outside the app (file association, second instance) waits here until
-// the renderer takes it: it may arrive before React listens, and each path is opened once.
-let queuedProjectPath: string | null = null;
+// What to open from outside the app (file association, second instance) waits here until the
+// renderer takes it: it may arrive before React listens, and each request is handled once.
+let queuedOpenRequest: OpenRequest | null = null;
 
 const api: RendererApi = {
   getFileList: path => ipcRenderer.invoke(IpcChannel.getFileList, path),
   openProject: () => ipcRenderer.invoke(IpcChannel.openProject),
   openProjectByPath: sicPath => ipcRenderer.invoke(IpcChannel.openProjectByPath, sicPath),
-  consumeQueuedProjectPath: () => {
-    const current = queuedProjectPath;
-    queuedProjectPath = null;
+  consumeQueuedOpenRequest: () => {
+    const current = queuedOpenRequest;
+    queuedOpenRequest = null;
     return current;
   },
   readFile: path => ipcRenderer.invoke(IpcChannel.readFile, path),
@@ -101,9 +102,9 @@ for (const event of [AppEvent.runInterval, AppEvent.uiPreferences]) {
   });
 }
 
-ipcRenderer.on(AppEvent.openProjectPath, (_event, sicPath: string) => {
-  queuedProjectPath = sicPath;
-  window.dispatchEvent(new CustomEvent(AppEvent.openProjectPath));
+ipcRenderer.on(AppEvent.openRequest, (_event, request: OpenRequest) => {
+  queuedOpenRequest = request;
+  window.dispatchEvent(new CustomEvent(AppEvent.openRequest));
 });
 
 // The renderer runs with context isolation, so the API goes through contextBridge.

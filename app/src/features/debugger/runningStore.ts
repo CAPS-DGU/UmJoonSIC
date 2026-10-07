@@ -552,6 +552,11 @@ export const useRunningStore = create<RunningState>((set, get) => {
 
   /** Load the program and show it, stopped at its first instruction. False if that failed. */
   const start = () => {
+    // Files open without a project: running needs one; offer to make it.
+    if (!useProjectStore.getState().projectPath) {
+      void import('@/features/project/outsideFiles').then(m => m.explainRunNeedsProject());
+      return Promise.resolve(false);
+    }
     starting ??= (async () => {
       set({ isStarting: true, loadFailed: false });
       try {

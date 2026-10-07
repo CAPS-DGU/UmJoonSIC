@@ -4,6 +4,7 @@ import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { requestCloseTab } from '@/features/editor/unsavedChanges';
 import { listingOfTab, useListingStore } from '@/features/listing/listingStore';
+import { isOutsideFile } from '@/features/project/outsideFiles';
 import { SETTINGS_TAB } from '@/features/project/projectSettingsTab';
 import { useStrings } from '@/i18n';
 import { ProjectIcon } from '@/lib/icons';
@@ -222,10 +223,14 @@ export default function TabBar() {
             <button
               onClick={() => activateTab(tab.filePath)}
               className="flex h-full items-center gap-1 px-3 min-w-0 flex-1"
-              title={tab.filePath}
+              title={isOutsideFile(tab.filePath) ? t.outside.tabTitle(tab.filePath) : tab.filePath}
+              data-outside-tab={isOutsideFile(tab.filePath) || undefined}
             >
               {getFileIcon(tab.filePath)}
-              <span className="truncate text-sm font-medium">
+              {/* A file from outside the project: in italics, as editors show files not in it. */}
+              <span
+                className={`truncate text-sm font-medium ${isOutsideFile(tab.filePath) ? 'italic' : ''}`}
+              >
                 {tabLabel(tab.title, tab.filePath)}
               </span>
               <span

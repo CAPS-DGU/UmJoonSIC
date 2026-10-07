@@ -77,3 +77,26 @@ export function sectionsInSource(source: string): string[] {
   }
   return names;
 }
+
+/** Instructions and directives only SIC/XE has (format 2, floating point, linking, base). */
+const XE_ONLY = new Set(
+  (
+    'ADDF ADDR CLEAR COMPF COMPR DIVF DIVR FIX FLOAT HIO LDB LDF LDS LDT LPS MULF MULR NORM ' +
+    'RMO SHIFTL SHIFTR SIO SSK STB STF STI STS STT SUBF SUBR SVC TIO TIXR BASE NOBASE CSECT ' +
+    'EXTDEF EXTREF'
+  ).split(' '),
+);
+
+/**
+ * The machine a source is written for: SIC/XE if it uses format 4 (+), immediate (#) or
+ * indirect (@) operands, or an instruction or directive only SIC/XE has; else SIC. Used for
+ * the project made for a file opened on its own.
+ */
+export function machineModeOf(source: string): 'SIC' | 'SICXE' {
+  for (const line of source.split(/\r?\n/)) {
+    const f = fields(line);
+    if (!f) continue;
+    if (f.op.startsWith('+') || /^[#@]/.test(f.operand) || XE_ONLY.has(f.op)) return 'SICXE';
+  }
+  return 'SIC';
+}

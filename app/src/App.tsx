@@ -27,6 +27,7 @@ import ProjectSettings from '@/features/project/ProjectSettings';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useProjectEvents } from '@/features/project/useProjectEvents';
 import NewProjectDialog from '@/features/project/NewProjectDialog';
+import NoProjectPanel from '@/features/project/NoProjectPanel';
 import WelcomeScreen from '@/features/project/WelcomeScreen';
 import { useStrings } from '@/i18n';
 
@@ -60,6 +61,7 @@ function App() {
   const t = useStrings();
   const projectName = useProjectStore(s => s.projectName);
   const activePath = useEditorTabStore(state => state.activePath);
+  const hasTabs = useEditorTabStore(state => state.tabs.length > 0);
   const layout = useLayoutStore(
     useShallow(s => ({
       filesWidth: s.filesWidth,
@@ -81,12 +83,34 @@ function App() {
   useCloseRequests();
   useTabShortcuts();
 
-  if (projectName === '') {
+  if (projectName === '' && !hasTabs) {
     return (
       <>
         <WelcomeScreen />
         <Overlays />
       </>
+    );
+  }
+
+  // Files opened on their own, with no project near them: edit only (outsideFiles.ts).
+  if (projectName === '') {
+    return (
+      <div className="flex h-screen w-screen flex-col">
+        <div className="flex flex-1 overflow-hidden">
+          <div
+            data-column="files"
+            className="shrink-0 min-w-0 border-r border-gray-300"
+            style={{ width: FILES_COLUMN.default }}
+          >
+            <NoProjectPanel />
+          </div>
+          <div data-column="editor" className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <EditorContainer />
+          </div>
+        </div>
+        <StatusBar />
+        <Overlays />
+      </div>
     );
   }
 

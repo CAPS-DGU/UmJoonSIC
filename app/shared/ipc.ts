@@ -25,6 +25,15 @@ export interface ProjectInfo {
 }
 
 /** Every `window.api` call resolves to this shape; failures carry a message, never a rejection. */
+/**
+ * Something to open that came from outside the app: a project.sic, or an assembly file
+ * (double-click, "Open with", the command line, a second start), with the project.sic found
+ * near it, if any (electron/project/nearbyProject.ts).
+ */
+export type OpenRequest =
+  | { kind: 'project'; path: string }
+  | { kind: 'file'; path: string; project: string | null };
+
 export interface IpcResult<T = void> {
   success: boolean;
   data?: T;
@@ -98,7 +107,7 @@ export const AppEvent = {
   serverLog: 'server-log',
   createNewProject: 'create-new-project',
   openProject: 'open-project',
-  openProjectPath: 'open-project-path',
+  openRequest: 'open-request',
   closeProject: 'close-project',
   /** The window is about to close but the renderer reported unsaved changes. */
   closeRequested: 'close-requested',
@@ -137,8 +146,8 @@ export interface RendererApi {
   getFileList(path: string): Promise<IpcResult<string[]>>;
   openProject(): Promise<IpcResult<ProjectInfo>>;
   openProjectByPath(sicPath: string): Promise<IpcResult<ProjectInfo>>;
-  /** A project path that arrived before the renderer was listening (file association, second instance). */
-  consumeQueuedProjectPath(): string | null;
+  /** What to open that arrived from outside the app (file association, second instance), once. */
+  consumeQueuedOpenRequest(): OpenRequest | null;
   readFile(path: string): Promise<IpcResult<string>>;
   saveFile(path: string, content: string): Promise<IpcResult>;
   createNewFile(folderPath: string, fileName: string): Promise<IpcResult>;

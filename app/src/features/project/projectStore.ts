@@ -48,7 +48,8 @@ interface ProjectState {
     mode: MachineMode,
   ) => Promise<IpcResult<ProjectInfo>>;
   openProject: () => Promise<void>;
-  openProjectByPath: (sicPath: string) => Promise<void>;
+  /** `unsavedResolved`: the caller has asked about unsaved changes already. */
+  openProjectByPath: (sicPath: string, options?: { unsavedResolved?: boolean }) => Promise<void>;
   /** Close the project (asking about unsaved changes first). */
   closeProject: () => Promise<void>;
   /** Add a new file to the project's asm list, on disk at once. */
@@ -143,7 +144,13 @@ export const useProjectStore = create<ProjectState>((set, get) => {
    * cancelled.
    */
   const leaveProject = async (unsavedResolved = false) => {
-    if (!get().projectPath) return true;
+    if (!get().projectPath) {
+      // No project, but maybe files opened on their own (edit only): they close too.
+      if (useEditorTabStore.getState().tabs.length === 0) return true;
+      if (!unsavedResolved && !(await resolveUnsavedChanges())) return false;
+      useEditorTabStore.getState().closeAllTabs();
+      return true;
+    }
     // `unsavedResolved`: the caller asked already (before its file picker), do not ask twice.
     if (!unsavedResolved && !(await resolveUnsavedChanges())) return false;
     // The project's messages, run and registers do not carry over to the next one.
@@ -298,12 +305,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       if (get().projectPath && !(await resolveUnsavedChanges())) return;
       await adoptProject(window.api.openProject(), 'open project', true);
     },
-    openProjectByPath: async sicPath => {
+    openProjectByPath: async (sicPath, { unsavedResolved = false } = {}) => {
       if (!sicPath) {
         console.error('Invalid project path received');
         return;
       }
-      await adoptProject(window.api.openProjectByPath(sicPath), 'open project by path');
+      await adoptProject(
+        window.api.openProjectByPath(sicPath),
+        'open project by path',
+        unsavedResolved,
+      );
     },
 
     closeProject: async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { devicesInSources, sectionsInSource } from './sourceDevices';
+import { devicesInSources, machineModeOf, sectionsInSource } from './sourceDevices';
 
 describe('devices in the source', () => {
   it('finds RD, WD and TD with the BYTE they name', () => {
@@ -55,5 +55,21 @@ describe('sections in the source', () => {
       '         END     main',
     ].join('\n');
     expect(sectionsInSource(source)).toEqual(['main', 'part2']);
+  });
+});
+
+describe('the machine a source is written for', () => {
+  it('is SIC for the textbook SIC program', () => {
+    expect(
+      machineModeOf('COPY     START   1000\nFIRST    STL     RETADR\n         END     FIRST'),
+    ).toBe('SIC');
+  });
+
+  it('is SIC/XE with +, #, @ or an XE-only instruction, and not for a comment', () => {
+    expect(machineModeOf('         +JSUB   F')).toBe('SICXE');
+    expect(machineModeOf('         LDA     #5')).toBe('SICXE');
+    expect(machineModeOf('         J       @RET')).toBe('SICXE');
+    expect(machineModeOf('         CLEAR   X')).toBe('SICXE');
+    expect(machineModeOf('. LDA #5 in a comment\n         LDA     FIVE')).toBe('SIC');
   });
 });

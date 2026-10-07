@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import path from 'path-browserify';
 import {
   cancelScheduledCheck,
   checkSyntax,
@@ -9,6 +8,7 @@ import { disposeModel, modelPath } from '@/features/editor/monaco/models';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import { moveItem } from '@/lib/moveItem';
+import { resolveInProject } from '@/lib/projectPath';
 import { strings } from '@/i18n';
 import { showError } from '@/stores/dialogStore';
 
@@ -110,8 +110,9 @@ export function tabPathOfModel(modelUri: string) {
     )?.filePath;
 }
 
+/** A tab's file on disk: a project file, or a file from outside it (an absolute path). */
 const absolutePath = (filePath: string) =>
-  path.join(useProjectStore.getState().projectPath, filePath);
+  resolveInProject(useProjectStore.getState().projectPath, filePath);
 
 let nextRevealId = 0;
 /** Counts openTab calls: when two overlap, the one asked for last is activated. */

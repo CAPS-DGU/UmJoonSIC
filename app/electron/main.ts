@@ -8,11 +8,12 @@ import { installMenu } from './menu';
 import { applyNativeTheme, onPreferencesChange } from './preferences';
 import {
   cancelPendingDispatch,
-  findSicPathInArgs,
-  hasPendingProjectPath,
-  queueProjectOpen,
-  sendPendingProjectPath,
-  setInitialProjectPath,
+  findOpenRequestInArgs,
+  hasPendingRequest,
+  openRequestFor,
+  queueOpen,
+  sendPendingRequest,
+  setInitialRequest,
 } from './project/openQueue';
 import { closeProgressWindow } from './simulator/download';
 import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/jar';
@@ -111,7 +112,7 @@ function createWindow(): void {
     }
   });
 
-  mainWindow.webContents.on('did-finish-load', sendPendingProjectPath);
+  mainWindow.webContents.on('did-finish-load', sendPendingRequest);
   mainWindow.on('closed', cancelPendingDispatch);
 }
 
@@ -119,22 +120,29 @@ function createWindow(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  const initialSicPath = findSicPathInArgs(process.argv);
-  if (initialSicPath) {
-    setInitialProjectPath(initialSicPath);
+  // A project.sic or an assembly file to open (double-click, "Open with", command line).
+  const initialRequest = findOpenRequestInArgs(process.argv);
+  if (initialRequest) {
+    setInitialRequest(initialRequest);
   }
 
   app.on('second-instance', (_event, commandLine) => {
-    const sicPath = findSicPathInArgs(commandLine);
-    if (sicPath) {
-      queueProjectOpen(sicPath);
+    const request = findOpenRequestInArgs(commandLine);
+    if (request) {
+      queueOpen(request);
+    } else {
+      // Started again without a file: show the window that is already there.
+      const mainWindow = getMainWindow();
+      if (mainWindow?.isMinimized()) mainWindow.restore();
+      mainWindow?.focus();
     }
   });
 
   // macOS delivers opened files through this event, not through argv.
   app.on('open-file', (event, filePath) => {
     event.preventDefault();
-    queueProjectOpen(filePath);
+    const request = openRequestFor(filePath);
+    if (request) queueOpen(request);
   });
 
   app.whenReady().then(() => {
@@ -151,8 +159,8 @@ if (!app.requestSingleInstanceLock()) {
 
     createWindow();
 
-    if (hasPendingProjectPath()) {
-      queueProjectOpen();
+    if (hasPendingRequest()) {
+      queueOpen();
     }
 
     app.on('activate', () => {

@@ -2,11 +2,11 @@
 // the text, the undo history and (through @monaco-editor/react) the view state of its file
 // while other tabs are shown.
 import * as monaco from 'monaco-editor';
-import path from 'path-browserify';
+import { resolveInProject } from '@/lib/projectPath';
 
-/** The model path (a file URI) of a project file. */
+/** The model path (a file URI) of a project file, or of a file from outside it (absolute). */
 export function modelPath(projectPath: string, filePath: string) {
-  return monaco.Uri.file(path.join(projectPath, filePath)).toString();
+  return monaco.Uri.file(resolveInProject(projectPath, filePath)).toString();
 }
 
 /** Drop the model of a closed tab, so that opening the file again starts from the disk. */
