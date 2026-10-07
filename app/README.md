@@ -63,12 +63,13 @@ src/
   components/            앱 전체에서 쓰는 컴포넌트 (ui/ 는 shadcn 기본 컴포넌트), AppDialog, Toasts, StatusBar
   i18n/                  화면의 글 (strings.ts: 영어·한국어), 어셈블러 메시지 번역
   features/
-    project/             프로젝트 열기·닫기, project.sic 설정 화면, 시작 화면
-    fileTree/            왼쪽 파일 트리
+    project/             프로젝트 열기·닫기, project.sic 설정 화면(어셈블 순서, 장치 표), 시작 화면
+    fileTree/            왼쪽 파일 트리 (프로젝트가 뿌리)
+    devices/             장치 패널(프로그램이 읽고 쓴 바이트), 소스에서 장치·제어 섹션 읽기
     editor/              Monaco 에디터(파일마다 모델 하나), 탭, 저장 확인, 자동 열 맞춤, 구문 검사
     listing/             실행 중 표시되는 리스팅 탭
     debugger/            실행 제어(runningStore), 도구 모음, 실행 간격, 레지스터, 메모리 뷰어
-    panel/               아래 패널: 변수 / 오류 / 시뮬레이터
+    panel/               아래 패널: 변수 / 장치 / 오류 / 시뮬레이터
   lib/, types/           여러 기능이 함께 쓰는 유틸, 전역 타입
   stores/                화면 설정(preferencesStore), 확인 창(dialogStore), 알림(toastStore)
 
@@ -94,7 +95,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 스크롤 막대: 목록과 패널은 `slim-scroll`(8 px), 탭 줄은 `no-scrollbar`.
 - 대화상자는 `src/components/ui/dialog.tsx` 로 만듭니다(Esc, 바깥 클릭, 포커스).
 - 메모리 뷰어의 너비는 `ch` 단위입니다 (`src/features/debugger/memory/gridLayout.ts`). 실행 패널은 높이가 고정(`h-full`)이어야 합니다. 높이가 열리면 메모리 뷰어가 4096 줄을 모두 그립니다.
-- 시험용 표시: `data-column`(세 열), `data-memory-row`(메모리 한 줄), `data-tab-path`(탭), `data-statusbar`, `data-run-state`(실행 상태: ready, load-failed, assembling, running, paused, breakpoint, halted), `data-register`(레지스터 한 칸).
+- 시험용 표시: `data-column`(세 열), `data-memory-row`(메모리 한 줄), `data-memory-underline` / `data-memory-label`(변수 밑줄과 이름), `data-tab-path`(탭), `data-statusbar`, `data-run-state`(실행 상태: ready, load-failed, assembling, running, paused, breakpoint, halted), `data-register`(레지스터 한 칸), `data-project-root`(트리의 뿌리), `data-assembly-order`(어셈블 순서 표시), `data-asm-file` / `data-asm-handle`(설정의 어셈블 파일 줄과 손잡이), `data-device-table` / `data-device-row` / `data-device-add-row`(설정의 장치 표), `data-device` / `data-stream-box`(장치 패널의 장치 한 줄과 바이트 칸), `data-tab-dot`(장치 탭의 새 데이터 점), `data-new-file-option`(새 파일 창의 선택).
 
 ## 알아 둘 점
 
@@ -102,10 +103,22 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 자동 열 맞춤(`src/features/editor/lib/autoIndentLine.ts`)은 입력 한 번마다 실행되므로, 바꿀 때는 `autoIndentLine.test.ts` 와 함께 확인하세요.
 - 실행 제어는 `src/features/debugger/runningStore.ts` 에 있습니다. 상태는 준비 → 실행 중 → 멈춤 → 종료이고, 상태 표시줄에 늘 보입니다. 중단점은 그 줄을 실행하기 전에 멈춥니다.
   - 실행(Run) 메뉴와 단축키: 실행·계속 F5, 일시 중지 F6, 한 단계 F10, 처음부터 다시 Ctrl+Shift+F5, 중지 Shift+F5.
-  - 실행 간격(명령어 사이의 시간)은 도구 모음의 목록과 실행 메뉴에서 고르며, 실행 중에도 바로 적용됩니다. 기본 100 ms. 20 ms 보다 짧으면 화면을 덜 자주 그립니다(레지스터 50 ms, 메모리·변수 250 ms 마다). 시뮬레이터는 바꾸지 않았습니다.
+  - 실행 간격(명령어 사이의 시간)은 도구 모음의 목록과 실행 메뉴에서 고르며, 실행 중에도 바로 적용됩니다. 기본 250 ms. 20 ms 보다 짧으면 화면을 덜 자주 그립니다(레지스터 50 ms, 메모리·변수 250 ms 마다). 시뮬레이터는 바꾸지 않았습니다.
   - 프로그램이 끝나면(halt) 창을 띄우지 않습니다. 레지스터, 메모리, 변수, 리스팅은 마지막 상태로 남고, 리스팅에 끝난 줄이 표시되며, 시뮬레이터 패널에 한 줄이 남습니다. 중지(Shift+F5)해야 실행이 닫힙니다.
-  - 실행 전에 project.sic 의 파일과 장치 파일이 있는지 확인하고, 프로그램이 쓰는 장치가 파일에 연결되어 있지 않으면 알립니다.
-- `project.sic` 는 JSON 입니다: `asm`(프로젝트 기준 경로), `main`(확장자 없는 이름), `filedevices`, `mode`(`"SIC"` 또는 `"SICXE"`, 없으면 SIC). 모드를 바꾸면 `mode` 만 바로 저장되고, 설정 화면의 저장하지 않은 편집은 그대로 남습니다.
+  - 실행 전에 project.sic 의 파일과 장치 파일이 있는지 확인하고, 프로그램이 쓰는 장치가 파일에 연결되어 있지 않으면 알립니다. 알림의 버튼은 새 파일(레이블 이름, 예: `outdev.txt`)을 만들어 연결하고 다시 시작합니다.
+  - 출력만 하는 장치(WD 만 있고 RD 는 없는 장치)의 파일은 실행을 시작할 때 비웁니다. 시뮬레이터는 파일을 앞에서부터 덮어쓰고 자르지 않아서, 짧은 출력 뒤에 지난 실행의 끝이 남았습니다(`XXXXXX` 에 `AB` → `ABXXXX`). 시뮬레이터는 바꾸지 않았습니다.
+  - 연결 안 된 장치는 0 을 읽고 쓴 것을 버리며, TD 에 준비되지 않았다고 답합니다(이 저장소의 SicTools 는 `Device.test()` 가 false). 그래서 교재의 `TD` / `JEQ` 루프는 끝나지 않고, 장치 패널이 "대기 중"으로 알립니다.
+- `project.sic` 는 JSON 입니다: `asm`(프로젝트 기준 경로, 어셈블 순서), `main`(먼저 실행할 제어 섹션의 START 또는 CSECT 이름; 여러 파일을 링크할 때만 쓰이며 대소문자를 구분), `filedevices`, `mode`(`"SIC"` 또는 `"SICXE"`, 없으면 SIC).
+- 프로젝트 설정 화면은 바뀐 것을 바로 project.sic 에 씁니다(저장 버튼 없음. 메인 프로그램 이름만은 칸을 떠날 때나 Enter, Ctrl+S 에 씁니다). 어셈블 파일을 빼거나 장치 연결을 끊으면 알림에 되돌리기가 있습니다.
+  - 장치 표는 소스에서 찾은 장치(RD, WD, TD 와 그 BYTE)와 연결된 장치를 함께 보여 줍니다. 연결 안 된 장치는 한 번에 새 파일로 연결하거나, 프로젝트 파일·새 파일·파일 선택 창(출력 장치는 저장 창이라 새 이름을 쓸 수 있음)에서 고릅니다. 장치 번호는 `F1`, `0xF1`, `X'F1'` 모두 됩니다.
+- 파일 트리의 뿌리는 프로젝트 폴더입니다(Visual Studio 의 솔루션처럼). 누르면 프로젝트 설정이 열리고, 접히지 않습니다. project.sic 는 파일로 보이지 않습니다.
+  - 어셈블하는 파일에는 순서(1st, 2nd …; 한국어 1번째 …)가 붙고, 메인 프로그램의 표시는 채워져 있습니다. 순서는 설정에서 손잡이를 끌거나, 손잡이에서 Alt+↑ / Alt+↓, ▲ / ▼ 로, 또는 트리의 오른쪽 클릭 메뉴로 바꿉니다.
+  - 새 파일 창: `.asm` 은 "어셈블 파일에 추가"(기본 켬), `.txt` 는 "장치에 연결"(번호 입력)을 고를 수 있습니다.
+- 장치 패널(`src/features/devices/`)은 실행 중 RD, WD, TD 를 명령어마다 기록합니다. 시뮬레이터에 묻지 않습니다: 실행한 명령어의 주소와 그 전후 레지스터, 리스팅으로 압니다(WD 는 실행 전 A 의 마지막 바이트, RD 는 실행 후, TD 는 SW 의 CC).
+  - 입력은 파일을 테이프처럼(읽은 바이트, 다음에 읽을 바이트, 남은 바이트, EOF), 출력은 쓴 바이트를 보여 줍니다. 연결 안 된 장치에 쓴 바이트는 지운 줄로 "버려짐" 표시. 문자 / 16진 보기, 복사, 장치마다 마지막 64 KiB.
+  - 끝까지 내려가 있을 때만 따라가고, 위로 올렸으면 "새 바이트 N개" 버튼을 띄웁니다. 실행이 끝나거나 중지해도 다음 실행까지 남습니다. 탭이 보이지 않을 때 새 바이트가 오면 탭에 점이 붙고, 탭이 저절로 바뀌지는 않습니다.
+- 바뀐 값 표시는 메모리 뷰어, 변수, 장치 패널이 같은 규칙을 씁니다(`src/lib/changeMarks.ts`). 한 단계에서 바뀐 값은 0.6 초 깜빡이고, 다음 단계까지 옅은 색과 굵은 글씨로 남습니다. 자동 실행 중 계속 바뀌는 값은 깜빡임을 다시 시작하지 않고 켜진 채로 둡니다(깜빡임이 초당 3번을 넘지 않도록). 20 ms 보다 짧은 간격에서는 표시하지 않습니다. 운영체제의 "움직임 줄이기"에서는 메모리 칸이 커지지 않습니다.
+- 메모리 뷰어의 변수 밑줄과 이름은 값 아래에 따로 줄이 있습니다(값 17 px, 밑줄 3 px, 이름 12 px; `gridLayout.ts`). 위치는 CSS grid 로 정합니다. Chromium 이 `calc()` 안에서 곱과 합의 뺄셈을 잘못 줄여 밑줄이 한 칸 짧아진 일이 있어 그런 식을 쓰지 않습니다.
 - 실행 간격은 프로젝트가 아니라 앱의 설정이라 렌더러의 localStorage(`umjoonsic.runInterval`)에 둡니다.
 - 메시지는 세 가지뿐입니다: 묻거나 오류를 알리는 창(`src/stores/dialogStore.ts` 의 `ask`, `showError` → `AppDialog`), 잠깐 보이는 알림(`toastStore` 의 `notify` → `Toasts`), 입력 칸 아래의 오류. 운영체제의 메시지 창은 시작 오류와 파일 선택 창에만 씁니다.
 - 에디터에서 Tab 은 다음 열로 갑니다. 키보드로 에디터를 나가려면 Ctrl+M(macOS 는 Ctrl+Shift+M)으로 Monaco 의 "Tab 으로 포커스 이동"을 켭니다 (VS Code 와 같음). 그래서 Windows·Linux 의 창 최소화에는 단축키가 없습니다.
