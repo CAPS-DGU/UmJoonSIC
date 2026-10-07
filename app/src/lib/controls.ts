@@ -1,5 +1,5 @@
 // One size per kind of control, so that controls of a kind look the same everywhere (see
-// the screen layout section of app/README.md). Heights: bars 40 px (top) and 32 px (panel
+// the screen layout rules in docs/DEVELOPMENT.md). Heights: bars 40 px (top) and 32 px (panel
 // headers); controls in them 28 px; small icon buttons inside rows 24 px.
 
 /** An icon button in a bar (file actions, run toolbar): 28 px square. */

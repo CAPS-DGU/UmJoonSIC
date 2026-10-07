@@ -1,7 +1,7 @@
 // The assembler's and linker's messages come from SicTools in English (the simulator is not
 // changed). In Korean mode the known ones are shown in Korean; the quoted part (the symbol,
 // the character) stays as written. Templates from SicTools/src/sic*/asm and the linker.
-// Terms as in the Korean Beck and the course (the terminology section of app/README.md):
+// Terms as in the Korean Beck and the course (the Korean terminology section of docs/DEVELOPMENT.md):
 // 기호 with "(symbol)" attached, 니모닉, 레이블, 위치 카운터, 주소 지정 방식, 제어 섹션.
 import type { UiLanguage } from '@shared/ipc';
 

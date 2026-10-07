@@ -1,3 +1,5 @@
+[![Read in English](https://img.shields.io/badge/Read_in-English-blue)](README.en.md)
+
 # 동국대학교 컴퓨터·AI학부 공식 실습 프로그램 **엄준SIC**
 <img width="2100" height="1400" alt="splash" src="https://github.com/user-attachments/assets/f293ede4-6af5-4723-b066-98ae02784de6" />
 
@@ -12,7 +14,7 @@
 ## 프로젝트 개요
 
 - **프론트엔드(Electron)**  
-  Windows·macOS에서 설치/실행 가능하며, **리눅스 지원도 순차적으로 추진**합니다. 기존 도구 대비 현대적이고 접근성 높은 UI/UX를 제공합니다.
+  Windows·macOS·**리눅스(x64)**에서 설치/실행 가능합니다. 기존 도구 대비 현대적이고 접근성 높은 UI/UX를 제공합니다.
 
 - **백엔드(Java, Spark 기반)**  
   jurem의 **SicTools**(Java) 프로젝트를 기반으로, 기존 **Swing 앱을 Spark(Java) 서버 애플리케이션**으로 재구성했습니다.
@@ -21,6 +23,18 @@
      - 원작자 웹사이트 : https://jurem.github.io/SicTools/
   - **SIC-XE뿐 아니라 순수 SIC까지** 아우르도록 로직을 보강했습니다.  
   - **문법 오류 위치 반환의 부정확성** 등 기존 이슈를 일괄 패치하여 실습 시 디버깅 경험을 개선했습니다.
+
+## 리눅스(x64) 설치
+
+[Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases)에서 `UmJoonSIC-linux-x64-<버전>.tar.gz`를 받아 압축을 풀고 `install.sh`를 실행합니다. 관리자 권한은 필요 없습니다.
+
+```bash
+tar -xzf UmJoonSIC-linux-x64-1.1.0.tar.gz
+cd UmJoonSIC-linux-x64-1.1.0
+./install.sh
+```
+
+설치 후 앱 목록의 엄준SIC 또는 터미널의 `umjoonsic`으로 실행합니다. 삭제는 `./install.sh --uninstall`입니다.
 
 ## 라이선스 및 서브트리 고지
 
@@ -52,76 +66,5 @@
 
 
 ## 개발자 / 기여자를 위한 가이드
-### 프론트엔드(일렉트론) 세팅 가이드
 
-**1. pnpm 설치**
-
-Node.js 환경에서 사용할 패키지 매니저 중 하나인 `pnpm`을 설치합니다.
-
-```
-npm install -g pnpm
-```
-
-> Node.js가 설치되어 있어야 합니다.
-
-**2. 프로젝트 의존성 설치**
-
-프로젝트의 프론트엔드 코드는 `app` 디렉토리에 있습니다. 이동 후 의존성을 설치합니다.
-
-```
-cd app
-pnpm install
-```
-
-**3. 개발 서버 실행**
-
-개발 중에는 로컬 서버를 띄워서 변경 사항을 실시간으로 확인할 수 있습니다.
-
-```
-pnpm run dev
-```
-
-> 서버가 정상적으로 실행되면 브라우저 또는 일렉트론 앱에서 바로 확인 가능합니다.
-
-**4. 빌드**
-
-```
-pnpm build
-```
-
-**5. 코드 포맷 및 린트 설정**
-
-코드 스타일을 일관되게 유지하기 위해 Prettier를 사용합니다.
-
-- IDE에서 Prettier 확장을 설치합니다.
-- VSCode를 사용하는 경우, 루트 경로에 `.vscode/settings.json` 파일을 만들고 다음을 추가합니다.
-
-```json
-{
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.formatOnSave": true
-}
-```
-
-> 이렇게 하면 저장할 때 자동으로 코드가 포맷되며, 협업 시 스타일 일관성을 유지할 수 있습니다.
-
-
-
-### 백엔드(java) 세팅 가이드
-**중요 : 파라미터를 통해 별도로 포트를 받지 않는다면, 반드시 9090 포트가 비어있어야 합니다**
-
-**1. gradle 설치**
-적절한 버전의 gradle을 설치하셔도 되고, intelliJ에서 프로젝트를 열어 gradle을 사용해도 됩니다(권장)
-
-**2. 실행 및 디버그**
-```bash
-cd simulator
-./gradlew run --stacktrace
-```
-IntelliJ에서 열 경우 해당 커맨드가 우측 상단의 Run Configurations에 자동적으로 나타납니다.
-
-**3. 최종 빌드**
-- 같은 디렉터리에서 다음을 실행하면 하나의 jar 파일로 빌드합니다 (Release 시)
-```bash
-./gradlew clean shadowJar
-```
+개발 환경 설정, 빌드, 릴리스 방법은 [개발 문서(영문)](docs/DEVELOPMENT.md)에 있습니다.

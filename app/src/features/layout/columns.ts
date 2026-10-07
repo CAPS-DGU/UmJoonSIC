@@ -1,5 +1,5 @@
 // Sizes of the three columns (files | editor | run panel) and of the bottom panel, in CSS px.
-// The numbers come from layout measurements (app/README.md, screen layout): each minimum is the
+// The numbers come from layout measurements (docs/DEVELOPMENT.md, screen layout rules): each minimum is the
 // width below which the column's content no longer fits, each maximum the width past which
 // the column only gains empty space.
 

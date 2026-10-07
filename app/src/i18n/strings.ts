@@ -1,6 +1,6 @@
 // The page's texts in both interface languages. English mode is English throughout; Korean
 // mode keeps the textbook's technical terms as students meet them in class (see
-// the terminology section of app/README.md for each choice).
+// the Korean terminology section of docs/DEVELOPMENT.md for each choice).
 // Both objects have the same keys (Strings): a missing translation is a type error.
 
 const en = {
