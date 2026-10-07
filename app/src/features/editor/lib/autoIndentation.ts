@@ -47,10 +47,28 @@ export function attachAutoIndentation(editor: Editor, isEnabled: () => boolean) 
           ],
     );
   };
+  /**
+   * The marker is moved in a microtask, never inside an editor event: Monaco can deliver
+   * queued events while a decoration change is running, and changing decorations from such
+   * an event is a recursion it reports ("Invoking deltaDecorations recursively").
+   */
+  let pending: number | null | undefined;
+  const setEdited = (lineNumber: number | null) => {
+    if (pending === undefined) queueMicrotask(flushEdited);
+    pending = lineNumber;
+  };
+  const flushEdited = () => {
+    if (pending === undefined) return;
+    const lineNumber = pending;
+    pending = undefined;
+    markEdited(lineNumber);
+  };
   const editedLine = () =>
-    edited.length
-      ? (editor.getModel()?.getDecorationRange(edited[0])?.startLineNumber ?? null)
-      : null;
+    pending !== undefined
+      ? pending
+      : edited.length
+        ? (editor.getModel()?.getDecorationRange(edited[0])?.startLineNumber ?? null)
+        : null;
 
   const lineRange = (model: monaco.editor.ITextModel, lineNumber: number) =>
     new monaco.Range(lineNumber, 1, lineNumber, model.getLineMaxColumn(lineNumber));
@@ -155,7 +173,7 @@ export function attachAutoIndentation(editor: Editor, isEnabled: () => boolean) 
         } finally {
           ownEdit = false;
         }
-        markEdited(null);
+        setEdited(null);
         return;
       }
     }
@@ -166,7 +184,7 @@ export function attachAutoIndentation(editor: Editor, isEnabled: () => boolean) 
   const onContent = editor.onDidChangeModelContent(e => {
     if (ownEdit || !isEnabled()) return;
     if (e.isUndoing || e.isRedoing || e.isFlush) {
-      markEdited(null);
+      setEdited(null);
       return;
     }
     // A change within one line (typing, or a paste of a part of a line).
@@ -179,17 +197,19 @@ export function attachAutoIndentation(editor: Editor, isEnabled: () => boolean) 
       const line = change.range.startLineNumber;
       const before = editedLine();
       if (before !== null && before !== line) queueMicrotask(() => formatLeft(before));
-      markEdited(line);
+      setEdited(line);
     }
   });
 
-  const onCursor = editor.onDidChangeCursorPosition(e => {
-    const left = editedLine();
-    if (left === null || left === e.position.lineNumber) return;
-    markEdited(null);
-    if (!isEnabled()) return;
-    // After the cursor event: the editor is still applying the move.
-    queueMicrotask(() => formatLeft(left));
+  // After the cursor event (the editor is still applying the move): lay out the line left.
+  const onCursor = editor.onDidChangeCursorPosition(() => {
+    queueMicrotask(() => {
+      const left = editedLine();
+      const now = editor.getPosition()?.lineNumber;
+      if (left === null || left === now) return;
+      setEdited(null);
+      if (isEnabled()) formatLeft(left);
+    });
   });
 
   /**

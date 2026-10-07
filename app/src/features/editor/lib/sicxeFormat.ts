@@ -43,6 +43,17 @@ export function isOperation(word: string) {
 }
 
 const isSpace = (ch: string | undefined) => ch === ' ' || ch === '\t';
+
+/** Tabs to spaces, except inside quotes: a tab in C'..' is a byte of the program. */
+function detab(s: string) {
+  let out = '';
+  let quote = false;
+  for (const ch of s) {
+    if (ch === "'") quote = !quote;
+    out += ch === '\t' && !quote ? ' ' : ch;
+  }
+  return out;
+}
 const OPERATORS = ',+-*/';
 
 // ---------------------------------------------------------------------------------------
@@ -219,10 +230,11 @@ export interface LayoutOptions {
 
 /**
  * Lay a line out in its columns. A field starts at its column, or one space after the field
- * before when that one is too long. A comment line starts at column 1; tabs become spaces.
+ * before when that one is too long. A comment line starts at column 1; tabs become spaces
+ * (not inside quotes).
  */
 export function layout(raw: string, { fix = false }: LayoutOptions = {}): Layout {
-  const s = raw.replace(/\t/g, ' ');
+  const s = detab(raw);
   const f = classify(s);
   const starts = { label: -1, opcode: -1, operand: -1, comment: -1 };
   if (f.kind === 'blank') return { line: '', starts };
@@ -268,7 +280,7 @@ export const formatLine = (line: string) => layout(line, { fix: true }).line;
  */
 export function formatPasted(lines: string[]) {
   const nonBlank = (ls: string[]) => ls.filter(l => l.trim() !== '');
-  let block = lines.map(l => l.replace(/\t/g, ' '));
+  let block = lines.map(detab);
   const numbered = nonBlank(block).filter(l => /^\s*\d+(\s|$)/.test(l));
   if (nonBlank(block).length >= 2 && numbered.length === nonBlank(block).length) {
     block = block.map(l => l.replace(/^(\s*)\d+(\s+|$)/, (_, a: string, b: string) => a + b));
@@ -313,7 +325,7 @@ function inQuotes(s: string, i: number) {
  * a space; Tab there goes to the next tab stop (8).
  */
 function stepAtEnd(left: string, tab: boolean): Edit {
-  const s = left.replace(/\t/g, ' ');
+  const s = detab(left);
   const f = classify(s.trimEnd());
   const plainSpace = () => plainSpaceFor(s, tab);
   if (f.kind === 'blank') return { line: ' '.repeat(OPCODE_COLUMN), cursor: OPCODE_COLUMN };
@@ -351,7 +363,7 @@ function plainSpaceFor(s: string, tab: boolean): Edit {
  * moves the cursor to the next field, as Tab always does.
  */
 export function onSpace(line: string, cursor: number, tab = false): Edit {
-  const s = line.replace(/\t/g, ' ');
+  const s = detab(line);
   const cp = Math.max(0, Math.min(cursor, s.length));
   const left = s.slice(0, cp);
   const right = s.slice(cp);
@@ -390,7 +402,7 @@ export function onShiftTab(line: string, cursor: number): Edit {
  *   the end of the last field.
  */
 export function onBackspace(line: string, cursor: number): Edit | null {
-  const s = line.replace(/\t/g, ' ');
+  const s = detab(line);
   const cp = Math.max(0, Math.min(cursor, s.length));
   if (cp === 0 || !isSpace(s[cp - 1])) return null;
   let start = cp;
@@ -416,7 +428,7 @@ export function onEnter(
   line: string,
   cursor: number,
 ): { before: string; after: string; cursor: number } {
-  const s = line.replace(/\t/g, ' ');
+  const s = detab(line);
   const cp = Math.max(0, Math.min(cursor, s.length));
   const before = formatLine(s.slice(0, cp));
   const rest = s.slice(cp).trimStart();

@@ -148,6 +148,16 @@ describe('formatLine: Enter, paste, Format Document, leaving a line', () => {
     expect(formatLine('LOOP     ')).toBe('LOOP');
   });
 
+  it('keeps a tab inside quotes (a byte of the program), turns the others into spaces', () => {
+    expect(formatLine("MSG\tBYTE\tC'A\tB'\t. x\ty")).toBe(
+      "MSG      BYTE    C'A\tB'            . x y",
+    );
+    expect(formatPasted(['\tLDA\tZERO', "T\tBYTE\tC'\t'"])).toEqual([
+      '         LDA     ZERO',
+      "T        BYTE    C'\t'",
+    ]);
+  });
+
   it('is idempotent', () => {
     for (const l of ['FIRST STL RETADR', ' RSUB x', "C1 BYTE C'A B'", 'E EQU A - B', '. c']) {
       expect(formatLine(formatLine(l))).toBe(formatLine(l));
