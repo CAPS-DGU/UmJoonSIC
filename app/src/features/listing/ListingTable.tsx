@@ -98,15 +98,15 @@ const InstructionRow = memo(function InstructionRow({
           <div className="w-2.5 h-2.5 rounded-full border border-gray-400 mx-auto opacity-0 group-hover:opacity-100"></div>
         )}
       </td>
-      <td className="px-2 py-1 w-24">
+      <td className="px-2 py-1">
         {'0x' + rowAddress(row).toString(16).toUpperCase().padStart(6, '0')}
       </td>
-      <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
-      <td className="px-2 py-1 w-24">{row.label}</td>
-      <td className="px-2 py-1 w-24">{row.instr}</td>
+      <td className="px-2 py-1">{row.rawCodeHex}</td>
+      <td className="px-2 py-1">{row.label}</td>
+      <td className="px-2 py-1">{row.instr}</td>
       {/* As the student wrote it (a decimal 0 was shown as 0x0000). Each symbol is a link to
           its definition (and its bytes in memory): "PRTNUM,PUTCH" has two. */}
-      <td className="px-2 py-1 w-24">
+      <td className="px-2 py-1">
         {operand.map((part, i) =>
           part.symbol === undefined ? (
             part.text
@@ -128,10 +128,10 @@ const InstructionRow = memo(function InstructionRow({
           ),
         )}
       </td>
-      <td className="px-2 py-1 flex-1 min-w-64">{row.comment}</td>
-      <td className="px-2 py-1 w-64">{row.rawCodeBinary}</td>
-      <td className="px-2 py-1 w-24">{row.instrBin}</td>
-      <td className="px-2 py-1 w-24">{row.nixbpe}</td>
+      <td className="px-2 py-1">{row.comment}</td>
+      <td className="px-2 py-1">{row.rawCodeBinary}</td>
+      <td className="px-2 py-1">{row.instrBin}</td>
+      <td className="px-2 py-1">{row.nixbpe}</td>
     </tr>
   );
 });
@@ -171,17 +171,21 @@ export default function ListingTable({
   const isHalted = useRunningStore(state => state.isHalted);
   // Only the end banner shows it: no redraw for every instruction while running.
   const stepCount = useRunningStore(state => (state.isHalted ? state.stepCount : 0));
+  // No fixed widths: the table fills the listing and every column takes its share in
+  // proportion to its content. A column's least width is its content and its name (in the
+  // interface language), never wrapped (the rows are nowrap); below the sum of those, the
+  // listing scrolls across. The breakpoint column alone is fixed.
   const COLUMNS: { title: string; className: string }[] = [
     { title: '', className: 'w-8' },
-    { title: t.listing.address, className: 'w-24' },
-    { title: t.listing.rawHex, className: 'w-32' },
-    { title: t.listing.label, className: 'w-24' },
-    { title: t.listing.instruction, className: 'w-24' },
-    { title: t.listing.operand, className: 'w-24' },
-    { title: t.listing.comment, className: 'flex-1 min-w-64' },
-    { title: t.listing.rawBinary, className: 'w-64' },
-    { title: t.listing.instructionBinary, className: 'w-24' },
-    { title: t.listing.flags, className: 'w-24' },
+    { title: t.listing.address, className: '' },
+    { title: t.listing.rawHex, className: '' },
+    { title: t.listing.label, className: '' },
+    { title: t.listing.instruction, className: '' },
+    { title: t.listing.operand, className: '' },
+    { title: t.listing.comment, className: '' },
+    { title: t.listing.rawBinary, className: '' },
+    { title: t.listing.instructionBinary, className: '' },
+    { title: t.listing.flags, className: '' },
   ];
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
@@ -238,7 +242,7 @@ export default function ListingTable({
       )}
       {/* The container scrolls both ways (no inner scroller), so that the header row can stick. */}
       <div className="w-full">
-        <table className="divide-y divide-gray-300 border-collapse">
+        <table className="w-full divide-y divide-gray-300 border-collapse">
           <thead>
             <tr className="whitespace-nowrap">
               {COLUMNS.map(column => (
@@ -258,9 +262,11 @@ export default function ListingTable({
               rows.map((row, index) => {
                 if (row.isCommentRow) {
                   return (
-                    <tr key={index} className="text-gray-600 italic whitespace-nowrap">
+                    <tr key={index} className="text-gray-600 italic">
                       <td colSpan={COLUMNS.length} className="px-2 py-1">
-                        {row.comment}
+                        {/* A comment line spans the table and wraps: with no width of its
+                            own (w-0), a long one does not widen every column. */}
+                        <div className="w-0 min-w-full break-words">{row.comment}</div>
                       </td>
                     </tr>
                   );
