@@ -102,7 +102,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 ## 알아 둘 점
 
 - 저장하지 않은 변경: 수정한 탭, 프로젝트, 창을 닫거나 앱을 끝낼 때 저장 / 저장 안 함 / 취소를 묻습니다 (`src/features/editor/unsavedChanges.ts`). 창 닫기는 메인 프로세스가 붙잡아 두었다가 렌더러가 답하면 닫습니다 (`electron/windows/mainWindow.ts`).
-- 자동 열 맞춤(`src/features/editor/lib/autoIndentLine.ts`)은 입력 한 번마다 실행되므로, 바꿀 때는 `autoIndentLine.test.ts` 와 함께 확인하세요.
+- 열 맞춤의 규칙은 `src/features/editor/lib/sicxeFormat.ts`(편집기 없는 순수 함수), 편집기 연결은 `autoIndentation.ts` 입니다. 키마다 실행되므로, 바꿀 때는 `sicxeFormat.test.ts`(키 입력 흉내 포함)와 함께 확인하세요.
 - 실행 제어는 `src/features/debugger/runningStore.ts` 에 있습니다. 상태는 준비 → 실행 중 → 멈춤 → 종료이고, 상태 표시줄에 늘 보입니다. 중단점은 그 줄을 실행하기 전에 멈춥니다.
   - 실행(Run) 메뉴와 단축키: 실행·계속 F5, 일시 중지 F6, 한 단계 F10, 처음부터 다시 Ctrl+Shift+F5, 중지 Shift+F5.
   - 실행 간격(명령어 사이의 시간)은 도구 모음의 목록과 실행 메뉴에서 고르며, 실행 중에도 바로 적용됩니다. 기본 250 ms. 20 ms 보다 짧으면 화면을 덜 자주 그립니다(레지스터 50 ms, 메모리·변수 250 ms 마다). 시뮬레이터는 바꾸지 않았습니다.
@@ -135,6 +135,13 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 메모리 뷰어의 변수 밑줄과 이름은 값 아래에 따로 줄이 있습니다(값 17 px, 밑줄 3 px, 이름 12 px; `gridLayout.ts`). 위치는 CSS grid 로 정합니다. Chromium 이 `calc()` 안에서 곱과 합의 뺄셈을 잘못 줄여 밑줄이 한 칸 짧아진 일이 있어 그런 식을 쓰지 않습니다.
 - 실행 간격은 프로젝트가 아니라 앱의 설정이라 렌더러의 localStorage(`umjoonsic.runInterval`)에 둡니다.
 - 메시지는 세 가지뿐입니다: 묻거나 오류를 알리는 창(`src/stores/dialogStore.ts` 의 `ask`, `showError` → `AppDialog`), 잠깐 보이는 알림(`toastStore` 의 `notify` → `Toasts`), 입력 칸 아래의 오류. 운영체제의 메시지 창은 시작 오류와 파일 선택 창에만 씁니다.
+- 편집기의 열 맞춤 (프로젝트의 `.asm` 파일): 레이블 1열, 명령어 10열, 피연산자 18열, 주석 36열.
+  - 필드는 어셈블러(SicTools)가 읽는 대로 나눕니다. 1열의 단어는 레이블이지만, 명령어이고 다음 단어가 명령어가 아니면 명령어입니다(1열에 친 `LDA ZERO`). 들여 쓴 단어는 다음 단어가 명령어이면 레이블입니다. 피연산자가 없는 명령어(RSUB, LTORG …) 뒤는 주석입니다. 피연산자 안의 빈칸(따옴표 안, 쉼표·연산자 옆, `=WORD 65535`)은 피연산자입니다.
+  - Space 와 Tab 은 다음 열로, Shift+Tab 은 앞 필드로 갑니다. 따옴표 안, 주석 안, 쉼표 뒤의 Space 는 빈칸입니다.
+  - Enter 는 그 줄을 정리하고, 새 줄은 명령어 열(10열)에서 시작합니다. 레이블은 그대로 쳐도 명령어가 뒤따르면 1열로 갑니다. Backspace 는 줄 앞의 빈칸에서 1열로, 필드 사이 빈칸에서 앞 필드 끝으로 갑니다(빈칸은 지우지 않음).
+  - 입력한 줄은 커서가 그 줄을 떠날 때 정리됩니다. 여러 줄 붙여넣기는 한 덩어리로 정리합니다: 모든 줄 앞의 줄 번호(교재 그림)를 빼고, 통째로 들여 쓴 덩어리는 왼쪽으로 옮깁니다. 문서 서식(Windows·macOS 는 Shift+Alt+F, Linux 는 Ctrl+Shift+I; 오른쪽 클릭 메뉴의 Format Document)은 파일 전체를 정리합니다.
+  - 정리할 때 어셈블러가 받지 않고 뜻이 하나뿐인 것은 고칩니다: 명령어, `C'`/`X'`, `,X`, 레지스터를 대문자로(기호는 대소문자를 구분하므로 그대로), 쉼표 옆 빈칸, 점 없는 주석 앞의 `. `(교재의 고정 형식). 데이터나 피연산자일 수 있는 것(`65535`, `- X1`, `'…'`)과 모르는 명령어 뒤에는 점을 붙이지 않아 오류로 보입니다.
+  - 키는 편집기가 적용하기 전에 처리합니다 (빠르게 쳐도 순서가 섞이지 않음). 선택 영역, 다중 커서, 한글 입력 중(조합 중)에는 편집기 기본 동작입니다. 단어 제안이 열려 있으면 Tab 은 제안을 받습니다.
 - 편집기에서 Tab 은 다음 열로 갑니다. 키보드로 편집기를 나가려면 Ctrl+M(macOS 는 Ctrl+Shift+M)으로 Monaco 의 "Tab 으로 포커스 이동"을 켭니다 (VS Code 와 같음). 그래서 Windows·Linux 의 창 최소화에는 단축키가 없습니다.
 - 탭: 끌어서 순서를 바꾸고, Ctrl+PageDown / Ctrl+PageUp 으로 옮겨 가며, Ctrl+Shift+PageDown / Ctrl+Shift+PageUp 으로 자리를 옮깁니다 (File 메뉴). macOS 에서도 Ctrl 입니다 (Cmd+PageDown 은 편집기의 스크롤).
 - 스플래시는 시작이 끝날 때까지의 창입니다. 닫으면 시작을 취소하고 앱이 끝납니다 (`electron/main.ts`).

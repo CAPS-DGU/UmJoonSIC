@@ -4,7 +4,8 @@
 import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import { registerSicxe } from '@/features/editor/monaco/sicxe';
+import { registerSicxeFormatting } from '@/features/editor/lib/autoIndentation';
+import { registerSicxe, SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 
 self.MonacoEnvironment = {
   // Only the core editor worker is needed: SIC/XE has no language service of its own.
@@ -23,6 +24,8 @@ window.addEventListener('unhandledrejection', event => {
   }
 });
 registerSicxe(monaco);
+// Format Document / Format Selection (Shift+Alt+F): the column layout of autoIndentation.
+registerSicxeFormatting(SICXE_LANGUAGE_ID);
 
 // Ctrl+PageDown / Ctrl+PageUp switch tabs (File menu). On macOS Monaco scrolls a line with
 // them, which would take the keys first; scrolling by line stays on its other keys.

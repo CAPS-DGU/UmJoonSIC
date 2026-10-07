@@ -144,16 +144,18 @@ export default function CodeEditor() {
       }
     });
 
-    // Pasted text is checked at once, without waiting for typing to pause.
+    // Column alignment applies to the project's .asm files only.
+    attachAutoIndentation(editor, () => isProjectAsmFile(shownTabPath(editor)));
+
+    // Pasted text is checked at once, without waiting for typing to pause; after the
+    // alignment above has laid it out (listeners run in order), so that the underlines are
+    // where the text ends up.
     editor.onDidPaste(() => {
       const filePath = shownTabPath(editor);
       if (filePath && isProjectAsmFile(filePath)) {
         checkSyntax([editor.getValue()], [filePath]);
       }
     });
-
-    // Column alignment applies to the project's .asm files only.
-    attachAutoIndentation(editor, () => isProjectAsmFile(shownTabPath(editor)));
 
     // A request made before the editor existed (the file was opened by an error click).
     applyRevealRequest(editor, useEditorTabStore.getState().revealRequest);
