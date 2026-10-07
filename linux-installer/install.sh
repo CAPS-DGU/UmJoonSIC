@@ -16,7 +16,8 @@
 # Wayland when there is no X server) and Chromium's sandbox mode (see sandbox_ok below).
 set -euo pipefail
 
-VERSION="@VERSION@" # filled in by pack.sh
+VERSION="@VERSION@"     # filled in by pack.sh
+MIN_GLIBC="@MIN_GLIBC@" # the newest glibc symbol version the app needs (measured by pack.sh)
 REPO="CAPS-DGU/UmJoonSIC"
 ID="umjoonsic"
 
@@ -138,16 +139,187 @@ if [ -z "$src_dir" ]; then
   exit $?
 fi
 
-# Libraries the app needs that are missing (an unusual minimal system): name them, go on.
-if command -v ldd >/dev/null 2>&1; then
-  missing="$(ldd "$src_dir/UmJoonSIC/UmJoonSIC" 2>/dev/null | awk '/not found/ {print $1}' | sort -u | tr '\n' ' ')"
-  if [ -n "$missing" ]; then
-    warn "these libraries are missing: $missing"
-    warn "install them with your package manager (for example: sudo apt install libnss3 libgtk-3-0 libgbm1 libasound2)."
+# ---------------------------------------------------------------------------------------
+# The system: C library, shared libraries, a Korean font
+# ---------------------------------------------------------------------------------------
+# shellcheck disable=SC1091 # the system's own file
+os_name="$( (. /etc/os-release 2>/dev/null && printf '%s' "${PRETTY_NAME:-$NAME}") || true)"
+say "System: ${os_name:-unknown Linux} ($(uname -m))"
+
+# $1 >= $2, as versions.
+version_ge() { [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -n 1)" = "$2" ]; }
+
+# The app is built against glibc; musl systems (Alpine) cannot run it.
+libc="$(getconf GNU_LIBC_VERSION 2>/dev/null || true)"
+[ -n "$libc" ] || die "UmJoonSIC needs a glibc-based distribution; this system's C library is not glibc (Alpine and other musl systems are not supported)"
+libc="${libc#glibc }"
+case "$MIN_GLIBC" in
+  @*) ;;
+  *) version_ge "$libc" "$MIN_GLIBC" || die "this system's glibc $libc is too old: UmJoonSIC needs glibc $MIN_GLIBC or newer" ;;
+esac
+
+# Run a command as root: directly, or through sudo.
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    return 1
+  fi
+}
+
+pm=""
+for candidate in apt-get dnf yum zypper pacman; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    pm="$candidate"
+    break
+  fi
+done
+
+# The package that provides a shared library, for each package manager. rpm-based systems
+# resolve the library name itself ("libgbm.so.1()(64bit)"); apt and pacman need the package.
+package_for() {
+  local lib="$1"
+  case "$pm" in
+    dnf | yum | zypper) printf '%s()(64bit)\n' "$lib" ;;
+    apt-get)
+      case "$lib" in
+        libglib-2.0.so.0 | libgobject-2.0.so.0 | libgio-2.0.so.0) echo libglib2.0-0 ;;
+        libnspr4.so) echo libnspr4 ;;
+        libnss3.so | libnssutil3.so | libsmime3.so) echo libnss3 ;;
+        libdbus-1.so.3) echo libdbus-1-3 ;;
+        libatk-1.0.so.0) echo libatk1.0-0 ;;
+        libatk-bridge-2.0.so.0) echo libatk-bridge2.0-0 ;;
+        libatspi.so.0) echo libatspi2.0-0 ;;
+        libcups.so.2) echo libcups2 ;;
+        libcairo.so.2) echo libcairo2 ;;
+        libgtk-3.so.0) echo libgtk-3-0 ;;
+        libpango-1.0.so.0) echo libpango-1.0-0 ;;
+        libX11.so.6) echo libx11-6 ;;
+        libXcomposite.so.1) echo libxcomposite1 ;;
+        libXdamage.so.1) echo libxdamage1 ;;
+        libXext.so.6) echo libxext6 ;;
+        libXfixes.so.3) echo libxfixes3 ;;
+        libXrandr.so.2) echo libxrandr2 ;;
+        libgbm.so.1) echo libgbm1 ;;
+        libexpat.so.1) echo libexpat1 ;;
+        libxcb.so.1) echo libxcb1 ;;
+        libxkbcommon.so.0) echo libxkbcommon0 ;;
+        libudev.so.1) echo libudev1 ;;
+        libasound.so.2) echo libasound2 ;;
+        libGL.so.1) echo libgl1 ;;
+        *) return 1 ;;
+      esac
+      ;;
+    pacman)
+      case "$lib" in
+        libglib-2.0.so.0 | libgobject-2.0.so.0 | libgio-2.0.so.0) echo glib2 ;;
+        libnspr4.so) echo nspr ;;
+        libnss3.so | libnssutil3.so | libsmime3.so) echo nss ;;
+        libdbus-1.so.3) echo dbus ;;
+        libatk-1.0.so.0 | libatk-bridge-2.0.so.0 | libatspi.so.0) echo at-spi2-core ;;
+        libcups.so.2) echo libcups ;;
+        libcairo.so.2) echo cairo ;;
+        libgtk-3.so.0) echo gtk3 ;;
+        libpango-1.0.so.0) echo pango ;;
+        libX11.so.6) echo libx11 ;;
+        libXcomposite.so.1) echo libxcomposite ;;
+        libXdamage.so.1) echo libxdamage ;;
+        libXext.so.6) echo libxext ;;
+        libXfixes.so.3) echo libxfixes ;;
+        libXrandr.so.2) echo libxrandr ;;
+        libgbm.so.1) echo mesa ;;
+        libexpat.so.1) echo expat ;;
+        libxcb.so.1) echo libxcb ;;
+        libxkbcommon.so.0) echo libxkbcommon ;;
+        libudev.so.1) echo systemd-libs ;;
+        libasound.so.2) echo alsa-lib ;;
+        libGL.so.1) echo libglvnd ;;
+        *) return 1 ;;
+      esac
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# A font for the Korean interface (the menus use the system's fonts).
+korean_font_package() {
+  case "$pm" in
+    apt-get) echo fonts-noto-cjk ;;
+    dnf | yum) echo 'font(:lang=ko)' ;;
+    zypper) echo noto-sans-cjk-fonts ;;
+    pacman) echo noto-fonts-cjk ;;
+    *) return 1 ;;
+  esac
+}
+
+# Whether a shared library is installed (the dynamic linker's cache, or the usual folders).
+has_lib() {
+  local dir
+  { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -qE "[[:space:]]$1[[:space:]]" && return 0
+  for dir in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib /lib64 /lib/x86_64-linux-gnu; do
+    [ -e "$dir/$1" ] && return 0
+  done
+  return 1
+}
+# The libraries ldd cannot find, and libGL.so.1, which Chromium's GPU process loads at run time
+# (without it the app exits with "GPU process isn't usable").
+missing_libs() {
+  ldd "$src_dir/UmJoonSIC/UmJoonSIC" 2>/dev/null | awk '/not found/ {print $1}'
+  has_lib libGL.so.1 || echo libGL.so.1
+}
+
+missing="$(missing_libs | sort -u | tr '\n' ' ')"
+packages=""
+for lib in $missing; do
+  p="$(package_for "$lib" || true)"
+  case " $packages " in *" $p "*) ;; *) [ -n "$p" ] && packages="$packages $p" ;; esac
+done
+font_missing=0
+if ! command -v fc-list >/dev/null 2>&1; then
+  # Without fontconfig's tools, whether a Korean font exists is unknown: install both.
+  font_missing=1
+  if [ -n "$pm" ]; then packages="$packages fontconfig"; fi
+elif [ -z "$(fc-list :lang=ko family 2>/dev/null | head -n 1)" ]; then
+  font_missing=1
+fi
+if [ "$font_missing" -eq 1 ]; then
+  font_package="$(korean_font_package || true)"
+  [ -n "$font_package" ] && packages="$packages $font_package"
+fi
+packages="${packages# }"
+
+if [ -n "$missing" ] || [ "$font_missing" -eq 1 ]; then
+  [ -n "$missing" ] && say "Missing libraries: $missing"
+  [ "$font_missing" -eq 1 ] && say "No Korean font found (the Korean menus would show boxes)."
+  if [ -n "$packages" ] && ask "Install them with $pm now ($packages)?"; then
+    install_ok=1
+    # The package lists are split into words on purpose.
+    # shellcheck disable=SC2086
+    case "$pm" in
+      apt-get)
+        # Debian 13 and Ubuntu 24.04 renamed some library packages (…t64).
+        as_root apt-get update -qq || install_ok=0
+        resolved=""
+        for p in $packages; do
+          if apt-cache show "${p}t64" >/dev/null 2>&1; then resolved="$resolved ${p}t64"; else resolved="$resolved $p"; fi
+        done
+        as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -q $resolved || install_ok=0
+        ;;
+      dnf | yum) as_root "$pm" install -y $packages || install_ok=0 ;;
+      zypper) as_root zypper --non-interactive install $packages || install_ok=0 ;;
+      pacman) as_root pacman -S --needed --noconfirm $packages || install_ok=0 ;;
+    esac
+    [ "$install_ok" -eq 1 ] || warn "installing the packages did not fully succeed"
+    missing="$(missing_libs | sort -u | tr '\n' ' ')"
+    [ -z "$missing" ] || warn "still missing: $missing (the app may not start)"
+  elif [ -n "$missing" ]; then
+    warn "the app may not start until these are installed${packages:+ (packages: $packages)}"
   fi
 fi
 
-if pgrep -f "$app_dir/UmJoonSIC" >/dev/null 2>&1; then
+if command -v pgrep >/dev/null 2>&1 && pgrep -f "$app_dir/UmJoonSIC" >/dev/null 2>&1; then
   die "UmJoonSIC is running from $app_dir: close it, then run the installer again"
 fi
 
@@ -176,7 +348,10 @@ if [ "$system" -eq 1 ]; then
   chown root:root "$helper" && chmod 4755 "$helper"
 elif ! userns_allowed; then
   say "This system restricts the sandbox Chromium normally uses."
-  if command -v sudo >/dev/null 2>&1 && ask "Set up the sandbox helper with sudo now (recommended)?"; then
+  if case ",$(findmnt -no OPTIONS -T "$app_dir" 2>/dev/null)," in *,nosuid,*) true ;; *) false ;; esac then
+    say "$app_dir is on a nosuid file system, where the sandbox helper cannot work. The app will start"
+    say "without Chromium's sandbox; to have it, install for all users instead: sudo $0 --system"
+  elif command -v sudo >/dev/null 2>&1 && ask "Set up the sandbox helper with sudo now (recommended)?"; then
     if ! { sudo chown root:root "$helper" && sudo chmod 4755 "$helper"; }; then
       warn "sudo failed: the app will start without Chromium's sandbox"
     fi
@@ -207,14 +382,26 @@ case "${UMJOONSIC_OZONE:-}" in
     fi
     ;;
 esac
-[ -n "${UMJOONSIC_DISABLE_GPU:-}" ] && args+=(--disable-gpu)
+# Without the system's OpenGL library, Chromium's GPU process cannot start: render in software.
+has_gl() {
+  local dir
+  { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -qE '[[:space:]]libGL\.so\.1[[:space:]]' && return 0
+  for dir in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib /lib64 /lib/x86_64-linux-gnu; do
+    [ -e "$dir/libGL.so.1" ] && return 0
+  done
+  return 1
+}
+if [ -n "${UMJOONSIC_DISABLE_GPU:-}" ] || ! has_gl; then args+=(--disable-gpu); fi
 
 # Chromium's sandbox: a setuid-root helper, or unprivileged user namespaces. Without either
 # (and as root, where Chromium refuses it), the app runs with --no-sandbox.
 sandbox_ok() {
   [ "$(id -u)" -ne 0 ] || return 1
   local helper="$APP_DIR/chrome-sandbox"
-  if [ -u "$helper" ] && [ "$(stat -c %u "$helper" 2>/dev/null)" = 0 ]; then return 0; fi
+  if [ -u "$helper" ] && [ "$(stat -c %u "$helper" 2>/dev/null)" = 0 ]; then
+    # A setuid helper on a nosuid file system (some /home setups) cannot work.
+    case ",$(findmnt -no OPTIONS -T "$helper" 2>/dev/null)," in *,nosuid,*) ;; *) return 0 ;; esac
+  fi
   [ "$(cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo 1)" = 1 ] || return 1
   [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 0 ] || return 1
   [ "$(cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo 1)" != 0 ] || return 1
