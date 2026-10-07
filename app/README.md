@@ -18,7 +18,9 @@ pnpm make             # electron-forge 설치 파일
 
 Node.js 22, pnpm 10 기준입니다.
 
-- Windows 설치 파일은 `pnpm package` 결과를 `../win-installer/inno-setup.iss` (Inno Setup) 로 묶어 만듭니다. `.sic` 파일 연결은 이 설치 파일이 등록합니다. `pnpm make` 의 Squirrel 설치 파일은 연결을 등록하지 않습니다.
+- Windows 설치 파일은 `pnpm package` 결과를 `../win-installer/inno-setup.iss` (Inno Setup) 로 묶어 만듭니다. `.sic` 과 `.asm` 파일 연결은 이 설치 파일이 등록합니다: 둘 다 "연결 프로그램" 목록에만 넣고 기본 프로그램으로 정하지는 않습니다 (`.asm` 은 다른 도구도 씁니다). `pnpm make` 의 Squirrel 설치 파일은 연결을 등록하지 않습니다.
+- macOS 는 `forge.config.cjs` 의 `extendInfo` 로 `.sic` 의 주인(Owner), `.asm` 의 다른 선택지(Alternate)로 등록합니다. Linux 패키지(deb, rpm)는 `.asm` 의 MIME 형식을 등록하지 않습니다: 등록하면 freedesktop 규칙상 `.asm` 의 기본 프로그램이 될 수 있습니다.
+- 밖에서 파일을 연 것처럼 시험하려면 경로를 넘깁니다: `pnpm exec electron-vite dev -- /경로/파일.asm` (또는 `project.sic`; `pnpm dev -- 경로` 는 pnpm 이 `--` 를 지워 electron-vite 가 경로를 프로젝트 폴더로 받습니다). 묶은 앱은 `UmJoonSIC /경로/파일.asm`. 앱이 떠 있으면 같은 명령이 두 번째 실행으로 그 창에 파일을 넘깁니다.
 
 ## 실행 구조
 
@@ -54,7 +56,7 @@ electron/
   paths.ts               빌드 결과물 경로
   windows/               mainWindow, splashWindow, aboutWindow
   ipc/                   window.api 요청 처리: project, files, server, window(창 닫기와 저장 확인), preferences
-  project/               project.sic 읽기·생성(projectFiles), 외부에서 연 프로젝트 경로 큐(openQueue)
+  project/               project.sic 읽기·생성(projectFiles), 밖에서 연 파일의 큐(openQueue)와 그 근처의 프로젝트(nearbyProject)
   simulator/             JRE(jre), simulator.jar(jar), 다운로드(download), 프로세스(process), 경로(paths)
 
 src/
@@ -95,7 +97,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 스크롤 막대: 목록과 패널은 `slim-scroll`(8 px), 탭 줄은 `no-scrollbar`.
 - 대화상자는 `src/components/ui/dialog.tsx` 로 만듭니다(Esc, 바깥 클릭, 포커스).
 - 메모리 뷰어의 너비는 `ch` 단위입니다 (`src/features/debugger/memory/gridLayout.ts`). 실행 패널은 높이가 고정(`h-full`)이어야 합니다. 높이가 열리면 메모리 뷰어가 4096 줄을 모두 그립니다.
-- 시험용 표시: `data-column`(세 열), `data-memory-row`(메모리 한 줄), `data-memory-underline` / `data-memory-label`(변수 밑줄과 이름), `data-tab-path`(탭), `data-statusbar`, `data-run-state`(실행 상태: ready, load-failed, assembling, running, paused, breakpoint, halted), `data-register`(레지스터 한 칸), `data-project-root`(트리의 뿌리), `data-assembly-order`(어셈블 순서 표시), `data-asm-file` / `data-asm-handle`(설정의 어셈블 파일 줄과 손잡이), `data-device-table` / `data-device-row` / `data-device-add-row`(설정의 장치 표), `data-device` / `data-stream-box`(장치 패널의 장치 한 줄과 바이트 칸), `data-tab-dot`(장치 탭의 새 데이터 점), `data-new-file-option`(새 파일 창의 선택).
+- 시험용 표시: `data-column`(세 열), `data-memory-row`(메모리 한 줄), `data-memory-underline` / `data-memory-label`(변수 밑줄과 이름), `data-tab-path`(탭), `data-statusbar`, `data-run-state`(실행 상태: ready, load-failed, assembling, running, paused, breakpoint, halted), `data-register`(레지스터 한 칸), `data-project-root`(트리의 뿌리), `data-assembly-order`(어셈블 순서 표시), `data-asm-file` / `data-asm-handle`(설정의 어셈블 파일 줄과 손잡이), `data-device-table` / `data-device-row` / `data-device-add-row`(설정의 장치 표), `data-device` / `data-stream-box`(장치 패널의 장치 한 줄과 바이트 칸), `data-tab-dot`(장치 탭의 새 데이터 점), `data-new-file-option`(새 파일 창의 선택), `data-outside-tab` / `data-outside-banner`(프로젝트 밖 파일의 탭과 띠), `data-no-project`(프로젝트 없이 연 파일의 왼쪽 열).
 
 ## 알아 둘 점
 
@@ -111,6 +113,18 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - `project.sic` 는 JSON 입니다: `asm`(프로젝트 기준 경로, 어셈블 순서), `main`(먼저 실행할 제어 섹션의 START 또는 CSECT 이름; 여러 파일을 링크할 때만 쓰이며 대소문자를 구분), `filedevices`, `mode`(`"SIC"` 또는 `"SICXE"`, 없으면 SIC).
 - 프로젝트 설정 화면은 바뀐 것을 바로 project.sic 에 씁니다(저장 버튼 없음. 메인 프로그램 이름만은 칸을 떠날 때나 Enter, Ctrl+S 에 씁니다). 어셈블 파일을 빼거나 장치 연결을 끊으면 알림에 되돌리기가 있습니다.
   - 장치 표는 소스에서 찾은 장치(RD, WD, TD 와 그 BYTE)와 연결된 장치를 함께 보여 줍니다. 연결 안 된 장치는 한 번에 새 파일로 연결하거나, 프로젝트 파일·새 파일·파일 선택 창(출력 장치는 저장 창이라 새 이름을 쓸 수 있음)에서 고릅니다. 장치 번호는 `F1`, `0xF1`, `X'F1'` 모두 됩니다.
+- 밖에서 연 파일(더블 클릭, 연결 프로그램, 명령줄, 두 번째 실행; macOS 는 `open-file`): `project.sic` 는 그 프로젝트를 엽니다. `.asm` 은 그 폴더와 위로 세 단계까지 가장 가까운 `project.sic` 을 찾아(`electron/project/nearbyProject.ts`) 다음처럼 엽니다 (`src/features/project/outsideFiles.ts`):
+
+  | 상황                                        | 동작                                                                                                                                                        |
+  | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 열린 프로젝트 없음, 근처에 project.sic 있음 | 그 프로젝트를 열고 파일을 탭으로. 어셈블 목록에 없으면 알림에 "어셈블 파일에 추가"                                                                          |
+  | 열린 프로젝트 없음, project.sic 없음        | 파일만 엽니다 (고치고 저장만, 아무것도 쓰지 않음). 왼쪽 열에 "여기에 프로젝트 만들기"·"프로젝트 열기". 실행하면 프로젝트를 만들자고 합니다                  |
+  | 열린 프로젝트의 파일                        | 그 탭 (위와 같은 알림)                                                                                                                                      |
+  | 다른 프로젝트의 파일                        | 묻습니다: 그 프로젝트 열기 / 파일만 고치기 / 취소. 실행 중이면 중지된다고 함께 말합니다                                                                     |
+  | 어느 프로젝트에도 없는 파일                 | 프로젝트 밖 파일 탭(경로가 절대 경로, 기울임꼴): 그 자리에서 고치고 저장하지만 어셈블하지 않습니다. 위의 띠에 "이 프로젝트로 복사"·"여기에 프로젝트 만들기" |
+  - 열린 프로젝트는 묻지 않고 닫지 않습니다 (VS Code, JetBrains, Visual Studio 처럼). 저장하지 않은 변경은 프로젝트를 바꿀 때 늘 묻습니다.
+  - "여기에 프로젝트 만들기"는 파일 옆에 `project.sic` 를 씁니다: 그 파일 하나, `main` 은 그 파일의 START 이름, 머신은 명령어로 판단 (`+`, `#`, `@`, SIC/XE 에만 있는 명령어가 있으면 SIC/XE). 파일은 옮기지 않습니다.
+
 - 파일 트리의 뿌리는 프로젝트 폴더입니다(Visual Studio 의 솔루션처럼). 누르면 프로젝트 설정이 열리고, 접히지 않습니다. project.sic 는 파일로 보이지 않습니다.
   - 어셈블하는 파일에는 순서(1st, 2nd …; 한국어 1번째 …)가 붙고, 메인 프로그램의 표시는 채워져 있습니다. 순서는 설정에서 손잡이를 끌거나, 손잡이에서 Alt+↑ / Alt+↓, ▲ / ▼ 로, 또는 트리의 오른쪽 클릭 메뉴로 바꿉니다.
   - 새 파일 창: `.asm` 은 "어셈블 파일에 추가"(기본 켬), `.txt` 는 "장치에 연결"(번호 입력)을 고를 수 있습니다.
