@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ListingRow } from '@/api/types';
 import {
+  operandParts,
   breakpointAt,
   rowAtAddress,
   rowDefining,
@@ -95,5 +96,21 @@ describe('listing store', () => {
     expect(rowOfSourceLine(rows, source, 4)).toBe(2);
     expect(sourceLineOfRow(rows, source, 2)).toBe(4);
     expect(rowOfSourceLine(rows, source, 1)).toBeNull();
+  });
+
+  it('cuts an operand into its symbols: each one a link of its own', () => {
+    const symbols = new Set(['PRTNUM', 'PUTCH', 'BUFFER', 'LIMIT', 'EOF', 'C']);
+    const parts = (operand: string) => operandParts(operand, name => symbols.has(name));
+    expect(parts('PRTNUM,PUTCH')).toEqual([
+      { text: 'PRTNUM', symbol: 'PRTNUM' },
+      { text: ',' },
+      { text: 'PUTCH', symbol: 'PUTCH' },
+    ]);
+    expect(parts('buffer,X')).toEqual([{ text: 'buffer', symbol: 'BUFFER' }, { text: ',X' }]);
+    expect(parts('#LIMIT')).toEqual([{ text: '#' }, { text: 'LIMIT', symbol: 'LIMIT' }]);
+    expect(parts("=C'EOF'")).toEqual([{ text: "=C'EOF'" }]);
+    expect(parts("C'EOF'")).toEqual([{ text: "C'EOF'" }]);
+    expect(parts('A,X')).toEqual([{ text: 'A,X' }]);
+    expect(parts('')).toEqual([]);
   });
 });

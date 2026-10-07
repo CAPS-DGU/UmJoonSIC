@@ -3,7 +3,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type Ref } fro
 import type { ListingRow } from '@/api/types';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { formatAddress, useRunningStore } from '@/features/debugger/runningStore';
-import { hasObjectCode, rowAddress, useListingStore } from '@/features/listing/listingStore';
+import {
+  hasObjectCode,
+  operandParts,
+  rowAddress,
+  useListingStore,
+  type OperandPart,
+} from '@/features/listing/listingStore';
 import { showSourceOfRow, showSymbol } from '@/features/listing/navigate';
 import { useStrings } from '@/i18n';
 import { usePreferencesStore } from '@/stores/preferencesStore';
@@ -29,12 +35,22 @@ interface RowProps {
   rowRef?: Ref<HTMLTableRowElement>;
   /** The row was asked for (a variable, an address): marked for a moment. */
   revealed: boolean;
-  /** The operand names a symbol of the program: a link to its definition. */
-  symbolOperand: boolean;
+  /** The operand in pieces: each symbol of the program is a link to its definition. */
+  operand: OperandPart[];
   onRowDoubleClick: (index: number) => void;
-  onSymbolClick: (operand: string) => void;
+  onSymbolClick: (symbol: string) => void;
   sourceTitle: string;
   symbolTitle: string;
+}
+
+/**
+ * Scroll the listing (only the listing: scrollIntoView also moved the panels around it) so that
+ * the row sits in the middle.
+ */
+function centerRow(container: HTMLElement, row: HTMLElement, behavior: ScrollBehavior) {
+  const offset = row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  const top = container.scrollTop + offset - (container.clientHeight - row.offsetHeight) / 2;
+  container.scrollTo({ top, behavior });
 }
 
 /**
@@ -52,7 +68,7 @@ const InstructionRow = memo(function InstructionRow({
   haltedTitle,
   rowRef,
   revealed,
-  symbolOperand,
+  operand,
   onRowDoubleClick,
   onSymbolClick,
   sourceTitle,
@@ -88,24 +104,28 @@ const InstructionRow = memo(function InstructionRow({
       <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
       <td className="px-2 py-1 w-24">{row.label}</td>
       <td className="px-2 py-1 w-24">{row.instr}</td>
-      {/* As the student wrote it (a decimal 0 was shown as 0x0000). A symbol is a link to its
-          definition (and its bytes in memory). */}
+      {/* As the student wrote it (a decimal 0 was shown as 0x0000). Each symbol is a link to
+          its definition (and its bytes in memory): "PRTNUM,PUTCH" has two. */}
       <td className="px-2 py-1 w-24">
-        {symbolOperand ? (
-          <button
-            type="button"
-            className="text-blue-700 underline decoration-dotted underline-offset-2 hover:decoration-solid"
-            title={symbolTitle}
-            onClick={e => {
-              e.stopPropagation();
-              onSymbolClick(row.operand);
-            }}
-            onDoubleClick={e => e.stopPropagation()}
-          >
-            {row.operand}
-          </button>
-        ) : (
-          row.operand
+        {operand.map((part, i) =>
+          part.symbol === undefined ? (
+            part.text
+          ) : (
+            <button
+              key={i}
+              type="button"
+              className="text-blue-700 underline decoration-dotted underline-offset-2 hover:decoration-solid"
+              title={symbolTitle}
+              data-symbol={part.symbol}
+              onClick={e => {
+                e.stopPropagation();
+                onSymbolClick(part.symbol!);
+              }}
+              onDoubleClick={e => e.stopPropagation()}
+            >
+              {part.text}
+            </button>
+          ),
         )}
       </td>
       <td className="px-2 py-1 flex-1 min-w-64">{row.comment}</td>
@@ -134,18 +154,17 @@ export default function ListingTable({
       new Set(listings.flatMap(l => l.rows.map(r => r.label.trim().toUpperCase())).filter(Boolean)),
     [listings],
   );
-  const symbolOf = (operand: string) =>
-    operand
-      .replace(/^[#@=+]/, '')
-      .split(',')[0]
-      .trim()
-      .toUpperCase();
+  // Per row, computed once per listing: the memoised rows keep their props.
+  const operands = useMemo(
+    () => rows.map(row => operandParts(row.operand, name => symbols.has(name))),
+    [rows, symbols],
+  );
   const onRowDoubleClick = useCallback(
     (index: number) => filePath && void showSourceOfRow(filePath, index),
     [filePath],
   );
   const onSymbolClick = useCallback(
-    (operand: string) => void showSymbol(operand, filePath ?? undefined),
+    (symbol: string) => void showSymbol(symbol, filePath ?? undefined),
     [filePath],
   );
   const PC = useRegisterStore(state => state.PC);
@@ -166,6 +185,9 @@ export default function ListingTable({
   ];
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
+  /** When a row was last asked for: the PC-follow below then leaves the scroll alone. */
+  const revealedAt = useRef(0);
+  const followedPc = useRef<number | null>(null);
 
   // A row asked for (a variable, an address, a symbol): scrolled to and marked for a moment.
   useEffect(() => {
@@ -173,22 +195,24 @@ export default function ListingTable({
     const el = containerRef.current?.querySelector<HTMLElement>(
       `[data-listing-row="${revealRequest.rowIndex}"]`,
     );
-    el?.scrollIntoView({ block: 'center' });
+    if (el && containerRef.current) centerRow(containerRef.current, el, 'auto');
+    revealedAt.current = Date.now();
     setRevealedRow(revealRequest.rowIndex);
     const timer = setTimeout(() => setRevealedRow(null), 1500);
     return () => clearTimeout(timer);
   }, [revealRequest, filePath]);
 
-  // Keep the current row in view.
+  // Keep the current row in view. When only the file changed (a symbol in another file was
+  // asked for, and the PC is in that file), the asked-for row wins: it was just scrolled to.
   useEffect(() => {
+    const pcMoved = followedPc.current !== PC;
+    followedPc.current = PC;
+    if (!pcMoved && Date.now() - revealedAt.current < 1500) return;
     if (highlightedRowRef.current && containerRef.current) {
       // Smooth scrolling is for following a slow run; a fast one would animate without end.
       const fast =
         useRunningStore.getState().delayTime < 20 && !useRunningStore.getState().isPaused;
-      highlightedRowRef.current.scrollIntoView({
-        behavior: fast ? 'auto' : 'smooth',
-        block: 'center',
-      });
+      centerRow(containerRef.current, highlightedRowRef.current, fast ? 'auto' : 'smooth');
     }
   }, [PC, rows]);
 
@@ -202,7 +226,7 @@ export default function ListingTable({
       {/* The program ended: say so next to the work, and leave everything as it is. */}
       {isHalted && (
         <div
-          className="mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 font-sans text-sm text-gray-900"
+          className="sticky left-0 mb-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 font-sans text-sm text-gray-900"
           role="status"
         >
           <CircleStop className="mt-0.5 size-4 shrink-0 text-red-600" aria-hidden />
@@ -212,14 +236,17 @@ export default function ListingTable({
           </span>
         </div>
       )}
-      <div className="w-full overflow-x-auto">
+      {/* The container scrolls both ways (no inner scroller), so that the header row can stick. */}
+      <div className="w-full">
         <table className="divide-y divide-gray-300 border-collapse">
           <thead>
             <tr className="whitespace-nowrap">
               {COLUMNS.map(column => (
+                // The column names stay at the top while the rows scroll under them.
+                // -top-4: at the container's edge, not below its padding.
                 <th
                   key={column.title}
-                  className={`px-2 py-2 text-left text-xs font-semibold text-gray-700 ${column.className}`}
+                  className={`sticky -top-4 z-10 bg-gray-100 px-2 py-2 text-left text-xs font-semibold text-gray-700 shadow-[inset_0_-1px_0_var(--color-gray-300)] ${column.className}`}
                 >
                   {column.title}
                 </th>
@@ -252,7 +279,7 @@ export default function ListingTable({
                     haltedTitle={t.listing.haltedHere}
                     rowRef={isCurrent ? highlightedRowRef : undefined}
                     revealed={revealedRow === index}
-                    symbolOperand={symbols.has(symbolOf(row.operand))}
+                    operand={operands[index]}
                     onRowDoubleClick={onRowDoubleClick}
                     onSymbolClick={onSymbolClick}
                     sourceTitle={t.listing.rowTitle}

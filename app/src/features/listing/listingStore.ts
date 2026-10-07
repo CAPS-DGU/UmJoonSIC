@@ -100,6 +100,36 @@ export function rowDefining(listings: ListingFile[], label: string, filePath?: s
   return null;
 }
 
+/** A piece of an operand: text, or a symbol of the program (a link to its definition). */
+export interface OperandPart {
+  text: string;
+  symbol?: string;
+}
+
+/**
+ * An operand cut into pieces, every symbol of the program a piece of its own: "PRTNUM,PUTCH"
+ * gives two links, "BUFFER,X" one (X is a register), "#LIMIT" the link after "#". Character and
+ * hex constants (C'EOF', X'F1') stay text, even when a label has the same name.
+ */
+export function operandParts(operand: string, isSymbol: (name: string) => boolean) {
+  const parts: OperandPart[] = [];
+  const pushText = (text: string) => {
+    const last = parts.at(-1);
+    if (last && last.symbol === undefined) last.text += text;
+    else parts.push({ text });
+  };
+  for (const [token, constant, name] of operand.matchAll(
+    /([CXcx]'[^']*')|([A-Za-z_]\w*)|[\s\S]/g,
+  )) {
+    if (constant === undefined && name !== undefined && isSymbol(name.toUpperCase())) {
+      parts.push({ text: token, symbol: name.toUpperCase() });
+    } else {
+      pushText(token);
+    }
+  }
+  return parts;
+}
+
 /** A source line's fields (label, operation, operand), as the listing has them. */
 function lineFields(line: string) {
   if (/^\s*\./.test(line) || line.trim() === '') return null;
