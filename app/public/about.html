@@ -172,7 +172,8 @@
       <main class="card" role="main" aria-labelledby="about-title">
         <header class="header">
           <h1 id="about-title">
-            UmJoonSIC <span class="badge">v1.0.4</span> <span class="badge">BSD-2</span>
+            UmJoonSIC <span class="badge" id="app-version">v1.0.4</span>
+            <span class="badge">BSD-2</span>
           </h1>
           <p class="subtitle">
             <span lang="ko"
@@ -362,6 +363,9 @@
       const params = new URLSearchParams(location.search);
       document.documentElement.lang = params.get('lang') === 'en' ? 'en' : 'ko';
       if (params.get('theme') === 'dark') document.documentElement.classList.add('dark');
+      // ?version= (aboutWindow.ts): the app's own version, so that a release changes it in one place.
+      const version = params.get('version');
+      if (version) document.getElementById('app-version').textContent = `v${version}`;
     </script>
   </body>
 </html>
