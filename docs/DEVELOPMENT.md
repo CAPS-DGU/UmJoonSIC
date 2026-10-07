@@ -323,7 +323,7 @@ bash ../linux-installer/pack.sh     # out/release/UmJoonSIC-linux-x64-<version>.
 The archive contains the app, `install.sh`, the icon and the licence. `install.sh`:
 
 - installs for the current user without root (`~/.local/share/umjoonsic`, the `umjoonsic` command in `~/.local/bin`, a menu entry), or for all users with `sudo ./install.sh --system` (`/opt/umjoonsic`, `/usr/local/bin`, `/usr/local/share/applications`);
-- removes it with `--uninstall` (`--purge` also removes the settings and the downloaded Java runtime);
+- keeps a copy of itself in the install folder, and removes the app with `--uninstall` (`--purge` also removes the settings and the downloaded Java runtime);
 - run on its own (as `install-linux.sh`), downloads the archive of its version from the release first;
 - does not register the app for `.asm` files (it would become their default); "Open With" can still choose it;
 - names missing system libraries, if any.

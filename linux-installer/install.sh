@@ -156,6 +156,10 @@ mkdir -p "$(dirname "$app_dir")" "$bin_dir" "$desktop_dir"
 rm -rf "$app_dir.new"
 cp -a "$src_dir/UmJoonSIC" "$app_dir.new"
 [ -f "$src_dir/$ID.png" ] && cp "$src_dir/$ID.png" "$app_dir.new/$ID.png"
+# A copy of this installer stays with the app: it removes it later, also after the extracted
+# folder (or the downloaded temporary copy) is gone.
+cp "$src_dir/install.sh" "$app_dir.new/install.sh"
+chmod 755 "$app_dir.new/install.sh"
 rm -rf "$app_dir"
 mv "$app_dir.new" "$app_dir"
 
@@ -258,7 +262,7 @@ case ":$PATH:" in
 esac
 say "  At its first start it downloads its Java runtime and simulator (about 45 MB)."
 if [ "$system" -eq 1 ]; then
-  say "  Remove it with: sudo $0 --uninstall --system"
+  say "  Remove it with: sudo $app_dir/install.sh --uninstall --system"
 else
-  say "  Remove it with: $0 --uninstall"
+  say "  Remove it with: $app_dir/install.sh --uninstall"
 fi
