@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "UmJoonSIC"
-#define MyAppVersion "0.0.1"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Dongguk University"
 #define MyAppURL "https://cs.dongguk.edu/main"
 #define MyAppExeName "UmJoonSIC.exe"
