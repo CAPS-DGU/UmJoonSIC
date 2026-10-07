@@ -6,7 +6,7 @@ import { BrowserWindow } from 'electron';
 import { texts } from '../i18n';
 import { staticPage } from '../paths';
 import { getPreferences } from '../preferences';
-import { getSplashWindow } from '../windows/splashWindow';
+import { getSplashWindow, setSplashStatus } from '../windows/splashWindow';
 import { getSimulatorDataDir } from './paths';
 
 /** Progress messages are sent at most this often (and whenever the percentage changes). */
@@ -58,7 +58,14 @@ function openProgressWindow(title: string) {
   return shown;
 }
 
+/**
+ * Show the progress: on the splash's bottom right while the splash is there (one window, as in
+ * Photoshop); in its own small window otherwise (a download after the start).
+ */
 async function setProgress(state: ProgressState) {
+  if (await setSplashStatus({ heading: state.heading, detail: state.status, failed: state.failed })) {
+    return;
+  }
   const window = progressWindow;
   if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
   try {
@@ -90,7 +97,9 @@ export async function downloadFile(relativePath: string, url: string, step: Down
   // Electron's own userData directory, whose name differs only in case).
   fs.mkdirSync(getSimulatorDataDir(), { recursive: true });
   const filePath = path.join(getSimulatorDataDir(), relativePath);
-  await openProgressWindow(`UmJoonSIC — ${relativePath}`);
+  // A window of its own only when there is no splash to show the progress on.
+  const splash = getSplashWindow();
+  if (!splash || splash.isDestroyed()) await openProgressWindow(`UmJoonSIC — ${relativePath}`);
   const heading = t.downloadHeading(step.index, step.total);
   await setProgress({ heading, percent: 0, status: step.label, failed: false });
 

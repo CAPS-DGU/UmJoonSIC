@@ -20,10 +20,12 @@ import { checkJARUpdate, checkServerExists, downloadServer } from './simulator/j
 import { checkJreExists, downloadJre } from './simulator/jre';
 import { simulatorProcess } from './simulator/process';
 import { createMainWindow, getMainWindow, noteQuitRequested } from './windows/mainWindow';
-import { createSplashWindow, showSplashContent } from './windows/splashWindow';
+import { createSplashWindow, setSplashStatus, showSplashContent } from './windows/splashWindow';
 
 /** The splash stays up at least this long once the simulator is being started. */
 const SPLASH_HOLD_MS = 3000;
+/** How long a failed start's message stays on the splash before the error box. */
+const SPLASH_FAILURE_MS = 1500;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -81,6 +83,7 @@ function createWindow(): void {
     showSplashContent(splash);
     try {
       await prepareSimulator();
+      void setSplashStatus({ heading: '', detail: texts().startingSimulator, failed: false });
       await Promise.all([simulatorProcess.start(), sleep(SPLASH_HOLD_MS)]);
     } catch (error) {
       // Stopped by the quit, not a failure.
@@ -88,6 +91,8 @@ function createWindow(): void {
       // The error box comes alone (destroy() does not count as the user closing the splash).
       // A message box, not showErrorBox: it does not block the main process, and its title
       // and button follow the interface language.
+      // The failure stays on the splash a moment, so that it is seen before the error box.
+      if (!splash.isDestroyed()) await sleep(SPLASH_FAILURE_MS);
       closeProgressWindow();
       if (!splash.isDestroyed()) splash.destroy();
       const t = texts();
