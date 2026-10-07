@@ -72,6 +72,25 @@ export async function resolveUnsavedChanges(filePaths?: string[]): Promise<boole
 
 /** Close a tab, asking first if it has unsaved changes. */
 export async function requestCloseTab(filePath: string) {
+  // The List tab belongs to the run: closing it stops the run, after asking.
+  if (tabKind(filePath) === 'listing') {
+    const { useRunningStore } = await import('@/features/debugger/runningStore');
+    if (useRunningStore.getState().isRunning) {
+      const t = strings();
+      const stop = await ask<boolean>({
+        title: t.listing.closeTitle,
+        message: t.listing.closeMessage,
+        buttons: [
+          { label: t.common.cancel, value: false },
+          { label: t.listing.closeAndStop, value: true, variant: 'primary' },
+        ],
+        cancelValue: false,
+      });
+      // Stopping closes the List tab with the run.
+      if (stop) await useRunningStore.getState().stopRunning();
+      return;
+    }
+  }
   if (await resolveUnsavedChanges([filePath])) {
     useEditorTabStore.getState().closeTab(filePath);
   }

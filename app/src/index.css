@@ -96,6 +96,23 @@ body {
   animation: memory-flash 0.6s ease-in-out;
 }
 
+/* A whole Watch row that changed: the same amber, a gentler rise and a longer fade than a
+   single value's flash. */
+@keyframes row-flash {
+  0% {
+    background-color: rgb(245 158 11 / 0);
+  }
+  20% {
+    background-color: rgb(245 158 11 / 0.32);
+  }
+  100% {
+    background-color: rgb(245 158 11 / 0.14);
+  }
+}
+.row-flash {
+  animation: row-flash 0.9s ease-out;
+}
+
 /* After its flash, a changed value stays faintly marked until the next step (Visual Studio,
    Eclipse and JetBrains keep changed values marked; src/lib/changeMarks.ts). */
 .changed-tint {

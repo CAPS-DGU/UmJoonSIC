@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, File, FileCode, FileText, ScrollText, X } fr
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { requestCloseTab } from '@/features/editor/unsavedChanges';
-import { listingOfTab, useListingStore } from '@/features/listing/listingStore';
+import { LISTING_TAB } from '@/features/listing/listingStore';
 import { isOutsideFile } from '@/features/project/outsideFiles';
 import { SETTINGS_TAB } from '@/features/project/projectSettingsTab';
 import { useStrings } from '@/i18n';
@@ -55,13 +55,13 @@ function useOverflow(strip: HTMLDivElement | null, deps: unknown) {
 /** Open tabs; drag a tab to move it. While a program runs, a button re-opens its List tabs. */
 export default function TabBar() {
   const t = useStrings();
-  const listings = useListingStore(state => state.listings);
-  // A listing tab is named in the current language (its title was set when it opened).
+  // The settings and the List tab are named in the current language (their titles were set
+  // when they opened).
   const tabLabel = (title: string, filePath: string) => {
     // The project settings, named as such (the file behind them is project.sic).
     if (filePath === SETTINGS_TAB) return t.settings.title;
-    const listing = listingOfTab(listings, filePath);
-    return listing ? t.tabs.listing(listing.filePath.split(/[/\\]/).pop()!) : title;
+    if (filePath === LISTING_TAB) return t.tabs.listingTab;
+    return title;
   };
   const tabs = useEditorTabStore(state => state.tabs);
   const activePath = useEditorTabStore(state => state.activePath);

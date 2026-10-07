@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ListingRow } from '@/api/types';
 import {
   breakpointAt,
-  listingOfTab,
-  listingTabPath,
+  rowAtAddress,
+  rowDefining,
+  rowOfSourceLine,
+  sourceLineOfRow,
   useListingStore,
 } from '@/features/listing/listingStore';
 
@@ -68,12 +70,30 @@ describe('listing store', () => {
     expect(useListingStore.getState().listings[0].breakpoints).toEqual([]);
   });
 
-  it('maps a file to its listing tab and back', () => {
-    useListingStore.getState().addListing('/p/main.asm', ROWS);
-    const tabPath = listingTabPath('/p/main.asm');
-    expect(tabPath).toBe('/p/main.asm.lst');
-    expect(listingOfTab(useListingStore.getState().listings, tabPath)?.filePath).toBe(
-      '/p/main.asm',
-    );
+  it('finds the row of an address, a label, and a source line (and back)', () => {
+    const rows: ListingRow[] = [
+      { ...row('000000', 'LDA', 'ONE'), rawCodeHex: '032003' },
+      { ...row('000003', 'RSUB'), rawCodeHex: '4F0000' },
+      { ...row('000006', 'RSUB'), rawCodeHex: '4F0000' },
+      { ...row('000009', 'WORD', '1'), label: 'ONE', rawCodeHex: '000001' },
+    ];
+    useListingStore.getState().addListing('/p/main.asm', rows);
+    const listings = useListingStore.getState().listings;
+    expect(rowAtAddress(listings, 0x0a)).toEqual({ filePath: '/p/main.asm', rowIndex: 3 });
+    expect(rowAtAddress(listings, 0x20)).toBeNull();
+    expect(rowDefining(listings, 'one')).toEqual({ filePath: '/p/main.asm', rowIndex: 3 });
+    const source = [
+      '. a comment',
+      'FIRST    LDA     ONE',
+      '         RSUB',
+      '         RSUB',
+      'ONE      WORD    1',
+    ].join('\n');
+    // The listing has no label FIRST here; a line is matched by its operation and operand.
+    expect(rowOfSourceLine(rows, source.replace('FIRST    LDA', '         LDA'), 2)).toBe(0);
+    // A repeated line is matched by its place: the second RSUB.
+    expect(rowOfSourceLine(rows, source, 4)).toBe(2);
+    expect(sourceLineOfRow(rows, source, 2)).toBe(4);
+    expect(rowOfSourceLine(rows, source, 1)).toBeNull();
   });
 });

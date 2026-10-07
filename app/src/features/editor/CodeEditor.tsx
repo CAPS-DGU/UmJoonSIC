@@ -21,7 +21,9 @@ import { modelPath } from '@/features/editor/monaco/models';
 import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 import '@/features/editor/monaco/setupMonaco';
 import { useErrorStore } from '@/features/panel/errorStore';
-import { useStrings } from '@/i18n';
+import { useRunningStore } from '@/features/debugger/runningStore';
+import { showSourceLineInListing } from '@/features/listing/navigate';
+import { strings, useStrings } from '@/i18n';
 import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import '@/features/editor/syntaxError.css';
@@ -90,6 +92,20 @@ export default function CodeEditor() {
 
   const handleEditorDidMount = (editor: MonacoEditor) => {
     editorRef.current = editor;
+    // While a program runs: from a source line to its row in the run's listing.
+    editor.addAction({
+      id: 'umjoonsic.showInListing',
+      label: strings().listing.showInListing,
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 0,
+      precondition: undefined,
+      run: () => {
+        const path = shownTabPath(editor);
+        const line = editor.getPosition()?.lineNumber;
+        if (!path || !line || !useRunningStore.getState().isRunning) return;
+        void showSourceLineInListing(path, line);
+      },
+    });
     editor.onDidDispose(() => {
       if (editorRef.current === editor) editorRef.current = null;
     });

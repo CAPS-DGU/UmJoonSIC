@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { IpcResult, MachineMode, ProjectInfo, ProjectSettings } from '@shared/ipc';
 import { simulator } from '@/api/simulator';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
+import { clearWriteTracking } from '@/features/debugger/lastWrite';
 import { clearDeviceStreams } from '@/features/devices/deviceStreamStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
@@ -168,6 +169,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     useErrorStore.getState().clearErrors();
     useListingStore.getState().forgetBreakpoints();
     clearDeviceStreams();
+    clearWriteTracking();
     await useMemoryViewStore.getState().reload();
     return true;
   };

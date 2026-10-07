@@ -42,6 +42,7 @@ function visibleRowIndexes(range: RowRange, totalRows: number) {
 }
 
 interface MemoryCellProps {
+  address: number;
   column: number;
   cell: MemoryCellValue;
   labelHighlight?: boolean;
@@ -49,10 +50,21 @@ interface MemoryCellProps {
   isSearched?: boolean;
 }
 
-function MemoryCell({ column, cell, labelHighlight, isChanged, isSearched }: MemoryCellProps) {
+function MemoryCell({
+  address,
+  column,
+  cell,
+  labelHighlight,
+  isChanged,
+  isSearched,
+}: MemoryCellProps) {
   // The cell takes an eighth of the row; the byte keeps its 3 characters in the middle.
   return (
-    <span className="flex justify-center" style={{ gridRow: 1, gridColumn: column + 1 }}>
+    <span
+      className="flex justify-center"
+      style={{ gridRow: 1, gridColumn: column + 1 }}
+      data-memory-address={address}
+    >
       <span
         className={`w-[3ch] shrink-0 text-center rounded
       ${labelHighlight ? '!text-orange-800 font-semibold' : ''}
@@ -126,6 +138,7 @@ export function MemoryRows({
             return (
               <MemoryCell
                 key={changedNodes.has(address) ? `${column}-${changedNodes.get(address)}` : column}
+                address={address}
                 column={column}
                 cell={cellAt(address)}
                 labelHighlight={rowLabels.some(l => column >= l.start && column <= l.end)}

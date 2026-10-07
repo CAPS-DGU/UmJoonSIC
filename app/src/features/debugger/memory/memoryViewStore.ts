@@ -35,6 +35,10 @@ interface MemoryViewState {
   changedNodes: ChangeMarks<number>;
   /** Counts the refreshes (the numbers in changedNodes). */
   changeVersion: number;
+  /** A request to show an address (a variable, the last write): the viewer scrolls to it. */
+  revealRequest: { address: number; size: number; id: number } | null;
+  /** Show `size` bytes at `address`: scrolled to if not on screen, then highlighted. */
+  reveal: (address: number, size?: number) => void;
 
   /** Switch machine mode: clears the view and restarts the simulation in that mode. */
   setMode: (mode: MachineMode) => void;
@@ -105,6 +109,9 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
     viewRange: INITIAL_VIEW,
     changedNodes: new Map(),
     changeVersion: 0,
+    revealRequest: null,
+    reveal: (address, size = 1) =>
+      set(state => ({ revealRequest: { address, size, id: (state.revealRequest?.id ?? 0) + 1 } })),
 
     setMode: mode => {
       const totalMemorySize = MEMORY_SIZE[mode];

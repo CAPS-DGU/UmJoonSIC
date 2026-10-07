@@ -2,6 +2,7 @@ import { CircleStop, CircleX, Moon, PauseCircle, PlayCircle, Settings2, Sun } fr
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { formatAddress, useRunningStore } from '@/features/debugger/runningStore';
 import { selectActiveTab, useEditorTabStore } from '@/features/editor/editorTabStore';
+import { showAddressInListing } from '@/features/listing/navigate';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useStrings } from '@/i18n';
 import { openPreferences, usePreferencesStore } from '@/stores/preferencesStore';
@@ -40,9 +41,10 @@ function RunState() {
   if (isHalted) {
     return (
       <span
-        className="flex items-center gap-1 font-medium text-gray-900"
-        title={t.state.haltedHint}
+        className="flex cursor-pointer items-center gap-1 font-medium text-gray-900 hover:underline"
+        title={`${t.state.haltedHint}\n${t.state.showPcTitle}`}
         data-run-state="halted"
+        onClick={() => void showAddressInListing(pc)}
       >
         <CircleStop className="size-3.5 text-red-600" aria-hidden />
         {t.state.halted(formatAddress(pc), stepCount)}
@@ -59,8 +61,10 @@ function RunState() {
   }
   return (
     <span
-      className="flex items-center gap-1 text-amber-700"
+      className="flex cursor-pointer items-center gap-1 text-amber-700 hover:underline"
       data-run-state={stopReason === 'breakpoint' ? 'breakpoint' : 'paused'}
+      title={t.state.showPcTitle}
+      onClick={() => void showAddressInListing(pc)}
     >
       <PauseCircle className="size-3.5" aria-hidden />
       {stopReason === 'breakpoint'

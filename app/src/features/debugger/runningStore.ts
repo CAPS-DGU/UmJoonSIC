@@ -3,6 +3,7 @@ import path from 'path-browserify';
 import { simulator } from '@/api/simulator';
 import type { LoadedFile, Registers } from '@/api/types';
 import { deviceHex, deviceInstructions } from '@/features/debugger/lib/deviceUse';
+import { recordWrite, startWriteTracking } from '@/features/debugger/lastWrite';
 import { devicesInSources } from '@/features/devices/sourceDevices';
 import {
   flushDeviceStreams,
@@ -16,7 +17,7 @@ import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import {
   breakpointAt,
   listingsAt,
-  listingTabPath,
+  LISTING_TAB,
   useListingStore,
 } from '@/features/listing/listingStore';
 import { useConsoleStore } from '@/features/panel/consoleStore';
@@ -162,26 +163,29 @@ function beginSimulation() {
   return simulator.begin(mode, absoluteDevices());
 }
 
-/** The tab that shows the listing of a loaded file (named as the simulator names it). */
-const listingTab = (fileName: string) => ({
-  title: strings().tabs.listing(fileName.split('/').pop()!),
-  filePath: listingTabPath(fileName),
-});
+/** The run's one List tab: its listings are mini-tabs inside it (ListingView). */
+const listingTab = () => ({ title: strings().tabs.listingTab, filePath: LISTING_TAB });
 
 /** Open the project settings tab (from a message's button). */
 const openSettings = openProjectSettings;
 
-/** Open a List tab for every loaded file and register its listing and watch variables. */
+/**
+ * Register every loaded file's listing and watch variables, and open the List tab: a run
+ * shows its listing (closing it stops the run).
+ */
 function publishLoadedFiles(files: LoadedFile[]) {
   const { addWatch } = useWatchStore.getState();
-  const { addListing } = useListingStore.getState();
-  const { openTab } = useEditorTabStore.getState();
+  const { addListing, setActiveFile } = useListingStore.getState();
 
   files.forEach(file => {
-    openTab(listingTab(file.fileName));
     addListing(file.fileName, file.listing.rows);
     file.listing.watch.forEach(variable => addWatch({ filePath: file.fileName, ...variable }));
   });
+  const first =
+    listingsAt(useListingStore.getState().listings, simulatorPC)[0] ??
+    useListingStore.getState().listings[0];
+  if (first) setActiveFile(first.filePath);
+  void useEditorTabStore.getState().openTab(listingTab());
 }
 
 /** Record the assembler errors, show a linker error if any, and open the first failing file. */
@@ -385,7 +389,10 @@ async function simulatorStep(): Promise<StepResult> {
   simulatorPC = data.registers.PC;
   simulatorRegisters = data.registers;
   // What an RD/WD/TD read or wrote (the Devices panel).
-  if (before && !halted) recordDeviceStep(pcBefore, before, data.registers);
+  if (before && !halted) {
+    recordDeviceStep(pcBefore, before, data.registers);
+    recordWrite(pcBefore, before, useMemoryViewStore.getState().mode);
+  }
   return { ok: true, registers: data.registers, halted };
 }
 
@@ -650,6 +657,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
       useRegisterStore.getState().setAll(data.registers);
       simulatorPC = data.registers.PC;
       simulatorRegisters = data.registers;
+      startWriteTracking(data.files.map(f => f.listing.rows));
       startDeviceStreams(
         deviceInstructions(data.files.map(f => f.listing.rows)),
         new Map(
@@ -737,13 +745,10 @@ export const useRunningStore = create<RunningState>((set, get) => {
 
     showListings: async () => {
       if (!get().isRunning) return;
-      const { listings } = useListingStore.getState();
-      const { openTab } = useEditorTabStore.getState();
-      for (const listing of listings) {
-        await openTab(listingTab(listing.filePath));
-      }
+      const { listings, setActiveFile } = useListingStore.getState();
       const current = listingsAt(listings, useRegisterStore.getState().PC)[0] ?? listings[0];
-      if (current) await openTab(listingTab(current.filePath));
+      if (current) setActiveFile(current.filePath);
+      await useEditorTabStore.getState().openTab(listingTab());
     },
   };
 });

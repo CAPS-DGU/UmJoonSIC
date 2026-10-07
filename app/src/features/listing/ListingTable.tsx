@@ -1,12 +1,16 @@
 import { CircleStop } from 'lucide-react';
-import { memo, useEffect, useRef, type Ref } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import type { ListingRow } from '@/api/types';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { formatAddress, useRunningStore } from '@/features/debugger/runningStore';
-import { hasObjectCode, rowAddress } from '@/features/listing/listingStore';
+import { hasObjectCode, rowAddress, useListingStore } from '@/features/listing/listingStore';
+import { showSourceOfRow, showSymbol } from '@/features/listing/navigate';
 import { useStrings } from '@/i18n';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 
 interface ListingTableProps {
+  /** The source file the listing is of (as the simulator names it). */
+  filePath: string | null;
   rows: ListingRow[];
   /** Row indexes that have a breakpoint. */
   breakpoints: number[];
@@ -23,6 +27,14 @@ interface RowProps {
   breakpointTitle: string;
   haltedTitle: string;
   rowRef?: Ref<HTMLTableRowElement>;
+  /** The row was asked for (a variable, an address): marked for a moment. */
+  revealed: boolean;
+  /** The operand names a symbol of the program: a link to its definition. */
+  symbolOperand: boolean;
+  onRowDoubleClick: (index: number) => void;
+  onSymbolClick: (operand: string) => void;
+  sourceTitle: string;
+  symbolTitle: string;
 }
 
 /**
@@ -39,12 +51,22 @@ const InstructionRow = memo(function InstructionRow({
   breakpointTitle,
   haltedTitle,
   rowRef,
+  revealed,
+  symbolOperand,
+  onRowDoubleClick,
+  onSymbolClick,
+  sourceTitle,
+  symbolTitle,
 }: RowProps) {
   return (
     <tr
       ref={rowRef}
-      className={`group whitespace-nowrap ${haltedHere ? 'bg-red-100' : isCurrent ? 'bg-blue-100' : ''}`}
-      title={haltedHere ? haltedTitle : undefined}
+      className={`group whitespace-nowrap ${haltedHere ? 'bg-red-100' : isCurrent ? 'bg-blue-100' : ''} ${
+        revealed ? 'value-flash' : ''
+      }`}
+      title={haltedHere ? haltedTitle : sourceTitle}
+      data-listing-row={index}
+      onDoubleClick={() => onRowDoubleClick(index)}
     >
       <td
         className="px-2 py-1 cursor-pointer w-8"
@@ -66,8 +88,26 @@ const InstructionRow = memo(function InstructionRow({
       <td className="px-2 py-1 w-32">{row.rawCodeHex}</td>
       <td className="px-2 py-1 w-24">{row.label}</td>
       <td className="px-2 py-1 w-24">{row.instr}</td>
-      {/* As the student wrote it (a decimal 0 was shown as 0x0000). */}
-      <td className="px-2 py-1 w-24">{row.operand}</td>
+      {/* As the student wrote it (a decimal 0 was shown as 0x0000). A symbol is a link to its
+          definition (and its bytes in memory). */}
+      <td className="px-2 py-1 w-24">
+        {symbolOperand ? (
+          <button
+            type="button"
+            className="text-blue-700 underline decoration-dotted underline-offset-2 hover:decoration-solid"
+            title={symbolTitle}
+            onClick={e => {
+              e.stopPropagation();
+              onSymbolClick(row.operand);
+            }}
+            onDoubleClick={e => e.stopPropagation()}
+          >
+            {row.operand}
+          </button>
+        ) : (
+          row.operand
+        )}
+      </td>
       <td className="px-2 py-1 flex-1 min-w-64">{row.comment}</td>
       <td className="px-2 py-1 w-64">{row.rawCodeBinary}</td>
       <td className="px-2 py-1 w-24">{row.instrBin}</td>
@@ -77,8 +117,37 @@ const InstructionRow = memo(function InstructionRow({
 });
 
 /** The assembly listing of one file, with the row at the PC highlighted. */
-export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: ListingTableProps) {
+export default function ListingTable({
+  filePath,
+  rows,
+  breakpoints,
+  onBreakpointToggle,
+}: ListingTableProps) {
   const t = useStrings();
+  const fontSize = usePreferencesStore(s => s.editorFontSize);
+  const listings = useListingStore(s => s.listings);
+  const revealRequest = useListingStore(s => s.revealRequest);
+  const [revealedRow, setRevealedRow] = useState<number | null>(null);
+  /** The program's symbols (labels of every listing), upper case. */
+  const symbols = useMemo(
+    () =>
+      new Set(listings.flatMap(l => l.rows.map(r => r.label.trim().toUpperCase())).filter(Boolean)),
+    [listings],
+  );
+  const symbolOf = (operand: string) =>
+    operand
+      .replace(/^[#@=+]/, '')
+      .split(',')[0]
+      .trim()
+      .toUpperCase();
+  const onRowDoubleClick = useCallback(
+    (index: number) => filePath && void showSourceOfRow(filePath, index),
+    [filePath],
+  );
+  const onSymbolClick = useCallback(
+    (operand: string) => void showSymbol(operand, filePath ?? undefined),
+    [filePath],
+  );
   const PC = useRegisterStore(state => state.PC);
   const isHalted = useRunningStore(state => state.isHalted);
   // Only the end banner shows it: no redraw for every instruction while running.
@@ -98,6 +167,18 @@ export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: 
   const containerRef = useRef<HTMLDivElement>(null);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
 
+  // A row asked for (a variable, an address, a symbol): scrolled to and marked for a moment.
+  useEffect(() => {
+    if (!revealRequest || revealRequest.filePath !== filePath) return;
+    const el = containerRef.current?.querySelector<HTMLElement>(
+      `[data-listing-row="${revealRequest.rowIndex}"]`,
+    );
+    el?.scrollIntoView({ block: 'center' });
+    setRevealedRow(revealRequest.rowIndex);
+    const timer = setTimeout(() => setRevealedRow(null), 1500);
+    return () => clearTimeout(timer);
+  }, [revealRequest, filePath]);
+
   // Keep the current row in view.
   useEffect(() => {
     if (highlightedRowRef.current && containerRef.current) {
@@ -112,7 +193,12 @@ export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: 
   }, [PC, rows]);
 
   return (
-    <div ref={containerRef} className="flex-1 p-4 bg-gray-100 overflow-auto font-mono text-sm">
+    <div
+      ref={containerRef}
+      className="flex-1 p-4 bg-gray-100 overflow-auto font-mono"
+      // The code font size of the preferences (the editor's), two px larger as before.
+      style={{ fontSize: fontSize + 2 }}
+    >
       {/* The program ended: say so next to the work, and leave everything as it is. */}
       {isHalted && (
         <div
@@ -165,6 +251,12 @@ export default function ListingTable({ rows, breakpoints, onBreakpointToggle }: 
                     breakpointTitle={t.listing.breakpointTitle}
                     haltedTitle={t.listing.haltedHere}
                     rowRef={isCurrent ? highlightedRowRef : undefined}
+                    revealed={revealedRow === index}
+                    symbolOperand={symbols.has(symbolOf(row.operand))}
+                    onRowDoubleClick={onRowDoubleClick}
+                    onSymbolClick={onSymbolClick}
+                    sourceTitle={t.listing.rowTitle}
+                    symbolTitle={t.listing.symbolTitle}
                   />
                 );
               })
