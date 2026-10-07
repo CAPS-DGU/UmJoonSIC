@@ -37,13 +37,13 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\lecti\Desktop\LocalProjects\UmJoonSIC\win-installer\license.txt
+LicenseFile=license.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputDir=C:\Users\lecti\Desktop\LocalProjects\UmJoonSIC\win-installer\out
-OutputBaseFilename=mysetup
-SetupIconFile=C:\Users\lecti\Desktop\LocalProjects\UmJoonSIC\images\icon.ico
+OutputDir=out
+OutputBaseFilename=UmJoonSIC-win32-x64-{#MyAppVersion}
+SetupIconFile=..\images\icon.ico
 SolidCompression=yes
 WizardStyle=modern
 
@@ -55,8 +55,8 @@ Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\lecti\Desktop\LocalProjects\UmJoonSIC\app\out\UmJoonSIC-win32-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\lecti\Desktop\LocalProjects\UmJoonSIC\app\out\UmJoonSIC-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\app\out\UmJoonSIC-win32-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\app\out\UmJoonSIC-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Registry]

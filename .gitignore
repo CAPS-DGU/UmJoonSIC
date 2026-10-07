@@ -34,3 +34,6 @@ $RECYCLE.BIN/
 .idea/*
 
 *.jar
+
+# Inno Setup output
+win-installer/out/
