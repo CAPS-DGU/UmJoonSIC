@@ -261,6 +261,8 @@ The rules are in `src/features/editor/lib/sicxeFormat.ts` (pure functions, no ed
 
 The Korean mode uses the words students meet in the textbook (Beck, *System Software*, Korean translation by 유원희·이필규·김유성, 홍릉과학출판사), in class and in exams.
 
+Every English term has three possible Korean forms: the English word as is (Motor), a transliteration (모터), or a translation (전동기). Which one to use is decided by how real Korean software, textbooks and courses actually say it, never by translating word for word. Look it up before adding a term. For example, dark mode is 다크모드 (as in Korean apps), not 어두운 모드; a store instruction is 저장 (as in Korean lecture notes on STA/STCH), so "Last write" is 최근 저장 위치, not 마지막 쓰기. Compound UI nouns are written without a space: 다크모드, 리스트파일, 목적코드.
+
 - Not translated: mnemonics (LDA, JSUB …), directives (START, BYTE, EXTDEF …), register names (A, X, L, B, S, T, F, PC, SW), record letters (H, T, E, M, D, R), SYMTAB, OPTAB, LOCCTR, nixbpe.
 - Abbreviations first, meaning in brackets: PC(프로그램 카운터), SYMTAB(기호 테이블).
 - A Korean term carries its English once (in a tooltip or message): 기호(symbol), 중단점(breakpoint).
@@ -286,6 +288,7 @@ The Korean mode uses the words students meet in the textbook (Beck, *System Soft
 | breakpoint | 중단점 | step | 한 단계 |
 | pause / stop | 일시 중지 / 중지 | halt (program end) | 종료 |
 | memory / register | 메모리 / 레지스터 | device | 장치 |
+| light / dark mode | 라이트모드 / 다크모드 | last write (memory) | 최근 저장 위치 |
 
 ## Testing
 
@@ -326,12 +329,17 @@ The archive contains the app, `install.sh`, the icon and the licence. `install.s
 - keeps a copy of itself in the install folder, and removes the app with `--uninstall` (`--purge` also removes the settings and the downloaded Java runtime);
 - run on its own (as `install-linux.sh`), downloads the archive of its version from the release first;
 - does not register the app for `.asm` files (it would become their default); "Open With" can still choose it;
-- names missing system libraries, if any.
+- checks the system first and adapts to it:
+  - glibc: the app's binaries need glibc 2.25 or newer (measured by `pack.sh` from the binaries' symbol versions and written into the installer). That is Debian 10, Ubuntu 18.04, RHEL 8 and newer. musl systems (Alpine) are refused with a clear message;
+  - libraries: the ones `ldd` cannot find, and `libGL.so.1`, which Chromium's GPU process loads at run time (without it the app exits with "GPU process isn't usable"). It offers to install them with the system's package manager. apt (Debian, Ubuntu) gets package names, including the `…t64` names of Debian 13 and Ubuntu 24.04. dnf, yum and zypper (Fedora, the RHEL family, openSUSE) get the library names themselves (`libgbm.so.1()(64bit)`). pacman (Arch) gets package names;
+  - a Korean font (the Korean menus use the system's fonts), offered with the libraries;
+  - `-y` answers every question with yes (for unattended installs).
 
 The launcher it writes decides at every start:
 
-- **Display:** X11, or Xwayland on a Wayland session (the most compatible choice). Native Wayland only when there is no X server. `UMJOONSIC_OZONE=wayland|x11|auto` overrides this; `UMJOONSIC_DISABLE_GPU=1` turns on software rendering.
-- **Sandbox:** Chromium's sandbox needs unprivileged user namespaces or a setuid-root `chrome-sandbox`. Some systems restrict the first (Ubuntu 24.04 and later, hardened kernels). There, the installer offers to make `chrome-sandbox` root-owned and setuid with sudo; without that, the launcher starts the app with `--no-sandbox`. A system install always sets the helper up.
+- **Display:** X11, or Xwayland on a Wayland session (the most compatible choice). Native Wayland only when there is no X server. `UMJOONSIC_OZONE=wayland|x11|auto` overrides this.
+- **Rendering:** without the system's OpenGL library the app renders in software (`--disable-gpu`); `UMJOONSIC_DISABLE_GPU=1` forces it (for broken graphics drivers).
+- **Sandbox:** Chromium's sandbox needs unprivileged user namespaces or a setuid-root `chrome-sandbox`. Some systems restrict the first (Ubuntu 24.04 and later, Debian 10, hardened kernels). There, the installer offers to make `chrome-sandbox` root-owned and setuid with sudo; without that, the launcher starts the app with `--no-sandbox`. A setuid helper on a `nosuid` file system (some `/home` setups) cannot work, so the launcher checks the mount too. A system install always sets the helper up.
 
 `UMJOONSIC_DRY_RUN=1 umjoonsic` prints the command the launcher would run.
 
