@@ -1,19 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  File,
-  FileCode,
-  FileText,
-  ScrollText,
-  Settings,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, File, FileCode, FileText, ScrollText, X } from 'lucide-react';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { requestCloseTab } from '@/features/editor/unsavedChanges';
 import { listingOfTab, useListingStore } from '@/features/listing/listingStore';
+import { SETTINGS_TAB } from '@/features/project/projectSettingsTab';
 import { useStrings } from '@/i18n';
+import { ProjectIcon } from '@/lib/icons';
 import { INLINE_ICON_BUTTON } from '@/lib/controls';
 
 /** Where a dragged tab would go: before or after the tab under the pointer. */
@@ -25,8 +18,8 @@ interface DropTarget {
 /** The same icons as the file tree; a listing has its own (it was a source file's icon). */
 const getFileIcon = (filePath: string) => {
   const lower = filePath.toLowerCase();
-  if (lower === 'project.sic')
-    return <Settings width={16} height={16} className="shrink-0 text-gray-700" />;
+  if (lower === SETTINGS_TAB)
+    return <ProjectIcon width={16} height={16} className="shrink-0 text-blue-700" />;
   if (lower.endsWith('.lst'))
     return <ScrollText width={16} height={16} className="shrink-0 text-blue-700" />;
   if (lower.endsWith('.asm'))
@@ -64,6 +57,8 @@ export default function TabBar() {
   const listings = useListingStore(state => state.listings);
   // A listing tab is named in the current language (its title was set when it opened).
   const tabLabel = (title: string, filePath: string) => {
+    // The project settings, named as such (the file behind them is project.sic).
+    if (filePath === SETTINGS_TAB) return t.settings.title;
     const listing = listingOfTab(listings, filePath);
     return listing ? t.tabs.listing(listing.filePath.split(/[/\\]/).pop()!) : title;
   };

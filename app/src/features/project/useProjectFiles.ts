@@ -50,9 +50,14 @@ export function useProjectFiles() {
 
   /**
    * Create an empty file in the selected folder (or next to the selected file, or at the
-   * project root). A new .asm file is also added to the project's asm list.
+   * project root). A new .asm file is added to the project's asm list if `addToAsm`.
    */
-  const createFile = async (folder: FileStructure | null, fileName: string, fileExt: string) => {
+  const createFile = async (
+    folder: FileStructure | null,
+    fileName: string,
+    fileExt: string,
+    addToAsm = true,
+  ) => {
     const trimmed = fileName.trim();
     if (!trimmed) return;
 
@@ -65,7 +70,7 @@ export function useProjectFiles() {
     }
 
     const newFile: FileStructure = { type: 'file', name: `${trimmed}${fileExt}`, relativePath };
-    if (fileExt === '.asm') await addAsmFile(newFile);
+    if (fileExt === '.asm' && addToAsm) await addAsmFile(newFile);
     refreshFileTree();
     return newFile;
   };

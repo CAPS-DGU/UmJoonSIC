@@ -29,7 +29,6 @@ export default function MemoryViewer() {
   const failed = useMemoryViewStore(state => state.failed);
   const isLoading = useMemoryViewStore(state => state.pendingReads > 0);
   const changedNodes = useMemoryViewStore(state => state.changedNodes);
-  const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
   const totalMemorySize = useMemoryViewStore(state => state.totalMemorySize);
   const setViewRange = useMemoryViewStore(state => state.setViewRange);
   const isRunning = useRunningStore(state => state.isRunning);
@@ -66,13 +65,8 @@ export default function MemoryViewer() {
     [bytes, failed, isLoading],
   );
 
-  // Drop the "changed" highlight once its animation has played.
-  useEffect(() => {
-    if (changedNodes.size > 0) {
-      const timer = setTimeout(clearChangedNodes, FLASH_MS);
-      return () => clearTimeout(timer);
-    }
-  }, [changedNodes, clearChangedNodes]);
+  // A changed byte stays tinted until the next step (lib/changeMarks.ts): its value is what
+  // the student looks for after stepping.
 
   // Same for the "searched" highlight.
   useEffect(() => {

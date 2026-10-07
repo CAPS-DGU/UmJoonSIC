@@ -65,6 +65,7 @@ const en = {
   openProjectTitle: 'Open Project (project.sic)',
   sicFilter: 'SIC Project',
   chooseFileTitle: 'Choose a File',
+  chooseOutputTitle: 'Choose or Name the Output File',
   // start-up
   simulatorErrorTitle: 'The Simulator Could Not Start',
   simulatorErrorMessage: 'UmJoonSIC needs Java and its simulator, and could not prepare them.',
@@ -151,6 +152,7 @@ const ko: Texts = {
   openProjectTitle: '프로젝트 열기 (project.sic)',
   sicFilter: 'SIC 프로젝트',
   chooseFileTitle: '파일 선택',
+  chooseOutputTitle: '출력 파일 고르기 또는 이름 정하기',
   simulatorErrorTitle: '시뮬레이터를 시작하지 못했습니다',
   simulatorErrorMessage: 'UmJoonSIC 에 필요한 Java 와 시뮬레이터를 준비하지 못했습니다.',
   simulatorErrorDetail: reason =>

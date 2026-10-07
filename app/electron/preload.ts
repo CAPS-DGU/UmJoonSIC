@@ -33,7 +33,7 @@ const api: RendererApi = {
     ipcRenderer.invoke(IpcChannel.deleteFile, { projectPath, relativePath }),
   deleteFolder: (projectPath, relativePath) =>
     ipcRenderer.invoke(IpcChannel.deleteFolder, { projectPath, relativePath }),
-  pickFile: () => ipcRenderer.invoke(IpcChannel.pickFile),
+  pickFile: options => ipcRenderer.invoke(IpcChannel.pickFile, options),
   restartServer: () => ipcRenderer.invoke(IpcChannel.restartServer),
   waitForSimulator: () => ipcRenderer.invoke(IpcChannel.waitForSimulator),
   getServerLog: () => ipcRenderer.invoke(IpcChannel.getServerLog),

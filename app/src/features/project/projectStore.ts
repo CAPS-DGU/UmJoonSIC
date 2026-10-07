@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { IpcResult, MachineMode, ProjectInfo, ProjectSettings } from '@shared/ipc';
 import { simulator } from '@/api/simulator';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
+import { clearDeviceStreams } from '@/features/devices/deviceStreamStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
@@ -58,6 +59,11 @@ interface ProjectState {
   renameAsmPaths: (from: string, to: string) => Promise<void>;
   /** Switch the machine mode; an open project remembers it (in project.sic, on disk at once). */
   changeMode: (mode: MachineMode) => Promise<void>;
+  /**
+   * Change the settings and write project.sic at once (the settings page saves as you go).
+   * Resolves to false, after saying why, if the file could not be written.
+   */
+  changeSettings: (patch: Partial<ProjectSettings>) => Promise<boolean>;
   /** Edit the settings (the settings form); saveSettings writes them. */
   setSettings: (settings: ProjectSettings) => void;
   /** Write the edited settings to project.sic; then the simulation restarts with them. */
@@ -78,28 +84,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
    * of the settings form stay unsaved. `change` runs when it is this write's turn, so it
    * sees the earlier writes.
    */
+  /** Resolves to the write's result (success when nothing had to be written). */
   const changeSavedSettings = (change: (settings: ProjectSettings) => Partial<ProjectSettings>) => {
     const { projectPath } = get();
-    const write = settingsWrites.then(async () => {
+    const write = settingsWrites.then(async (): Promise<IpcResult> => {
       // Another project was opened meanwhile.
-      if (get().projectPath !== projectPath) return;
+      if (get().projectPath !== projectPath) return { success: true };
       const { savedSettings } = get();
       const patch = change(savedSettings);
       const keys = Object.keys(patch) as (keyof ProjectSettings)[];
-      if (keys.every(key => patch[key] === savedSettings[key])) return;
+      if (keys.every(key => patch[key] === savedSettings[key])) return { success: true };
       const saved = { ...savedSettings, ...patch };
       const res = await writeSettingsFile(saved);
       if (!res.success) {
         console.error('Failed to update project.sic:', res.message);
-        return;
+        return res;
       }
-      if (get().projectPath !== projectPath) return;
+      if (get().projectPath !== projectPath) return res;
       set(state => ({
         savedSettings: saved,
         settings: { ...state.settings, ...change(state.settings) },
       }));
+      return res;
     });
-    settingsWrites = write.catch(() => {});
+    settingsWrites = write.then(
+      () => {},
+      () => {},
+    );
     return write;
   };
 
@@ -149,6 +160,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     cancelAllScheduledChecks();
     useErrorStore.getState().clearErrors();
     useListingStore.getState().forgetBreakpoints();
+    clearDeviceStreams();
     await useMemoryViewStore.getState().reload();
     return true;
   };
@@ -331,6 +343,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         // The mode when the write's turn comes: after a quick change back, nothing is written.
         await changeSavedSettings(() => ({ mode: useMemoryViewStore.getState().mode }));
       }
+    },
+
+    changeSettings: async patch => {
+      const res = await changeSavedSettings(() => patch);
+      if (!res.success) void showError(strings().messages.saveFailed('project.sic'), res.message);
+      return res.success;
     },
 
     setSettings: settings => set({ settings }),

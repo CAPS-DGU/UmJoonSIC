@@ -1,16 +1,21 @@
+import DevicesPanel from '@/features/devices/DevicesPanel';
+import { useDeviceStreamStore } from '@/features/devices/deviceStreamStore';
 import ConsolePanel from '@/features/panel/ConsolePanel';
 import ErrorPanel from '@/features/panel/ErrorPanel';
 import { usePanelStore, type PanelTab } from '@/features/panel/panelStore';
 import WatchPanel from '@/features/panel/WatchPanel';
 import { useStrings } from '@/i18n';
 
-/** The panel under the editor: Watch, Errors and Simulator tabs. */
+/** The panel under the editor: Watch, Devices, Errors and Simulator tabs. */
 export default function BottomPanel() {
   const t = useStrings();
   const activeTab = usePanelStore(s => s.activeTab);
   const setActiveTab = usePanelStore(s => s.setActiveTab);
+  // New bytes on a device while its tab is not shown: a dot, never a switch of tabs.
+  const devicesUnseen = useDeviceStreamStore(s => s.unseen);
   const TABS: { key: PanelTab; label: string }[] = [
     { key: 'watch', label: t.panel.watch },
+    { key: 'devices', label: t.panel.devices },
     { key: 'errors', label: t.panel.errors },
     { key: 'server', label: t.panel.server },
   ];
@@ -29,6 +34,14 @@ export default function BottomPanel() {
             }`}
           >
             {tab.label}
+            {tab.key === 'devices' && devicesUnseen && activeTab !== 'devices' && (
+              <span
+                className="ml-1.5 size-1.5 rounded-full bg-amber-500"
+                role="img"
+                aria-label={t.devices.newData}
+                data-tab-dot
+              />
+            )}
           </button>
         ))}
       </div>
@@ -36,6 +49,7 @@ export default function BottomPanel() {
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="h-full">
           {activeTab === 'watch' && <WatchPanel />}
+          {activeTab === 'devices' && <DevicesPanel />}
           {activeTab === 'errors' && <ErrorPanel />}
           {activeTab === 'server' && <ConsolePanel />}
         </div>

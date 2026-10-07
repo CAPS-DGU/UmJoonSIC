@@ -122,6 +122,16 @@ export const AppEvent = {
   runInterval: 'run-interval',
 } as const;
 
+/** Options of window.api.pickFile. */
+export interface PickFileOptions {
+  /** The folder the dialog opens in (the project folder). */
+  defaultPath?: string;
+  /** A Save dialog: the file may not exist yet (an output device's file). */
+  save?: boolean;
+  /** The name filled in, with `save`. */
+  suggestedName?: string;
+}
+
 /** The object the preload script exposes as `window.api`. */
 export interface RendererApi {
   getFileList(path: string): Promise<IpcResult<string[]>>;
@@ -135,7 +145,8 @@ export interface RendererApi {
   createNewFolder(folderPath: string, folderName: string): Promise<IpcResult>;
   deleteFile(projectPath: string, relativePath: string): Promise<IpcResult>;
   deleteFolder(projectPath: string, relativePath: string): Promise<IpcResult>;
-  pickFile(): Promise<IpcResult<string>>;
+  /** A file chosen in the system's dialog (an Open dialog, or a Save dialog with `save`). */
+  pickFile(options?: PickFileOptions): Promise<IpcResult<string>>;
   restartServer(): Promise<IpcResult>;
   /** Resolves once the simulator accepts requests (waits while it starts or restarts). */
   waitForSimulator(): Promise<IpcResult>;

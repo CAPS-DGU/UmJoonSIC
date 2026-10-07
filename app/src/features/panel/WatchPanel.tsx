@@ -1,13 +1,27 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FileCode } from 'lucide-react';
-import { useWatchStore } from '@/features/panel/watchStore';
+import { useWatchStore, watchKey } from '@/features/panel/watchStore';
 import type { WatchRow } from '@/features/panel/watchStore';
 import { hexAddress, toChar, toDecimal, toHex } from '@/features/panel/watchFormat';
 import { useStrings } from '@/i18n';
+import { CHANGED_CLASSES } from '@/lib/changeMarks';
 
 export default function WatchPanel() {
   const t = useStrings();
   const watch = useWatchStore(s => s.watch);
+  const changed = useWatchStore(s => s.changed);
+  // A changed value flashes, then stays tinted until the next step (lib/changeMarks); a row
+  // keyed with its mark is drawn anew when the mark is new, so the flash plays again.
+
+  /** The mark of the bytes in [from, to) of this variable that changed (the latest), if any. */
+  const markIn = (row: WatchRow, from: number, to: number) => {
+    let mark: number | null = null;
+    for (const [offset, update] of changed.get(watchKey(row)) ?? []) {
+      if (offset >= from && offset < to) mark = Math.max(mark ?? 0, update);
+    }
+    return mark;
+  };
+  const flash = (mark: number | null) => (mark === null ? '' : ` ${CHANGED_CLASSES}`);
   // Files and arrays: files are open unless closed, arrays closed unless opened.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
@@ -29,16 +43,18 @@ export default function WatchPanel() {
     for (let i = 0; i < row.elementCount; i++) {
       const startIndex = i * row.elementSize;
       const elementValue = row.value?.slice(startIndex, startIndex + row.elementSize) || [];
+      const elementMark = markIn(row, startIndex, startIndex + row.elementSize);
+      const elementFlash = flash(elementMark);
       elements.push(
-        <tr key={`${row.name}[${i}]`} className="hover:bg-gray-200">
+        <tr key={`${row.name}[${i}]@${elementMark ?? ''}`} className="hover:bg-gray-200">
           <td className={`${cell} pl-10`}>
             {row.name}[{i}]
           </td>
           <td className={cell}>{row.dataType}</td>
           <td className={cell}>{hexAddress(row.address + i * row.elementSize)}</td>
-          <td className={cell}>{toDecimal(elementValue)}</td>
-          <td className={cell}>{toHex(elementValue)}</td>
-          <td className={cell}>{toChar(elementValue)}</td>
+          <td className={cell + elementFlash}>{toDecimal(elementValue)}</td>
+          <td className={cell + elementFlash}>{toHex(elementValue)}</td>
+          <td className={cell + elementFlash}>{toChar(elementValue)}</td>
         </tr>,
       );
     }
@@ -87,9 +103,11 @@ export default function WatchPanel() {
                       const arrayKey = `${filePath}-${row.name}`;
                       const isArray = row.elementCount > 1;
                       const isArrayExpanded = !!toggled[arrayKey];
+                      const rowMark = markIn(row, 0, Infinity);
+                      const rowFlash = flash(rowMark);
                       return (
                         <React.Fragment key={row.name}>
-                          <tr className="hover:bg-gray-200">
+                          <tr key={`row@${rowMark ?? ''}`} className="hover:bg-gray-200">
                             <td className={`${cell} pl-5`} title={row.name}>
                               {isArray ? (
                                 <button
@@ -110,11 +128,13 @@ export default function WatchPanel() {
                             </td>
                             <td className={cell}>{row.dataType}</td>
                             <td className={cell}>{hexAddress(row.address)}</td>
-                            <td className={cell}>{isArray ? '' : toDecimal(row.value ?? [])}</td>
-                            <td className={cell} title={toHex(row.value ?? [])}>
+                            <td className={cell + rowFlash}>
+                              {isArray ? '' : toDecimal(row.value ?? [])}
+                            </td>
+                            <td className={cell + rowFlash} title={toHex(row.value ?? [])}>
                               {toHex(row.value ?? [])}
                             </td>
-                            <td className={cell} title={toChar(row.value ?? [])}>
+                            <td className={cell + rowFlash} title={toChar(row.value ?? [])}>
                               {toChar(row.value ?? [])}
                             </td>
                           </tr>

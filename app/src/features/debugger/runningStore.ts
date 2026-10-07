@@ -2,7 +2,14 @@ import { create } from 'zustand';
 import path from 'path-browserify';
 import { simulator } from '@/api/simulator';
 import type { LoadedFile, Registers } from '@/api/types';
-import { deviceHex, devicesUsed } from '@/features/debugger/lib/deviceUse';
+import { deviceHex, deviceInstructions } from '@/features/debugger/lib/deviceUse';
+import { devicesInSources } from '@/features/devices/sourceDevices';
+import {
+  flushDeviceStreams,
+  recordDeviceStep,
+  startDeviceStreams,
+  stopDeviceRecording,
+} from '@/features/devices/deviceStreamStore';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
@@ -17,14 +24,17 @@ import { useErrorStore } from '@/features/panel/errorStore';
 import { usePanelStore } from '@/features/panel/panelStore';
 import { useWatchStore } from '@/features/panel/watchStore';
 import { usableDevicePaths } from '@/features/project/devicePaths';
+import { connectToNewFile, suggestedFileName } from '@/features/project/deviceSettings';
+import { openProjectSettings } from '@/features/project/projectSettingsTab';
 import { useProjectStore } from '@/features/project/projectStore';
 import { strings } from '@/i18n';
+import type { MarkMode } from '@/lib/changeMarks';
 import { resolveInProject, toProjectRelativePath } from '@/lib/projectPath';
 import { ask, showError } from '@/stores/dialogStore';
 import { notify } from '@/stores/toastStore';
 
-/** 100 ms: ten instructions a second, slow enough to follow, fast enough for a loop. */
-export const DEFAULT_INTERVAL_MS = 100;
+/** 250 ms: four instructions a second, easy to follow step by step; Fastest is one click away. */
+export const DEFAULT_INTERVAL_MS = 250;
 /** The longest delay a timer can wait (about 24 days); a longer one would run at once. */
 const MAX_DELAY_MS = 2 ** 31 - 1;
 /**
@@ -126,6 +136,26 @@ function absoluteDevices() {
     }));
 }
 
+/**
+ * Empty the files of the devices the program only writes (WD, never RD): the simulator writes
+ * from the start of a file without cutting it, so a shorter output left the end of the last
+ * run's ("AB" over "XXXXXX" gave "ABXXXX").
+ */
+async function emptyOutputFiles() {
+  const { projectPath, settings } = useProjectStore.getState();
+  const texts = await Promise.all(
+    settings.asm.map(async file => {
+      const res = await window.api.readFile(resolveInProject(projectPath, file));
+      return res.success && typeof res.data === 'string' ? res.data : '';
+    }),
+  );
+  const outputOnly = devicesInSources(texts).filter(
+    d => d.uses.includes('write') && !d.uses.includes('read'),
+  );
+  const files = absoluteDevices().filter(d => outputOnly.some(o => o.device === d.index));
+  await Promise.all(files.map(d => window.api.saveFile(d.filename, '')));
+}
+
 /** Restart the simulation in the current machine mode with the project's file devices. */
 function beginSimulation() {
   const { mode } = useMemoryViewStore.getState();
@@ -139,8 +169,7 @@ const listingTab = (fileName: string) => ({
 });
 
 /** Open the project settings tab (from a message's button). */
-const openSettings = () =>
-  useEditorTabStore.getState().openTab({ title: 'project.sic', filePath: 'project.sic' });
+const openSettings = openProjectSettings;
 
 /** Open a List tab for every loaded file and register its listing and watch variables. */
 function publishLoadedFiles(files: LoadedFile[]) {
@@ -265,33 +294,47 @@ async function checkProjectFiles(): Promise<boolean> {
   return true;
 }
 
-/** After loading: a device the program uses but the project does not connect (warning only). */
+/**
+ * After loading: devices the program uses but the project does not connect. The notice's
+ * action connects each to a new file named after its symbol (INDEV → indev.txt) and runs
+ * the program again with them: the fix is offered where the need appears.
+ */
 function warnUnconnectedDevices(files: LoadedFile[]) {
   const connected = new Set(useProjectStore.getState().settings.filedevices.map(d => d.index));
-  const unconnected = [
-    ...new Set(
-      devicesUsed(files.map(f => f.listing.rows))
-        .filter(u => !connected.has(u.device))
-        .map(u => u.device),
-    ),
-  ];
-  if (unconnected.length === 0) return;
+  const byDevice = new Map<number, string[]>();
+  for (const { device, label } of deviceInstructions(files.map(f => f.listing.rows))) {
+    if (connected.has(device)) continue;
+    const labels = byDevice.get(device) ?? [];
+    if (label && !labels.includes(label)) labels.push(label);
+    byDevice.set(device, labels);
+  }
+  if (byDevice.size === 0) return;
   const t = strings();
-  notify('warning', t.messages.unmappedDevice(unconnected.map(deviceHex).join(', ')), {
-    label: t.messages.openSettings,
-    run: () => void openSettings(),
+  const names = [...byDevice].map(([device, labels]) => ({
+    device,
+    name: suggestedFileName(device, labels),
+  }));
+  notify('warning', t.messages.unmappedDevice([...byDevice.keys()].map(deviceHex).join(', ')), {
+    label: t.messages.connectAndRestart(names.map(n => n.name).join(', ')),
+    run: () =>
+      void (async () => {
+        for (const { device, name } of names) {
+          if (!(await connectToNewFile(device, name))) return;
+        }
+        await useRunningStore.getState().restart();
+      })(),
   });
 }
 
 /**
- * Read the memory the views show (the memory viewer and the watch list) again. With
- * `markChanges`, the memory viewer flashes the bytes that changed (after a step).
+ * Read the memory the views show (the memory viewer and the watch list) again; both mark the
+ * bytes that changed as `mode` says (lib/changeMarks: a step flashes them, a fast run does not
+ * mark, or everything would flash all the time).
  */
-function refreshMemoryViews({ markChanges }: { markChanges: boolean }) {
-  const memory = useMemoryViewStore.getState();
+function refreshMemoryViews(mode: MarkMode) {
   return Promise.all([
-    markChanges ? memory.refresh() : memory.setViewRange(memory.viewRange),
-    useWatchStore.getState().fetchVarMemoryValue(),
+    useMemoryViewStore.getState().refresh(mode),
+    useWatchStore.getState().fetchVarMemoryValue(mode),
   ]);
 }
 
@@ -314,6 +357,8 @@ let loadId = 0;
  * the PC where it was (it jumps to itself).
  */
 let simulatorPC = 0;
+/** The registers after that instruction: what a WD wrote is A's low byte before the next. */
+let simulatorRegisters: Registers | null = null;
 
 /**
  * Every instruction goes through this queue, in auto-play and from Step alike, so that the
@@ -332,10 +377,15 @@ type StepResult = { ok: true; registers: Registers; halted: boolean } | { ok: fa
 
 /** Execute one instruction in the simulator. Only call it from a queued step (enqueueStep). */
 async function simulatorStep(): Promise<StepResult> {
+  const pcBefore = simulatorPC;
+  const before = simulatorRegisters;
   const data = await simulator.step();
   if (!data.ok) return { ok: false };
   const halted = data.registers.PC === simulatorPC;
   simulatorPC = data.registers.PC;
+  simulatorRegisters = data.registers;
+  // What an RD/WD/TD read or wrote (the Devices panel).
+  if (before && !halted) recordDeviceStep(pcBefore, before, data.registers);
   return { ok: true, registers: data.registers, halted };
 }
 
@@ -346,20 +396,22 @@ export const useRunningStore = create<RunningState>((set, get) => {
   /** The program ended: keep everything on screen and say so (status bar, listing). */
   const enterHalted = async () => {
     runId++;
+    flushDeviceStreams('step');
     set({ isPaused: true, isHalted: true, stopReason: 'halt', rate: 0 });
     useConsoleStore
       .getState()
       .addRunLine(
         strings().state.logHalted(formatAddress(useRegisterStore.getState().PC), get().stepCount),
       );
-    await refreshMemoryViews({ markChanges: true });
+    await refreshMemoryViews('step');
   };
 
   /**
-   * Execute one instruction of the run `forRun` and refresh the views. Resolves to false if
-   * the run cannot go on (it halted, failed or was stopped).
+   * Execute one instruction of the run `forRun` and refresh the views, marking what changed as
+   * `mode` says (a step, or an instruction of a slow auto-play). Resolves to false if the run
+   * cannot go on (it halted, failed or was stopped).
    */
-  const executeStep = (forRun: number): Promise<boolean> =>
+  const executeStep = (forRun: number, mode: 'step' | 'playing'): Promise<boolean> =>
     enqueueStep(async () => {
       if (forRun !== runId || !get().isRunning || get().isHalted) return false;
       const forLoad = loadId;
@@ -372,7 +424,8 @@ export const useRunningStore = create<RunningState>((set, get) => {
         await enterHalted();
         return false;
       }
-      await refreshMemoryViews({ markChanges: true });
+      flushDeviceStreams(mode);
+      await refreshMemoryViews(mode);
       return forRun === runId;
     });
 
@@ -396,6 +449,8 @@ export const useRunningStore = create<RunningState>((set, get) => {
     let rateSince = Date.now();
     let rateSteps = 0;
     let unpublished = 0;
+    /** Fast instructions ran since the views were last marked. */
+    let unmarked = false;
 
     /** Show what fast mode has not shown yet. */
     const publish = async () => {
@@ -408,7 +463,12 @@ export const useRunningStore = create<RunningState>((set, get) => {
     const stopAt = async (reason: StopReason) => {
       await publish();
       set({ isPaused: true, stopReason: reason, rate: 0 });
-      await refreshMemoryViews({ markChanges: true });
+      // After a slow instruction the views are marked already (marking them again would find
+      // nothing changed and clear its marks).
+      if (unmarked) {
+        flushDeviceStreams('step');
+        await refreshMemoryViews('step');
+      }
     };
 
     try {
@@ -424,7 +484,8 @@ export const useRunningStore = create<RunningState>((set, get) => {
           }
           if (!isCurrent()) return;
           lastStepAt = Date.now();
-          const stepped = await executeStep(forRun);
+          const stepped = await executeStep(forRun, 'playing');
+          unmarked = false;
           if (!isCurrent()) return;
           if (!stepped) {
             // The step failed (the run itself goes on): stop auto-playing.
@@ -447,6 +508,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
           }
           registers = result.registers;
           unpublished++;
+          unmarked = true;
           if (result.halted) {
             await publish();
             await enterHalted();
@@ -461,7 +523,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
           }
           if (now - lastViewsAt >= FAST_VIEWS_MS) {
             lastViewsAt = now;
-            void refreshMemoryViews({ markChanges: false });
+            void refreshMemoryViews('none');
           }
         }
         rateSteps++;
@@ -477,9 +539,10 @@ export const useRunningStore = create<RunningState>((set, get) => {
         }
       }
       // Paused by the user (not stopped, not halted): show where the program stands.
-      if (forLoad === loadId && get().isRunning && !get().isHalted && unpublished > 0) {
+      if (forLoad === loadId && get().isRunning && !get().isHalted && unmarked) {
         await publish();
-        await refreshMemoryViews({ markChanges: false });
+        flushDeviceStreams('step');
+        await refreshMemoryViews('step');
       }
     } catch (error) {
       console.error('Auto-play stopped:', error);
@@ -506,7 +569,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
           stepCount: 0,
           rate: 0,
         });
-        await refreshMemoryViews({ markChanges: false });
+        await refreshMemoryViews('none');
         return true;
       } finally {
         starting = null;
@@ -544,6 +607,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
       if (!(await checkProjectFiles())) return false;
       if (forRun !== runId) return false;
 
+      await emptyOutputFiles();
       const begun = await beginSimulation();
       if (!begun.ok) {
         // For example a file device that cannot be opened (project.sic edited by hand).
@@ -580,6 +644,15 @@ export const useRunningStore = create<RunningState>((set, get) => {
       }
       useRegisterStore.getState().setAll(data.registers);
       simulatorPC = data.registers.PC;
+      simulatorRegisters = data.registers;
+      startDeviceStreams(
+        deviceInstructions(data.files.map(f => f.listing.rows)),
+        new Map(
+          settings.filedevices
+            .filter(d => !skippedDevices.has(d.index))
+            .map(d => [d.index, d.filename]),
+        ),
+      );
       publishLoadedFiles(data.files);
       // While a program runs, the variables are what to watch.
       usePanelStore.getState().setActiveTab('watch');
@@ -629,7 +702,7 @@ export const useRunningStore = create<RunningState>((set, get) => {
     stepOnce: async () => {
       if (get().isRunning && get().isPaused && !get().isHalted) {
         set({ stopReason: 'step' });
-        await executeStep(runId);
+        await executeStep(runId, 'step');
       }
     },
 
@@ -641,6 +714,9 @@ export const useRunningStore = create<RunningState>((set, get) => {
     stopRunning: async () => {
       runId++;
       loadId++;
+      // The streams stay (what the program wrote is worth reading after it); a new run starts
+      // new ones.
+      stopDeviceRecording();
       // Whatever the simulator answers, the run is over for the user.
       useListingStore.getState().clearListings();
       useEditorTabStore.getState().closeListingTabs();

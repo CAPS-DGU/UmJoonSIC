@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { File, FileCode, ChevronRight, Settings, List, CircleX } from 'lucide-react';
+import { File, FileCode, ChevronRight, List, CircleX } from 'lucide-react';
+import { ProjectIcon } from '@/lib/icons';
 import { useErrorStore } from '@/features/panel/errorStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import type { CompileError } from '@/features/panel/errorStore';
@@ -23,7 +24,7 @@ const getFileName = (filePath: string) => {
 };
 
 const getFileIcon = (fileName: string) => {
-  if (fileName === 'project.sic') return <Settings className="text-gray-600 mr-2 w-4 h-4" />;
+  if (fileName === 'project.sic') return <ProjectIcon className="text-blue-700 mr-2 w-4 h-4" />;
   if (fileName.toLowerCase().endsWith('.lst'))
     return <List className="text-gray-600 mr-2 w-4 h-4" />;
   // The same icon as in the file tree, the tabs and the Watch.

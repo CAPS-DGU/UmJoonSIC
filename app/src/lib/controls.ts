@@ -8,7 +8,7 @@ export const BAR_ICON_BUTTON =
 
 /** A small icon button inside a row (close a tab, remove from a list): 24 px square. */
 export const INLINE_ICON_BUTTON =
-  'inline-flex size-6 shrink-0 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800';
+  'inline-flex size-6 shrink-0 items-center justify-center rounded text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 disabled:pointer-events-none disabled:opacity-30';
 
 /** A text field or a select: 28 px high. */
 export const FORM_FIELD = 'h-7 rounded-md border border-gray-300 bg-white px-2';

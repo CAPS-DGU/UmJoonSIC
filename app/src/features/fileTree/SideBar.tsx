@@ -1,17 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FilePlus, FolderOpen, FolderPlus, RefreshCw } from 'lucide-react';
 import { AppEvent } from '@shared/ipc';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { ContextMenu } from '@/features/fileTree/ContextMenu';
-import { FileTreeItem } from '@/features/fileTree/FileTreeItem';
-import { NameDialog } from '@/features/fileTree/NameDialog';
+import { FileTreeItem, ROOT_PATH } from '@/features/fileTree/FileTreeItem';
+import {
+  NameDialog,
+  type NewFileChoice,
+  type NewFileOptions,
+} from '@/features/fileTree/NameDialog';
+import { deviceHex } from '@/features/debugger/lib/deviceUse';
+import { useMainFile, useProjectSources } from '@/features/devices/useProjectSources';
+import { connectDevice } from '@/features/project/deviceSettings';
 import type { FileStructure } from '@/features/fileTree/types';
 import { useFileTree } from '@/features/fileTree/useFileTree';
 import { useFileTreeNavigation } from '@/features/fileTree/useFileTreeNavigation';
 import { useProjectStore } from '@/features/project/projectStore';
+import { openProjectSettings, SETTINGS_TAB } from '@/features/project/projectSettingsTab';
 import { FileActionError, useProjectFiles } from '@/features/project/useProjectFiles';
 import { strings, useStrings } from '@/i18n';
 import { BAR_ICON_BUTTON } from '@/lib/controls';
+import { moveItem } from '@/lib/moveItem';
 import { ask, showError } from '@/stores/dialogStore';
 import { notify } from '@/stores/toastStore';
 
@@ -48,7 +57,8 @@ const folderOf = (item: FileStructure | null) =>
 /** Left column: project name, file actions and the file tree. */
 export default function SideBar() {
   const t = useStrings();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // The project node (ROOT_PATH) starts open.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ [ROOT_PATH]: true });
   const [nameRequest, setNameRequest] = useState<NameRequest | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [treeFocused, setTreeFocused] = useState(false);
@@ -60,26 +70,66 @@ export default function SideBar() {
   const selectedFileOrFolder = useProjectStore(s => s.selectedFileOrFolder);
   const setSelectedFileOrFolder = useProjectStore(s => s.setSelectedFileOrFolder);
   const projectFiles = useProjectStore(s => s.settings.asm);
+  const changeSettings = useProjectStore(s => s.changeSettings);
+  // What the sources say: the devices the program uses, the main program's file.
+  const sources = useProjectSources();
+  const mainFile = useMainFile(sources);
+  /** Move an assembled file one place earlier or later; add or remove it (written at once). */
+  const moveAsm = (file: string, by: -1 | 1) => {
+    const i = projectFiles.indexOf(file);
+    if (i < 0 || i + by < 0 || i + by >= projectFiles.length) return;
+    void changeSettings({ asm: moveItem(projectFiles, i, i + by) });
+  };
+  const toggleAsm = (file: string) => {
+    const before = projectFiles;
+    if (!before.includes(file)) {
+      void changeSettings({ asm: [...before, file] });
+      return;
+    }
+    void changeSettings({ asm: before.filter(f => f !== file) }).then(ok => {
+      if (ok)
+        notify('info', t.settings.removedAsm(file), {
+          label: t.settings.undo,
+          run: () => void changeSettings({ asm: before }),
+        });
+    });
+  };
   const openTab = useEditorTabStore(s => s.openTab);
   const { createFile, createFolder, deleteFile, deleteFolder, renameEntry } = useProjectFiles();
 
   const fileTreeStructure = useFileTree(fileTree);
+  // The tree under one node, the project: project.sic is not a file of it (the node itself
+  // opens the settings that edit project.sic).
+  const projectRoot = useMemo<FileStructure>(
+    () => ({
+      type: 'folder',
+      name: projectName,
+      relativePath: ROOT_PATH,
+      children: fileTreeStructure.filter(item => item.relativePath !== SETTINGS_TAB),
+    }),
+    [projectName, fileTreeStructure],
+  );
 
-  const toggleFolder = (relativePath: string) =>
+  // The project node does not fold (also not with the arrow keys).
+  const toggleFolder = (relativePath: string) => {
+    if (relativePath === ROOT_PATH) return;
     setExpanded(prev => ({ ...prev, [relativePath]: !prev[relativePath] }));
+  };
 
   /** Open every folder on the way to `relativePath` (a new file is shown, not hidden). */
   const reveal = (relativePath: string) => {
     const parts = relativePath.split('/').slice(0, -1);
     setExpanded(prev => {
-      const next = { ...prev };
+      const next: Record<string, boolean> = { ...prev, [ROOT_PATH]: true };
       parts.forEach((_, i) => (next[parts.slice(0, i + 1).join('/')] = true));
       return next;
     });
   };
 
   const handleOpenFile = (item: FileStructure) => {
-    if (item.type === 'file') {
+    if (item.relativePath === ROOT_PATH) {
+      void openProjectSettings();
+    } else if (item.type === 'file') {
       openTab({ title: item.name, filePath: item.relativePath });
     }
   };
@@ -112,7 +162,7 @@ export default function SideBar() {
   };
 
   const { focusPath, flatList, setFocusIndex, handleKeyDown } = useFileTreeNavigation(
-    fileTreeStructure,
+    [projectRoot],
     expanded,
     toggleFolder,
     handleOpenFile,
@@ -124,6 +174,22 @@ export default function SideBar() {
     const index = flatList.findIndex(item => item.relativePath === selectedPath);
     if (index >= 0) setFocusIndex(index);
   }, [selectedPath, flatList, setFocusIndex]);
+
+  // The New File dialog's options: the next place in the assembled files, and the devices the
+  // program uses but are not connected (then the textbook's F1 and 05).
+  const detectedDevices = sources.devices;
+  const connectedDevices = useProjectStore(s => s.settings.filedevices);
+  const newFileOptions: NewFileOptions = {
+    assembleOrdinal: t.files.ordinal(projectFiles.length + 1),
+    deviceSuggestions: [
+      ...detectedDevices
+        .filter(d => !connectedDevices.some(c => c.index === d.device))
+        .map(d => deviceHex(d.device)),
+      'F1',
+      '05',
+    ].filter((v, i, all) => all.indexOf(v) === i),
+    deviceUses: Object.fromEntries(detectedDevices.map(d => [deviceHex(d.device), d.uses])),
+  };
 
   const dialog = (() => {
     if (!nameRequest) return null;
@@ -153,24 +219,20 @@ export default function SideBar() {
           label: t.files.fileName,
           extensions: ['.asm', '.txt'],
           submitLabel: t.common.create,
-          onSubmit: async (name: string, ext: string) => {
+          fileOptions: newFileOptions,
+          onSubmit: async (name: string, ext: string, choice: NewFileChoice) => {
             // A name typed with its extension keeps it.
             const [base, extension] = /\.(asm|txt)$/i.test(name)
               ? [name.replace(/\.(asm|txt)$/i, ''), name.slice(-4).toLowerCase()]
               : [name, ext];
             try {
-              const file = await createFile(where, base, extension);
+              // The dialog's checkboxes say whether it is assembled or connected.
+              const file = await createFile(where, base, extension, choice.assemble);
               if (file) {
                 reveal(file.relativePath);
                 setSelectedFileOrFolder(file);
                 void openTab({ title: file.name, filePath: file.relativePath });
-                // Added to project.sic's asm list (useProjectFiles): say so, with the way back.
-                if (extension === '.asm') {
-                  notify('info', t.files.addedToAsm(file.name), {
-                    label: t.messages.openSettings,
-                    run: () => void openTab({ title: 'project.sic', filePath: 'project.sic' }),
-                  });
-                }
+                if (choice.device !== null) await connectDevice(choice.device, file.relativePath);
               }
               return null;
             } catch (error) {
@@ -197,9 +259,11 @@ export default function SideBar() {
 
   return (
     <div className="w-full bg-white border-r border-gray-300 flex flex-col h-full">
+      {/* The pane's title and its actions; the project itself is the tree's first node (the top
+          bar showed the project's name and the tree listed project.sic as a file). */}
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-gray-300 px-2">
-        <span className="min-w-0 truncate text-sm font-semibold" title={projectPath}>
-          {projectName}
+        <span className="min-w-0 truncate text-xs font-semibold tracking-wide text-gray-700 uppercase">
+          {t.files.project}
         </span>
         <div className="flex shrink-0 gap-0.5">
           <button
@@ -246,10 +310,12 @@ export default function SideBar() {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setTreeFocused(false);
         }}
       >
-        {fileTreeStructure.map(item => (
+        {[projectRoot].map(item => (
           <FileTreeItem
             key={item.relativePath}
             item={item}
+            projectPath={projectPath}
+            mainFile={mainFile}
             expanded={expanded}
             toggleFolder={toggleFolder}
             selected={selectedFileOrFolder}
@@ -275,6 +341,20 @@ export default function SideBar() {
           onNewFile={() => setNameRequest({ kind: 'file', where: contextMenu.item })}
           onNewFolder={() => setNameRequest({ kind: 'folder', where: contextMenu.item })}
           onRename={() => setNameRequest({ kind: 'rename', item: contextMenu.item })}
+          onOpenSettings={() => void openProjectSettings()}
+          onOpenProject={() => window.dispatchEvent(new Event(AppEvent.openProject))}
+          asm={
+            /\.asm$/i.test(contextMenu.item.relativePath) && contextMenu.item.type === 'file'
+              ? {
+                  listed: projectFiles.includes(contextMenu.item.relativePath),
+                  first: projectFiles[0] === contextMenu.item.relativePath,
+                  last: projectFiles.at(-1) === contextMenu.item.relativePath,
+                }
+              : null
+          }
+          onAsmEarlier={() => moveAsm(contextMenu.item.relativePath, -1)}
+          onAsmLater={() => moveAsm(contextMenu.item.relativePath, 1)}
+          onAsmToggle={() => toggleAsm(contextMenu.item.relativePath)}
           onReveal={() =>
             void window.api.showInFolder(`${projectPath}/${contextMenu.item.relativePath}`)
           }
@@ -292,6 +372,7 @@ export default function SideBar() {
           initial={'initial' in dialog ? dialog.initial : ''}
           submitLabel={dialog.submitLabel}
           extensions={'extensions' in dialog ? dialog.extensions : undefined}
+          fileOptions={'fileOptions' in dialog ? dialog.fileOptions : undefined}
           onClose={() => setNameRequest(null)}
           onSubmit={dialog.onSubmit}
         />

@@ -2,7 +2,7 @@
 import { dialog, ipcMain, shell } from 'electron';
 import * as fs from 'fs';
 import * as pathModule from 'path';
-import { IpcChannel, type IpcResult } from '../../shared/ipc';
+import { IpcChannel, type IpcResult, type PickFileOptions } from '../../shared/ipc';
 import { texts } from '../i18n';
 import { listProjectEntries } from '../project/projectFiles';
 import { checkName } from './project';
@@ -30,21 +30,37 @@ export function registerFileHandlers() {
     ipcResult(() => fs.writeFileSync(filePath, content)),
   );
 
-  // File picker; resolves to the absolute path.
-  ipcMain.handle(IpcChannel.pickFile, async (): Promise<IpcResult<string>> => {
-    try {
-      const pick = await dialog.showOpenDialog({
-        properties: ['openFile'],
-        title: texts().chooseFileTitle,
-      });
-      if (pick.canceled || pick.filePaths.length === 0) {
-        return { success: false, code: 'canceled', message: 'canceled' };
+  // File picker; resolves to the absolute path. It opens in `defaultPath` (the project
+  // folder). With `save`, it is a Save dialog, where a new file's name can be typed (an
+  // output device's file need not exist yet), with `suggestedName` filled in.
+  ipcMain.handle(
+    IpcChannel.pickFile,
+    async (_event, options: PickFileOptions = {}): Promise<IpcResult<string>> => {
+      try {
+        if (options.save) {
+          const pick = await dialog.showSaveDialog({
+            title: texts().chooseOutputTitle,
+            defaultPath: pathModule.join(options.defaultPath ?? '', options.suggestedName ?? ''),
+          });
+          if (pick.canceled || !pick.filePath) {
+            return { success: false, code: 'canceled', message: 'canceled' };
+          }
+          return { success: true, data: pick.filePath };
+        }
+        const pick = await dialog.showOpenDialog({
+          properties: ['openFile'],
+          title: texts().chooseFileTitle,
+          ...(options.defaultPath ? { defaultPath: options.defaultPath } : {}),
+        });
+        if (pick.canceled || pick.filePaths.length === 0) {
+          return { success: false, code: 'canceled', message: 'canceled' };
+        }
+        return { success: true, data: pick.filePaths[0] };
+      } catch (error) {
+        return { success: false, message: toErrorMessage(error) };
       }
-      return { success: true, data: pick.filePaths[0] };
-    } catch (error) {
-      return { success: false, message: toErrorMessage(error) };
-    }
-  });
+    },
+  );
 
   ipcMain.handle(
     IpcChannel.createNewFile,
