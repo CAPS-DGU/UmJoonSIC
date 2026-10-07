@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { simulator } from '@/api/simulator';
 import type { MachineMode } from '@/api/types';
 import { recheckOpenProjectFiles } from '@/features/editor/lib/syntaxCheck';
+import { nextMarks, type ChangeMarks, type MarkMode } from '@/lib/changeMarks';
+import { resolveInProject } from '@/lib/projectPath';
 import { useProjectStore } from '@/features/project/projectStore';
 
 export type { MachineMode };
@@ -30,7 +32,13 @@ interface MemoryViewState {
   /** What the viewer shows (with a margin around it). Read again after every step. */
   viewRange: AddressRange;
   /** Addresses whose value changed in the last refresh; the viewer flashes them. */
-  changedNodes: ReadonlySet<number>;
+  changedNodes: ChangeMarks<number>;
+  /** Counts the refreshes (the numbers in changedNodes). */
+  changeVersion: number;
+  /** A request to show an address (a variable, the last write): the viewer scrolls to it. */
+  revealRequest: { address: number; size: number; id: number } | null;
+  /** Show `size` bytes at `address`: scrolled to if not on screen, then highlighted. */
+  reveal: (address: number, size?: number) => void;
 
   /** Switch machine mode: clears the view and restarts the simulation in that mode. */
   setMode: (mode: MachineMode) => void;
@@ -39,8 +47,8 @@ interface MemoryViewState {
    * value (after a run has ended, the view keeps the memory as the run left it).
    */
   setViewRange: (range: AddressRange, options?: { keepKnown?: boolean }) => Promise<void>;
-  /** Read the shown range again and mark the bytes that changed (after a step). */
-  refresh: () => Promise<void>;
+  /** Read the shown range again (after a step) and mark the bytes that changed (see MarkMode). */
+  refresh: (mode: MarkMode) => Promise<void>;
   /** Forget what is shown and read it again (the simulator's memory was reset). */
   reload: () => Promise<void>;
   clearChangedNodes: () => void;
@@ -61,7 +69,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
       const { values } = await simulator.memory(start, end - 1);
       return values;
     } catch (error) {
-      console.error(`메모리 범위 ${start}-${end} 로드 실패:`, error);
+      console.error(`Memory ${start}-${end} could not be loaded:`, error);
       set(state => {
         const failed = new Set(state.failed);
         for (let address = start; address < end; address++) failed.add(address);
@@ -99,7 +107,11 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
     failed: new Set(),
     pendingReads: 0,
     viewRange: INITIAL_VIEW,
-    changedNodes: new Set(),
+    changedNodes: new Map(),
+    changeVersion: 0,
+    revealRequest: null,
+    reveal: (address, size = 1) =>
+      set(state => ({ revealRequest: { address, size, id: (state.revealRequest?.id ?? 0) + 1 } })),
 
     setMode: mode => {
       const totalMemorySize = MEMORY_SIZE[mode];
@@ -108,7 +120,7 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
         totalMemorySize,
         bytes: new Map(),
         failed: new Set(),
-        changedNodes: new Set(),
+        changedNodes: new Map(),
         viewRange: clamp(state.viewRange, totalMemorySize),
       }));
 
@@ -116,8 +128,16 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
       // again: what is valid depends on the mode, and the simulator works in the mode it is in.
       void (async () => {
         try {
-          const { settings } = useProjectStore.getState();
-          const data = await simulator.begin(mode, settings.filedevices);
+          const { settings, projectPath } = useProjectStore.getState();
+          // Relative device paths are inside the project (the simulator would open them in
+          // its own working folder).
+          const data = await simulator.begin(
+            mode,
+            settings.filedevices.map(d => ({
+              ...d,
+              filename: resolveInProject(projectPath, d.filename),
+            })),
+          );
           if (!data.ok) {
             console.error('Failed to begin after mode change');
           }
@@ -136,19 +156,23 @@ export const useMemoryViewStore = create<MemoryViewState>((set, get) => {
       if (values) store(viewRange.start, values, keepKnown);
     },
 
-    refresh: async () => {
+    refresh: async mode => {
       const { viewRange } = get();
       const values = await read(viewRange);
       if (values) {
-        set({ changedNodes: store(viewRange.start, values, false) });
+        const changed = store(viewRange.start, values, false);
+        set(state => ({
+          changedNodes: nextMarks(state.changedNodes, changed, state.changeVersion + 1, mode),
+          changeVersion: state.changeVersion + 1,
+        }));
       }
     },
 
     reload: async () => {
-      set({ bytes: new Map(), failed: new Set(), changedNodes: new Set() });
+      set({ bytes: new Map(), failed: new Set(), changedNodes: new Map() });
       await get().setViewRange(get().viewRange);
     },
 
-    clearChangedNodes: () => set({ changedNodes: new Set() }),
+    clearChangedNodes: () => set({ changedNodes: new Map() }),
   };
 });

@@ -1,205 +1,191 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { ProjectSettings as Settings } from '@shared/ipc';
-import { useEditorTabStore } from '@/features/editor/editorTabStore';
+import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import TabBar from '@/features/editor/TabBar';
+import { AsmOrderList } from '@/features/project/AsmOrderList';
+import { useMainFile, useProjectSources } from '@/features/devices/useProjectSources';
+import { DeviceTable } from '@/features/project/DeviceTable';
 import { useProjectStore } from '@/features/project/projectStore';
-import { useInfoModalStore } from '@/stores/infoModalStore';
-import { FORM_BUTTON, FORM_FIELD, INLINE_ICON_BUTTON } from '@/lib/controls';
-import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useStrings } from '@/i18n';
+import { FORM_BUTTON, FORM_FIELD } from '@/lib/controls';
+import { resolveInProject } from '@/lib/projectPath';
+import { notify } from '@/stores/toastStore';
 
-/** Device numbers 0x00-0xFF. */
-const DEVICE_INDEXES = Array.from({ length: 256 }, (_, i) => i);
+/** Which of these absolute paths exist (re-checked when the list changes). */
+function useExisting(paths: string[]) {
+  const [exists, setExists] = useState<Record<string, boolean>>({});
+  const key = paths.join('\n');
+  useEffect(() => {
+    let current = true;
+    void window.api.pathExists(paths).then(res => {
+      if (current && res.success && res.data) {
+        setExists(Object.fromEntries(paths.map((p, i) => [p, res.data![i]])));
+      }
+    });
+    return () => {
+      current = false;
+    };
+    // `key` stands for `paths`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return (p: string) => exists[p] !== false;
+}
 
-const toHexByte = (value: number) => `0x${value.toString(16).toUpperCase().padStart(2, '0')}`;
-
-/** Editor for project.sic, shown while its tab is active: entry module, asm files, file devices. */
-export default function ProjectSettings() {
-  const settings = useProjectStore(s => s.settings);
-  const setSettings = useProjectStore(s => s.setSettings);
-  const saveSettings = useProjectStore(s => s.saveSettings);
-  // This view shows the active tab, which is the settings tab.
-  const settingsTabPath = useEditorTabStore(state => state.activePath);
-  const setModified = useEditorTabStore(state => state.setModified);
-  const setIsModified = useCallback(
-    (isModified: boolean) => {
-      if (settingsTabPath) setModified(settingsTabPath, isModified);
-    },
-    [settingsTabPath, setModified],
+function Missing({ label }: { label: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-xs text-amber-700" title={label}>
+      <AlertTriangle className="size-3.5" aria-hidden />
+      {label}
+    </span>
   );
+}
+
+/**
+ * The project settings (they edit project.sic), shown while their tab is active: the main
+ * program, the assembled files in their order, the devices. Every change is written at once:
+ * no Save button next to changes that apply by themselves, and removals can be undone.
+ */
+export default function ProjectSettings() {
+  const t = useStrings();
+  const settings = useProjectStore(s => s.settings);
+  const projectPath = useProjectStore(s => s.projectPath);
+  const changeSettings = useProjectStore(s => s.changeSettings);
+  const fileTree = useProjectStore(s => s.fileTree);
+  const [main, setMain] = useState(settings.main);
   const [newAsm, setNewAsm] = useState('');
-  const [deviceIndex, setDeviceIndex] = useState<number>(0);
 
-  const devices = settings.filedevices || [];
+  // Another project, or a change from elsewhere: show the saved name.
+  useEffect(() => setMain(settings.main), [settings.main]);
 
-  /** Apply a change to the settings and mark the tab as modified. */
-  const update = (changed: Partial<Settings>) => {
-    setSettings({ ...settings, ...changed });
-    setIsModified(true);
+  const absolute = (file: string) => resolveInProject(projectPath, file);
+  const asmExists = useExisting(settings.asm.map(absolute));
+  const unlistedAsm = fileTree
+    .map(f => f.relativePath)
+    .filter(p => /\.asm$/i.test(p) && !settings.asm.includes(p))
+    .sort();
+  const sources = useProjectSources();
+  const mainFile = useMainFile(sources);
+  // The names main can give: the sections the files define (START, CSECT).
+  const sectionNames = settings.asm.flatMap(file => sources.sections[file] ?? []);
+
+  const saveMain = () => {
+    const value = main.trim();
+    if (value !== settings.main) void changeSettings({ main: value });
   };
 
-  // Ctrl+S / Cmd+S saves the settings.
+  // Ctrl+S writes the main program's name now (everything else is written as it changes).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         e.stopPropagation();
-        saveSettings().then(res => {
-          if (res.success) {
-            setIsModified(false);
-          } else {
-            useInfoModalStore.getState().show('저장 실패', res.message ?? 'project.sic');
-          }
-        });
+        saveMain();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [saveSettings, setIsModified]);
+  });
 
-  const addAsm = () => {
-    setSettings({ ...settings, asm: [...settings.asm, newAsm] });
-    setNewAsm('');
-    setIsModified(true);
-  };
-
-  /** Map the selected device number to a file chosen in the native file picker. */
-  const pickDeviceFile = async () => {
-    const res = await window.api.pickFile();
-    if (res.success && res.data) {
-      const others = devices.filter(d => d.index !== deviceIndex);
-      update({ filedevices: others.concat([{ index: deviceIndex, filename: res.data }]) });
+  const changeAsm = async (asm: string[]) => {
+    const before = settings.asm;
+    const ok = await changeSettings({ asm });
+    // A file taken off the list: say so, with the way back.
+    const removed = before.find(file => !asm.includes(file));
+    if (ok && removed && asm.length < before.length) {
+      notify('info', t.settings.removedAsm(removed), {
+        label: t.settings.undo,
+        run: () => void changeSettings({ asm: before }),
+      });
     }
   };
 
-  const save = () => {
-    saveSettings().then(res => {
-      if (res.success) {
-        setIsModified(false);
-        alert('Settings saved');
-      } else {
-        alert(res.message ?? 'Failed to save settings');
-      }
-    });
+  const addAsm = () => {
+    const file = newAsm.trim();
+    if (!file || settings.asm.includes(file)) return;
+    void changeSettings({ asm: [...settings.asm, file] });
+    setNewAsm('');
   };
 
   return (
     <div className="flex flex-col flex-1 w-full h-full">
       <TabBar />
-      <div className="flex-1 overflow-auto bg-gray-100 p-4 text-sm">
-        <div className="flex max-w-2xl flex-col gap-5">
-          <h1 className="text-base font-semibold">SIC Setting</h1>
+      <div className="slim-scroll flex-1 overflow-auto bg-gray-100 p-4 text-sm">
+        <div className="flex max-w-3xl flex-col gap-6">
+          <header className="flex flex-wrap items-baseline justify-between gap-2">
+            <h1 className="text-base font-semibold">{t.settings.title}</h1>
+            <span className="text-xs text-gray-600">{t.settings.autosave}</span>
+          </header>
 
-          <section className="flex flex-col gap-2">
+          <section className="flex flex-col gap-1.5">
             <label className="font-semibold" htmlFor="sic-main">
-              Main
+              {t.settings.main}
             </label>
             <input
               id="sic-main"
               type="text"
+              list="asm-module-names"
               className={`${FORM_FIELD} w-full max-w-xs font-mono`}
-              value={settings.main}
-              onChange={e => update({ main: e.target.value })}
+              value={main}
+              onChange={e => setMain(e.target.value)}
+              onBlur={saveMain}
+              onKeyDown={e => e.key === 'Enter' && saveMain()}
             />
+            <datalist id="asm-module-names">
+              {sectionNames.map(name => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            <p className="text-xs text-gray-600">{t.settings.mainHint}</p>
+            {settings.main.trim() && settings.asm.length > 1 && mainFile === null && (
+              <p className="flex items-center gap-1 text-xs text-amber-800" data-main-not-found>
+                <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+                {t.settings.mainNotFound(settings.main)}
+              </p>
+            )}
           </section>
 
-          <section className="flex flex-col gap-2">
-            <h2 className="font-semibold">Asm List</h2>
-            <ul className="divide-y rounded border bg-white">
-              {settings.asm.map(asm => (
-                <li key={asm} className="flex items-center gap-2 px-2 py-1">
-                  <span className="min-w-0 flex-1 truncate font-mono" title={asm}>
-                    {asm}
-                  </span>
-                  <button
-                    className={INLINE_ICON_BUTTON}
-                    title="목록에서 빼기"
-                    onClick={() => update({ asm: settings.asm.filter(a => a !== asm) })}
-                  >
-                    <X width={12} height={12} />
-                  </button>
-                </li>
-              ))}
-              {settings.asm.length === 0 && (
-                <li className="px-2 py-1 text-xs text-gray-400">No file</li>
-              )}
-            </ul>
-            <div className="flex flex-wrap items-center gap-2">
+          <section className="flex flex-col gap-1.5">
+            <h2 className="font-semibold">{t.settings.asmList}</h2>
+            <p className="text-xs text-gray-600">{t.settings.asmHint}</p>
+            <AsmOrderList
+              files={settings.asm}
+              mainFile={mainFile}
+              onChange={asm => void changeAsm(asm)}
+              missing={asm => !asmExists(absolute(asm))}
+              missingMark={<Missing label={t.settings.missingFile} />}
+            />
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={e => {
+                e.preventDefault();
+                addAsm();
+              }}
+            >
               <input
                 type="text"
-                aria-label="Add Asm"
-                placeholder="file.asm"
+                list="unlisted-asm-files"
+                aria-label={t.settings.asmList}
+                placeholder={t.settings.asmPlaceholder}
                 className={`${FORM_FIELD} min-w-0 flex-1 basis-40 font-mono`}
                 value={newAsm}
                 onChange={e => setNewAsm(e.target.value)}
               />
-              <button className={FORM_BUTTON} onClick={addAsm}>
-                Add
-              </button>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-semibold">Device List</h2>
-            <ul className="divide-y rounded border bg-white">
-              {devices.map(d => (
-                <li key={d.index} className="flex items-center gap-2 px-2 py-1">
-                  <span className="shrink-0 font-mono text-xs">{toHexByte(d.index)}</span>
-                  <span className="min-w-0 flex-1 truncate font-mono" title={d.filename}>
-                    {d.filename}
-                  </span>
-                  <button
-                    className={INLINE_ICON_BUTTON}
-                    title="장치 연결 해제"
-                    onClick={() =>
-                      update({ filedevices: devices.filter(x => x.index !== d.index) })
-                    }
-                  >
-                    <X width={12} height={12} />
-                  </button>
-                </li>
-              ))}
-              {devices.length === 0 && (
-                <li className="px-2 py-1 text-xs text-gray-400">No device mapped</li>
-              )}
-            </ul>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="shrink-0 font-semibold">Add Device</span>
-              <select
-                className={`${FORM_FIELD} shrink-0 font-mono`}
-                value={deviceIndex.toString(16)}
-                onChange={e => setDeviceIndex(parseInt(e.target.value, 16))}
-              >
-                {DEVICE_INDEXES.map(i => (
-                  <option key={i} value={i.toString(16)}>
-                    {toHexByte(i)}
-                  </option>
+              {/* The project's .asm files that are not assembled yet, as suggestions. */}
+              <datalist id="unlisted-asm-files">
+                {unlistedAsm.map(file => (
+                  <option key={file} value={file} />
                 ))}
-              </select>
-              <div className="flex min-w-0 flex-1 basis-48 items-center gap-2">
-                <input
-                  type="text"
-                  className="h-7 min-w-0 flex-1 cursor-not-allowed rounded-md border border-gray-300 bg-gray-100 px-2 font-mono"
-                  value={devices.find(d => d.index === deviceIndex)?.filename ?? ''}
-                  placeholder="파일을 선택하세요"
-                  disabled
-                />
-                <button
-                  className={cn(FORM_BUTTON, 'px-2')}
-                  title="파일 선택"
-                  onClick={pickDeviceFile}
-                >
-                  …
-                </button>
-              </div>
-            </div>
+              </datalist>
+              <button type="submit" className={FORM_BUTTON}>
+                {t.settings.add}
+              </button>
+            </form>
           </section>
 
-          <div>
-            <button className={FORM_BUTTON} onClick={save}>
-              Save
-            </button>
-          </div>
+          <section className="flex flex-col gap-1.5">
+            <h2 className="font-semibold">{t.settings.devices}</h2>
+            <p className="text-xs text-gray-600">{t.settings.devicesHint}</p>
+            <DeviceTable />
+          </section>
         </div>
       </div>
     </div>

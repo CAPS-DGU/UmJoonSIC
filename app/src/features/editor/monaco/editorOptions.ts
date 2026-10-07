@@ -25,4 +25,10 @@ export const editorOptions: monaco_editor.editor.IStandaloneEditorConstructionOp
   formatOnType: false,
   formatOnPaste: false,
   tabCompletion: 'off',
+
+  // Enter always starts a new line: students end every line with Enter, and accepting the
+  // word suggestion there joined two lines ("STA ALPHAX", usage study). Tab accepts.
+  acceptSuggestionOnEnter: 'off',
+  // No pinned label line at the top: it hid lines and made the numbers jump (3 -> 8).
+  stickyScroll: { enabled: false },
 };

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { simulator } from '@/api/simulator';
 import type { Registers } from '@/api/types';
 
 const REGISTER_NAMES = ['A', 'X', 'L', 'S', 'T', 'B', 'SW', 'PC', 'F'] as const;
@@ -10,14 +9,9 @@ interface RegisterState extends Registers {
   changedRegisters: Set<string>;
   setAll: (registers: Registers) => void;
   clearChangedRegisters: () => void;
-  /**
-   * Execute one instruction and take over the resulting registers. 'halted' means the PC
-   * did not move: the program ended (it jumps to itself).
-   */
-  step: () => Promise<'stepped' | 'halted' | 'failed'>;
 }
 
-export const useRegisterStore = create<RegisterState>((set, get) => ({
+export const useRegisterStore = create<RegisterState>(set => ({
   A: 0,
   X: 0,
   L: 0,
@@ -44,15 +38,4 @@ export const useRegisterStore = create<RegisterState>((set, get) => ({
     })),
 
   clearChangedRegisters: () => set({ changedRegisters: new Set() }),
-
-  step: async () => {
-    const data = await simulator.step();
-    if (!data.ok) {
-      console.error('Failed to step');
-      return 'failed';
-    }
-    const halted = get().PC === data.registers.PC;
-    get().setAll(data.registers);
-    return halted ? 'halted' : 'stepped';
-  },
 }));

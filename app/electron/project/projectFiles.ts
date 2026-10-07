@@ -14,18 +14,40 @@ function ensureDir(p: string) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
 }
 
-/** Read a project.sic and describe the project around it. Throws if the file is missing or not JSON. */
+/** An error that says what is wrong with a project.sic ('notFound', 'invalidJson'). */
+export class ProjectFileError extends Error {
+  readonly code: 'notFound' | 'invalidJson';
+  constructor(code: 'notFound' | 'invalidJson', message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/**
+ * Read a project.sic and describe the project around it. Throws a ProjectFileError if the
+ * file is missing or not JSON.
+ */
 export function loadProjectFromSic(sicPath: string): ProjectInfo {
   const resolved = pathModule.resolve(sicPath);
   if (!fs.existsSync(resolved)) {
-    throw new Error('Project file not found.');
+    throw new ProjectFileError('notFound', resolved);
   }
 
   const projectRoot = pathModule.dirname(resolved);
   const projectName = pathModule.basename(projectRoot);
 
   const sicRaw = fs.readFileSync(resolved, 'utf8');
-  const sic = JSON.parse(sicRaw) as {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(sicRaw);
+  } catch (error) {
+    // The parser's message says where (e.g. "Expected ',' or '}' ... at position 87").
+    throw new ProjectFileError(
+      'invalidJson',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  const sic = (parsed && typeof parsed === 'object' ? parsed : {}) as {
     asm?: unknown;
     main?: unknown;
     filedevices?: unknown;

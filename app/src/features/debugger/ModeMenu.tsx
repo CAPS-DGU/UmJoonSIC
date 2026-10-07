@@ -1,35 +1,35 @@
+import { useEffect } from 'react';
 import type { MachineMode } from '@/api/types';
-
-const MODES: { value: MachineMode; label: string }[] = [
-  { value: 'SIC', label: 'SIC 모드' },
-  { value: 'SICXE', label: 'SIC/XE 모드' },
-];
-
-const MODE_NAME: Record<MachineMode, string> = { SIC: 'SIC', SICXE: 'SIC/XE' };
+import { useStrings } from '@/i18n';
 
 interface ModeButtonProps {
   mode: MachineMode;
   /** While a program runs, the mode is shown but cannot be changed. */
   disabled: boolean;
+  expanded: boolean;
   onClick: () => void;
 }
 
-/** The architecture button: shows the machine mode, and opens the mode menu. */
-export function ModeButton({ mode, disabled, onClick }: ModeButtonProps) {
+/** The machine button: shows SIC or SIC/XE, and opens the mode menu. */
+export function ModeButton({ mode, disabled, expanded, onClick }: ModeButtonProps) {
+  const t = useStrings();
   const colors =
     mode === 'SICXE'
       ? 'border-blue-300 bg-blue-50 text-blue-700'
-      : 'border-gray-300 bg-gray-50 text-gray-700';
+      : 'border-gray-300 bg-gray-50 text-gray-800';
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-sm font-semibold transition-colors ${colors} ${
-        disabled ? 'opacity-60 cursor-default' : 'hover:bg-gray-100'
+      aria-haspopup="menu"
+      aria-expanded={expanded}
+      className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-xs font-semibold transition-colors ${colors} ${
+        disabled ? 'cursor-default opacity-60' : 'hover:bg-gray-100'
       }`}
-      title={disabled ? '실행 중에는 아키텍처를 바꿀 수 없습니다' : '아키텍처 설정'}
+      title={disabled ? t.run.machineLocked : t.run.machineTitle}
     >
-      {MODE_NAME[mode]}
+      {mode === 'SICXE' ? t.run.sicxe : t.run.sic}
     </button>
   );
 }
@@ -37,26 +37,48 @@ export function ModeButton({ mode, disabled, onClick }: ModeButtonProps) {
 interface ModeMenuProps {
   mode: MachineMode;
   onChange: (mode: MachineMode) => void;
+  onClose: () => void;
 }
 
-/** Drop-down under the architecture button: choose between SIC and SIC/XE. */
-export function ModeMenu({ mode, onChange }: ModeMenuProps) {
+/** The menu under the machine button. A choice closes it, and so does Escape. */
+export function ModeMenu({ mode, onChange, onClose }: ModeMenuProps) {
+  const t = useStrings();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const options: { value: MachineMode; label: string }[] = [
+    { value: 'SIC', label: t.run.sic },
+    { value: 'SICXE', label: t.run.sicxe },
+  ];
   return (
-    <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg p-2 z-10">
-      <div className="flex flex-col space-y-1">
-        {MODES.map(({ value, label }) => (
-          <label key={value} className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="radio"
-              name="machineMode"
-              value={value}
-              checked={mode === value}
-              onChange={() => onChange(value)}
-            />
-            <span>{label}</span>
-          </label>
-        ))}
-      </div>
+    <div
+      role="menu"
+      className="absolute top-full right-0 z-10 mt-1 flex min-w-28 flex-col rounded-md border border-gray-300 bg-white p-1 shadow-lg"
+    >
+      {options.map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          role="menuitemradio"
+          aria-checked={mode === value}
+          autoFocus={mode === value}
+          onClick={() => {
+            onChange(value);
+            onClose();
+          }}
+          className={`flex items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-gray-100 ${
+            mode === value ? 'font-semibold text-blue-700' : 'text-gray-800'
+          }`}
+        >
+          <span className="w-3 text-center">{mode === value ? '●' : ''}</span>
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -25,17 +25,58 @@
         -webkit-app-region: drag;
         user-select: none;
       }
+      #splash {
+        position: relative;
+      }
       #splash img {
         display: block;
         width: 600px;
         height: 400px;
         -webkit-user-drag: none;
       }
+      /* What the start is doing (downloads, starting the simulator), at the bottom right as in
+         Photoshop's splash: written by electron/windows/splashWindow.ts. */
+      #status {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        max-width: 230px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: rgba(18, 18, 24, 0.78);
+        color: #e5e7eb;
+        font:
+          12px/1.45 system-ui,
+          'Segoe UI',
+          'Apple SD Gothic Neo',
+          'Malgun Gothic',
+          sans-serif;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+      }
+      #status[hidden] {
+        display: none;
+      }
+      #status-heading {
+        color: #9ca3af;
+        font-size: 11px;
+      }
+      #status-heading:empty {
+        display: none;
+      }
+      #status.failed #status-heading {
+        color: #fca5a5;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
     <div id="splash">
       <img src="splash.png" alt="UmJoonSIC" width="600" height="400" />
+      <div id="status" role="status" aria-live="polite" hidden>
+        <div id="status-heading"></div>
+        <div id="status-detail"></div>
+      </div>
     </div>
   </body>
 </html>

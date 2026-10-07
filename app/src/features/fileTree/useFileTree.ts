@@ -57,6 +57,10 @@ export function buildFileTree(fileTree: FileStructure[]): FileStructure[] {
         return { type: 'file', name, relativePath: currentPath };
       })
       .sort((a, b) => {
+        // The build output (.out) goes last: it is not what students work on.
+        const outA = a.type === 'folder' && a.name === '.out';
+        const outB = b.type === 'folder' && b.name === '.out';
+        if (outA !== outB) return outA ? 1 : -1;
         if (a.type === 'folder' && b.type === 'file') return -1;
         if (a.type === 'file' && b.type === 'folder') return 1;
         return a.name.localeCompare(b.name);

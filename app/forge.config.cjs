@@ -14,6 +14,24 @@ module.exports = {
     ],
     icon: './src/assets/icon',
     executableName: 'UmJoonSIC',
+    // macOS: the app owns .sic (projects) and is one choice among others for .asm (Open With;
+    // other tools claim .asm too). Windows registers the same in win-installer/inno-setup.iss.
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'UmJoonSIC Project',
+          CFBundleTypeExtensions: ['sic'],
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Owner',
+        },
+        {
+          CFBundleTypeName: 'SIC Assembly Source',
+          CFBundleTypeExtensions: ['asm'],
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Alternate',
+        },
+      ],
+    },
     osxSign: {},
     osxNotarize: {
       appleId: process.env.APPLE_ID,

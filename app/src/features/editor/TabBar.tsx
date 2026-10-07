@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { File, ListOrdered, Settings, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, File, FileCode, FileText, ScrollText, X } from 'lucide-react';
 import { useRunningStore } from '@/features/debugger/runningStore';
 import { useEditorTabStore } from '@/features/editor/editorTabStore';
 import { requestCloseTab } from '@/features/editor/unsavedChanges';
+import { LISTING_TAB } from '@/features/listing/listingStore';
+import { isOutsideFile } from '@/features/project/outsideFiles';
+import { SETTINGS_TAB } from '@/features/project/projectSettingsTab';
+import { useStrings } from '@/i18n';
+import { ProjectIcon } from '@/lib/icons';
 import { INLINE_ICON_BUTTON } from '@/lib/controls';
 
 /** Where a dragged tab would go: before or after the tab under the pointer. */
@@ -11,18 +16,53 @@ interface DropTarget {
   after: boolean;
 }
 
-const getFileIcon = (fileName: string) => {
-  if (fileName.toLowerCase() === 'project.sic') {
-    return <Settings width={16} height={16} className="shrink-0 text-blue-500" />;
-  }
-  if (fileName.toLowerCase().endsWith('.asm')) {
-    return <File width={16} height={16} className="shrink-0 text-green-500" />;
-  }
-  return <File width={16} height={16} className="shrink-0 text-gray-500" />;
+/** The same icons as the file tree; a listing has its own (it was a source file's icon). */
+const getFileIcon = (filePath: string) => {
+  const lower = filePath.toLowerCase();
+  if (lower === SETTINGS_TAB)
+    return <ProjectIcon width={16} height={16} className="shrink-0 text-blue-700" />;
+  if (lower.endsWith('.lst'))
+    return <ScrollText width={16} height={16} className="shrink-0 text-blue-700" />;
+  if (lower.endsWith('.asm'))
+    return <FileCode width={16} height={16} className="shrink-0 text-green-700" />;
+  if (lower.endsWith('.txt'))
+    return <FileText width={16} height={16} className="shrink-0 text-gray-700" />;
+  return <File width={16} height={16} className="shrink-0 text-gray-700" />;
 };
+
+/** Is the strip scrolled away from its start / its end (then an arrow shows on that side)? */
+function useOverflow(strip: HTMLDivElement | null, deps: unknown) {
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+  useEffect(() => {
+    if (!strip) return;
+    const update = () =>
+      setOverflow({
+        left: strip.scrollLeft > 1,
+        right: strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1,
+      });
+    update();
+    strip.addEventListener('scroll', update);
+    const observer = new ResizeObserver(update);
+    observer.observe(strip);
+    return () => {
+      strip.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, [strip, deps]);
+  return overflow;
+}
 
 /** Open tabs; drag a tab to move it. While a program runs, a button re-opens its List tabs. */
 export default function TabBar() {
+  const t = useStrings();
+  // The settings and the List tab are named in the current language (their titles were set
+  // when they opened).
+  const tabLabel = (title: string, filePath: string) => {
+    // The project settings, named as such (the file behind them is project.sic).
+    if (filePath === SETTINGS_TAB) return t.settings.title;
+    if (filePath === LISTING_TAB) return t.tabs.listingTab;
+    return title;
+  };
   const tabs = useEditorTabStore(state => state.tabs);
   const activePath = useEditorTabStore(state => state.activePath);
   const activateTab = useEditorTabStore(state => state.activateTab);
@@ -33,14 +73,34 @@ export default function TabBar() {
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const stripRef = useRef<HTMLDivElement>(null);
+  const [strip, setStrip] = useState<HTMLDivElement | null>(null);
 
   // Keep the active tab in sight when it changes by keyboard (Ctrl+PageDown) or a move.
   const tabOrder = tabs.map(tab => tab.filePath).join('\n');
+  const overflow = useOverflow(strip, tabOrder);
+  const scrollStrip = (direction: 1 | -1) =>
+    strip?.scrollBy({
+      left: direction * Math.max(160, strip.clientWidth * 0.6),
+      behavior: 'smooth',
+    });
+  const arrow =
+    'flex w-6 shrink-0 items-center justify-center border-gray-300 text-gray-700 hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-30';
+  // Both arrows while the tabs do not fit (the one at an end disabled): the strip keeps its
+  // width as it scrolls, so a tab does not slide under an arrow that just appeared.
+  const overflowing = overflow.left || overflow.right;
   useEffect(() => {
-    if (!activePath) return;
-    const tab = stripRef.current?.querySelector(`[data-tab-path="${CSS.escape(activePath)}"]`);
-    tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [activePath, tabOrder]);
+    if (!activePath || !strip) return;
+    const tabOf = () =>
+      strip.querySelector<HTMLElement>(`[data-tab-path="${CSS.escape(activePath)}"]`);
+    const reveal = () => tabOf()?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    reveal();
+    // Also when the strip changes width (the arrows or the Listing button appear, the window
+    // is resized): the active tab was left half under an arrow. Scrolling with the arrows does
+    // not change the width (both show while the tabs overflow), so this does not undo it.
+    const observer = new ResizeObserver(reveal);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [activePath, tabOrder, strip]);
 
   const endDrag = () => {
     setDraggedPath(null);
@@ -90,9 +150,24 @@ export default function TabBar() {
   };
 
   return (
-    <div className="flex h-10 shrink-0 flex-row bg-white border-b border-gray-300">
+    <div className="@container flex h-10 shrink-0 flex-row bg-white border-b border-gray-300">
+      {/* When the tabs do not fit, arrows show that there are more (they were cut silently). */}
+      {overflowing && (
+        <button
+          className={`${arrow} border-r`}
+          disabled={!overflow.left}
+          onClick={() => scrollStrip(-1)}
+          title={t.tabs.scrollLeft}
+          aria-label={t.tabs.scrollLeft}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+      )}
       <div
-        ref={stripRef}
+        ref={element => {
+          stripRef.current = element;
+          setStrip(element);
+        }}
         // Tabs keep a readable width; when they do not fit, the strip scrolls: with the mouse
         // wheel, Ctrl+PageDown/PageUp, and to the active tab. No scrollbar: it would take the
         // tabs' height.
@@ -139,7 +214,7 @@ export default function TabBar() {
               dropOn(targetAt(event, tab.filePath));
             }}
             onDragEnd={endDrag}
-            className={`flex shrink-0 items-center min-w-28 max-w-48 border-r border-gray-300 transition-colors ${
+            className={`flex shrink-0 items-center min-w-28 max-w-64 border-r border-gray-300 transition-colors ${
               tab.filePath === activePath
                 ? 'bg-gray-200 border-b-0'
                 : 'bg-gray-50 hover:bg-gray-200'
@@ -148,12 +223,19 @@ export default function TabBar() {
             <button
               onClick={() => activateTab(tab.filePath)}
               className="flex h-full items-center gap-1 px-3 min-w-0 flex-1"
-              title={tab.filePath}
+              title={isOutsideFile(tab.filePath) ? t.outside.tabTitle(tab.filePath) : tab.filePath}
+              data-outside-tab={isOutsideFile(tab.filePath) || undefined}
             >
-              {getFileIcon(tab.title)}
-              <span className="truncate text-sm font-medium">{tab.title}</span>
+              {getFileIcon(tab.filePath)}
+              {/* A file from outside the project: in italics, as editors show files not in it. */}
               <span
-                className={`text-red-500 text-xs ml-1 transition-opacity duration-200 ${
+                // pr-0.5: an italic name's last letter leans past its box and was cut.
+                className={`truncate text-sm font-medium ${isOutsideFile(tab.filePath) ? 'pr-0.5 italic' : ''}`}
+              >
+                {tabLabel(tab.title, tab.filePath)}
+              </span>
+              <span
+                className={`text-red-700 text-xs ml-1 transition-opacity duration-200 ${
                   tab.isModified ? 'opacity-100' : 'opacity-0'
                 }`}
               >
@@ -163,21 +245,34 @@ export default function TabBar() {
             <button
               onClick={() => requestCloseTab(tab.filePath)}
               className={`${INLINE_ICON_BUTTON} mr-1`}
-              title="Close tab"
+              title={t.tabs.close}
+              aria-label={t.tabs.close}
             >
               <X width={12} height={12} />
             </button>
           </div>
         ))}
       </div>
+      {overflowing && (
+        <button
+          className={`${arrow} border-l`}
+          disabled={!overflow.right}
+          onClick={() => scrollStrip(1)}
+          title={t.tabs.scrollRight}
+          aria-label={t.tabs.scrollRight}
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      )}
       {isRunning && (
         <button
           onClick={() => void showListings()}
-          className="flex items-center gap-1 px-3 shrink-0 border-l border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-100"
-          title="리스트 보기 (닫은 List 탭 다시 열기)"
+          className="flex items-center gap-1 px-3 shrink-0 border-l border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          title={t.tabs.showListingTitle}
         >
-          <ListOrdered width={16} height={16} />
-          List
+          <ScrollText width={16} height={16} />
+          {/* A narrow bar keeps the room for the tabs (the title still names the button). */}
+          <span className="@max-[30rem]:sr-only">{t.tabs.showListing}</span>
         </button>
       )}
     </div>

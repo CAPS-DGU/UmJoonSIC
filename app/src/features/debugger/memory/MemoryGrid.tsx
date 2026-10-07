@@ -1,7 +1,18 @@
 // The memory viewer's grid: rows of an address and 8 bytes. Only the rows in
 // `visibleRowRange` are rendered; each is positioned absolutely inside a container as tall as
 // all rows. Sizes: gridLayout.ts.
-import { CELL_CH, ROW_HEIGHT, ROW_SIZE } from '@/features/debugger/memory/gridLayout';
+import {
+  NAME_LINE,
+  ROW_HEIGHT,
+  ROW_SIZE,
+  RULE_LINE,
+  VALUE_LINE,
+  namePlacements,
+} from '@/features/debugger/memory/gridLayout';
+import type { ChangeMarks } from '@/lib/changeMarks';
+
+/** The three lines of a row: the bytes, the underline, the names. */
+const GRID_ROWS = `${VALUE_LINE}px ${RULE_LINE}px ${NAME_LINE}px`;
 
 /** What a cell shows: two hex digits, or 'ER' if reading the byte failed. */
 export interface MemoryCellValue {
@@ -31,20 +42,33 @@ function visibleRowIndexes(range: RowRange, totalRows: number) {
 }
 
 interface MemoryCellProps {
+  address: number;
+  column: number;
   cell: MemoryCellValue;
   labelHighlight?: boolean;
   isChanged?: boolean;
   isSearched?: boolean;
 }
 
-function MemoryCell({ cell, labelHighlight, isChanged, isSearched }: MemoryCellProps) {
+function MemoryCell({
+  address,
+  column,
+  cell,
+  labelHighlight,
+  isChanged,
+  isSearched,
+}: MemoryCellProps) {
   // The cell takes an eighth of the row; the byte keeps its 3 characters in the middle.
   return (
-    <span className="flex justify-center">
+    <span
+      className="flex justify-center"
+      style={{ gridRow: 1, gridColumn: column + 1 }}
+      data-memory-address={address}
+    >
       <span
         className={`w-[3ch] shrink-0 text-center rounded
-      ${labelHighlight ? '!text-orange-500 font-semibold' : ''}
-      ${isChanged ? 'memory-flash' : ''}
+      ${labelHighlight ? '!text-orange-800 font-semibold' : ''}
+      ${isChanged ? 'memory-flash changed-tint font-semibold' : ''}
       ${isSearched ? 'search-flash' : ''}
       ${cell.isLoading ? 'bg-gray-200 animate-pulse' : ''}
       `}
@@ -62,14 +86,10 @@ interface MemoryRowsProps {
   digits: number;
   labels: MemoryLabel[];
   cellAt: (address: number) => MemoryCellValue;
-  changedNodes: ReadonlySet<number>;
+  /** Changed cells, each with the update whose flash it shows: a new one draws the cell anew. */
+  changedNodes: ChangeMarks<number>;
   searchedNodes: ReadonlySet<number>;
 }
-
-/** The width of one cell: an eighth of the cells' area (the row minus its 0.5rem padding). */
-const CELL = `((100% - 0.5rem) / ${ROW_SIZE})`;
-/** How far a byte's 3 characters are from its cell's edges. */
-const CELL_INSET = `((${CELL} - ${CELL_CH}ch) / 2)`;
 
 /** The rows on screen. Must sit in a monospace container as tall as all rows (relative). */
 export function MemoryRows({
@@ -94,27 +114,32 @@ export function MemoryRows({
         end: Math.min(l.end, rowEndAddr) - rowStartAddr,
         /** The range begins on this row (its name is shown here). */
         beginsHere: l.start >= rowStartAddr,
-      }));
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    const names = namePlacements(rowLabels);
 
     return (
       <div
         key={rowIndex}
         data-memory-row={rowStartAddr}
         className="absolute inset-x-0 flex"
-        style={{ top: rowIndex * ROW_HEIGHT, height: ROW_HEIGHT }}
+        style={{ top: rowIndex * ROW_HEIGHT, height: ROW_HEIGHT, lineHeight: `${VALUE_LINE}px` }}
       >
         <span
-          className="shrink-0 border-r border-gray-300 pr-2 text-right text-green-600"
+          className="shrink-0 whitespace-nowrap border-r border-gray-300 pr-2 text-right text-green-800"
           style={{ width: `calc(${digits}ch + 0.5rem + 1px)` }}
         >
           {rowStartAddr.toString(16).toUpperCase().padStart(digits, '0')}
         </span>
-        <div className="relative grid h-5 flex-1 grid-cols-8 pl-2">
+        <div className="grid flex-1 grid-cols-8 pl-2" style={{ gridTemplateRows: GRID_ROWS }}>
           {Array.from({ length: ROW_SIZE }, (_, column) => {
             const address = rowStartAddr + column;
             return (
               <MemoryCell
-                key={column}
+                key={changedNodes.has(address) ? `${column}-${changedNodes.get(address)}` : column}
+                address={address}
+                column={column}
                 cell={cellAt(address)}
                 labelHighlight={rowLabels.some(l => column >= l.start && column <= l.end)}
                 isChanged={changedNodes.has(address)}
@@ -123,26 +148,43 @@ export function MemoryRows({
             );
           })}
 
-          {/* a line beneath each labelled range, and its name where the range starts */}
-          {rowLabels.map((label, idx) => (
+          {/* A line under each labelled range, from its first byte's digits to its last's.
+              Grid items of the same columns as the bytes, so they line up at every width. */}
+          {rowLabels.map(label => {
+            const span = label.end - label.start + 1;
+            return (
+              <div
+                key={`line-${label.start}`}
+                data-memory-underline={label.name}
+                className="h-0.5 self-start bg-orange-600"
+                style={{
+                  gridRow: 2,
+                  gridColumn: `${label.start + 1} / span ${span}`,
+                  // The digits are 2ch wide, centred in each cell (a cell is 100% / span).
+                  marginInline: `calc(${50 / span}% - 1ch)`,
+                }}
+              />
+            );
+          })}
+
+          {/* The names: see namePlacements. All in the row's whole width (one base for the
+              percentages); each cut with "…" only if it cannot fit (the tooltip has it all). */}
+          {names.map(({ label, left, maxWidth }) => (
             <div
-              key={idx}
-              className="absolute top-full"
-              // from the first byte's characters to the last's, a little inside them
+              key={`name-${label.start}`}
+              data-memory-label={label.name}
+              // Clipped across only: in the 12 px line, the tails of g, p, y reach below it.
+              className="min-w-0 justify-self-start [overflow-x:clip] [overflow-y:visible] text-ellipsis whitespace-nowrap text-xs text-orange-700"
               style={{
-                left: `calc(0.5rem + ${label.start} * ${CELL} + ${CELL_INSET} + 0.25ch)`,
-                width: `calc(${label.end - label.start + 1} * ${CELL} - 2 * ${CELL_INSET} - 0.5ch)`,
+                gridRow: 3,
+                gridColumn: `1 / ${ROW_SIZE + 1}`,
+                lineHeight: `${NAME_LINE}px`,
+                marginLeft: left,
+                maxWidth,
               }}
+              title={label.name}
             >
-              <div className="border-t-2 border-orange-500" />
-              {label.beginsHere && (
-                <div
-                  className="whitespace-nowrap text-center text-xs leading-[10px] text-orange-500"
-                  title={label.name}
-                >
-                  {label.name}
-                </div>
-              )}
+              {label.name}
             </div>
           ))}
         </div>

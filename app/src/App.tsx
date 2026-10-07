@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { InfoModal } from '@/components/InfoModal';
+import { AppDialog } from '@/components/AppDialog';
 import Splitter from '@/components/Splitter';
 import StatusBar from '@/components/StatusBar';
+import { Toasts } from '@/components/Toasts';
 import DebugPanel from '@/features/debugger/DebugPanel';
 import EditorContainer from '@/features/editor/EditorContainer';
 import { tabKind, useEditorTabStore } from '@/features/editor/editorTabStore';
@@ -10,7 +11,6 @@ import { useCloseRequests } from '@/features/editor/hooks/useCloseRequests';
 import { useTabShortcuts } from '@/features/editor/hooks/useTabShortcuts';
 import SideBar from '@/features/fileTree/SideBar';
 import {
-  BOTTOM_PANEL,
   clamp,
   DEBUG_COLUMN,
   dragRange,
@@ -26,11 +26,30 @@ import { useServerLog } from '@/features/panel/useServerLog';
 import ProjectSettings from '@/features/project/ProjectSettings';
 import { useProjectStore } from '@/features/project/projectStore';
 import { useProjectEvents } from '@/features/project/useProjectEvents';
+import NewProjectDialog from '@/features/project/NewProjectDialog';
+import PreferencesDialog from '@/features/preferences/PreferencesDialog';
+import NoProjectPanel from '@/features/project/NoProjectPanel';
 import WelcomeScreen from '@/features/project/WelcomeScreen';
+import { useStrings } from '@/i18n';
 
 /** A divider between two columns: no width of its own, a 4 px grip over the borders. */
 const COLUMN_SPLITTER =
   'relative z-10 -mx-[2px] w-[4px] shrink-0 transition-colors hover:bg-blue-400/50 focus-visible:bg-blue-500';
+/** The same for the bottom panel (one style for every divider; the panel draws the border). */
+const ROW_SPLITTER =
+  'relative z-10 -my-[2px] h-[4px] w-full shrink-0 transition-colors hover:bg-blue-400/50 focus-visible:bg-blue-500';
+
+/** Dialogs and notices: on every screen, the welcome screen too. */
+function Overlays() {
+  return (
+    <>
+      <NewProjectDialog />
+      <PreferencesDialog />
+      <AppDialog />
+      <Toasts />
+    </>
+  );
+}
 
 /** What the centre area shows depends on the active tab: a listing, the project settings, or the editor. */
 function MainView({ activePath }: { activePath: string | null }) {
@@ -41,8 +60,10 @@ function MainView({ activePath }: { activePath: string | null }) {
 }
 
 function App() {
+  const t = useStrings();
   const projectName = useProjectStore(s => s.projectName);
   const activePath = useEditorTabStore(state => state.activePath);
+  const hasTabs = useEditorTabStore(state => state.tabs.length > 0);
   const layout = useLayoutStore(
     useShallow(s => ({
       filesWidth: s.filesWidth,
@@ -64,8 +85,35 @@ function App() {
   useCloseRequests();
   useTabShortcuts();
 
+  if (projectName === '' && !hasTabs) {
+    return (
+      <>
+        <WelcomeScreen />
+        <Overlays />
+      </>
+    );
+  }
+
+  // Files opened on their own, with no project near them: edit only (outsideFiles.ts).
   if (projectName === '') {
-    return <WelcomeScreen />;
+    return (
+      <div className="flex h-screen w-screen flex-col">
+        <div className="flex flex-1 overflow-hidden">
+          <div
+            data-column="files"
+            className="shrink-0 min-w-0 border-r border-gray-300"
+            style={{ width: FILES_COLUMN.default }}
+          >
+            <NoProjectPanel />
+          </div>
+          <div data-column="editor" className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <EditorContainer />
+          </div>
+        </div>
+        <StatusBar />
+        <Overlays />
+      </div>
+    );
   }
 
   // The side columns get the widths the user chose, fitted into the window (columns.ts).
@@ -80,9 +128,11 @@ function App() {
     layout.setFilesWidth(fit.files);
     layout.setDebugWidth(fit.debug);
   };
-  const panelHeight = middleSize.height
-    ? clamp(layout.panelHeight, panel.min, panel.max)
-    : layout.panelHeight;
+  // Until the user sets it (0), the bottom panel takes 30 % of the column: a fixed height left
+  // the variables 4 rows on a tall window.
+  const wanted =
+    layout.panelHeight || Math.round(clamp((middleSize.height || 640) * 0.3, 160, 420));
+  const panelHeight = middleSize.height ? clamp(wanted, panel.min, panel.max) : wanted;
 
   return (
     <div className="flex h-screen w-screen flex-col">
@@ -92,7 +142,7 @@ function App() {
         </div>
         <Splitter
           orientation="vertical"
-          label="파일 목록 너비"
+          label={t.splitter.files}
           value={fit.files}
           {...filesRange}
           onStart={pinColumns}
@@ -111,14 +161,14 @@ function App() {
           </div>
           <Splitter
             orientation="horizontal"
-            label="아래 패널 높이"
+            label={t.splitter.bottom}
             value={panelHeight}
             {...panel}
             invert
             onChange={layout.setPanelHeight}
-            onReset={() => layout.setPanelHeight(BOTTOM_PANEL.default)}
+            onReset={() => layout.setPanelHeight(0)}
             onCommit={layout.save}
-            className="h-1 w-full shrink-0 bg-gray-600 hover:bg-gray-400 focus-visible:bg-blue-500"
+            className={ROW_SPLITTER}
           />
           <div className="shrink-0" style={{ height: panelHeight }}>
             <BottomPanel />
@@ -126,7 +176,7 @@ function App() {
         </div>
         <Splitter
           orientation="vertical"
-          label="실행 패널 너비"
+          label={t.splitter.run}
           value={fit.debug}
           {...debugRange}
           invert
@@ -145,7 +195,7 @@ function App() {
         </div>
       </div>
       <StatusBar />
-      <InfoModal />
+      <Overlays />
     </div>
   );
 }

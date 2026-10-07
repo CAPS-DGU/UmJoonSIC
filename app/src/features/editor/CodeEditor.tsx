@@ -21,6 +21,10 @@ import { modelPath } from '@/features/editor/monaco/models';
 import { SICXE_LANGUAGE_ID } from '@/features/editor/monaco/sicxe';
 import '@/features/editor/monaco/setupMonaco';
 import { useErrorStore } from '@/features/panel/errorStore';
+import { useRunningStore } from '@/features/debugger/runningStore';
+import { showSourceLineInListing } from '@/features/listing/navigate';
+import { strings, useStrings } from '@/i18n';
+import { usePreferencesStore } from '@/stores/preferencesStore';
 import { useProjectStore } from '@/features/project/projectStore';
 import '@/features/editor/syntaxError.css';
 
@@ -45,7 +49,19 @@ function applyRevealRequest(editor: MonacoEditor, request: RevealRequest | null)
  * file (see monaco/models.ts), so switching tabs keeps each file's text, undo history,
  * cursor and scroll position.
  */
+/** The field guides (label, opcode, operand) of assembly files; other files get none. */
+const rulersFor = (filePath: string | null) =>
+  filePath?.toLowerCase().endsWith('.asm') ? editorOptions.rulers : [];
+const optionsFor = () => ({
+  ...editorOptions,
+  // The code font size of the preferences.
+  fontSize: usePreferencesStore.getState().editorFontSize,
+  rulers: rulersFor(useEditorTabStore.getState().activePath),
+});
+
 export default function CodeEditor() {
+  const t = useStrings();
+  const theme = usePreferencesStore(s => s.theme);
   const activeTab = useEditorTabStore(selectActiveTab);
   const revealRequest = useEditorTabStore(state => state.revealRequest);
   const projectPath = useProjectStore(state => state.projectPath);
@@ -63,8 +79,33 @@ export default function CodeEditor() {
     if (editorRef.current) applyRevealRequest(editorRef.current, revealRequest);
   }, [revealRequest, activePath]);
 
+  // The code font size follows the preferences at once.
+  const fontSize = usePreferencesStore(s => s.editorFontSize);
+  useEffect(() => {
+    editorRef.current?.updateOptions({ fontSize });
+  }, [fontSize]);
+
+  // The column guides are for assembly; a .txt file gets none.
+  useEffect(() => {
+    editorRef.current?.updateOptions({ rulers: rulersFor(activePath) });
+  }, [activePath]);
+
   const handleEditorDidMount = (editor: MonacoEditor) => {
     editorRef.current = editor;
+    // While a program runs: from a source line to its row in the run's listing.
+    editor.addAction({
+      id: 'umjoonsic.showInListing',
+      label: strings().listing.showInListing,
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 0,
+      precondition: undefined,
+      run: () => {
+        const path = shownTabPath(editor);
+        const line = editor.getPosition()?.lineNumber;
+        if (!path || !line || !useRunningStore.getState().isRunning) return;
+        void showSourceLineInListing(path, line);
+      },
+    });
     editor.onDidDispose(() => {
       if (editorRef.current === editor) editorRef.current = null;
     });
@@ -73,12 +114,12 @@ export default function CodeEditor() {
     (async () => {
       try {
         await document.fonts.load(`12px "JetBrains Mono"`);
-        editor.updateOptions(editorOptions);
+        editor.updateOptions(optionsFor());
         // measure again on the next tick, with the font in place
         setTimeout(() => editor.layout(), 50);
       } catch (error) {
         console.error('Font loading failed:', error);
-        editor.updateOptions(editorOptions);
+        editor.updateOptions(optionsFor());
       }
     })();
 
@@ -103,7 +144,12 @@ export default function CodeEditor() {
       }
     });
 
-    // Pasted text is checked at once, without waiting for typing to pause.
+    // Column alignment applies to the project's .asm files only.
+    attachAutoIndentation(editor, () => isProjectAsmFile(shownTabPath(editor)));
+
+    // Pasted text is checked at once, without waiting for typing to pause; after the
+    // alignment above has laid it out (listeners run in order), so that the underlines are
+    // where the text ends up.
     editor.onDidPaste(() => {
       const filePath = shownTabPath(editor);
       if (filePath && isProjectAsmFile(filePath)) {
@@ -111,18 +157,15 @@ export default function CodeEditor() {
       }
     });
 
-    // Column alignment applies to the project's .asm files only.
-    attachAutoIndentation(editor, () => isProjectAsmFile(shownTabPath(editor)));
-
     // A request made before the editor existed (the file was opened by an error click).
     applyRevealRequest(editor, useEditorTabStore.getState().revealRequest);
   };
 
   if (!activeTab) {
     return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <h1 className="text-2xl font-bold">열려있는 파일이 없습니다. </h1>
-        <p className="text-sm text-gray-500">파일을 열어 새로운 탭을 만드세요</p>
+      <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
+        <h1 className="text-lg font-semibold text-gray-800">{t.editor.noFile}</h1>
+        <p className="text-sm text-gray-600">{t.editor.noFileHint}</p>
       </div>
     );
   }
@@ -134,6 +177,7 @@ export default function CodeEditor() {
         path={modelPath(projectPath, activeTab.filePath)}
         defaultValue={activeTab.content}
         defaultLanguage={SICXE_LANGUAGE_ID}
+        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
         keepCurrentModel
         onMount={handleEditorDidMount}
       />

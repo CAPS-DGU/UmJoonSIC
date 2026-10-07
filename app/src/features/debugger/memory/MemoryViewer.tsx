@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { PenLine } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { simulator } from '@/api/simulator';
 import {
   addressDigits,
   gridWidth,
@@ -13,9 +14,12 @@ import {
 } from '@/features/debugger/memory/MemoryGrid';
 import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
 import { useRegisterStore } from '@/features/debugger/registerStore';
-import { useRunningStore } from '@/features/debugger/runningStore';
+import { useLastWriteStore } from '@/features/debugger/lastWrite';
+import { formatAddress, useRunningStore } from '@/features/debugger/runningStore';
+import { showAddressInListing } from '@/features/listing/navigate';
 import { useWatchStore } from '@/features/panel/watchStore';
 import '@/features/debugger/memory/searchAnimation.css';
+import { useStrings } from '@/i18n';
 import { FORM_FIELD } from '@/lib/controls';
 
 /** Bytes read above and below the rows on screen, so that short scrolls show values at once. */
@@ -29,7 +33,6 @@ export default function MemoryViewer() {
   const failed = useMemoryViewStore(state => state.failed);
   const isLoading = useMemoryViewStore(state => state.pendingReads > 0);
   const changedNodes = useMemoryViewStore(state => state.changedNodes);
-  const clearChangedNodes = useMemoryViewStore(state => state.clearChangedNodes);
   const totalMemorySize = useMemoryViewStore(state => state.totalMemorySize);
   const setViewRange = useMemoryViewStore(state => state.setViewRange);
   const isRunning = useRunningStore(state => state.isRunning);
@@ -66,13 +69,8 @@ export default function MemoryViewer() {
     [bytes, failed, isLoading],
   );
 
-  // Drop the "changed" highlight once its animation has played.
-  useEffect(() => {
-    if (changedNodes.size > 0) {
-      const timer = setTimeout(clearChangedNodes, FLASH_MS);
-      return () => clearTimeout(timer);
-    }
-  }, [changedNodes, clearChangedNodes]);
+  // A changed byte stays tinted until the next step (lib/changeMarks.ts): its value is what
+  // the student looks for after stepping.
 
   // Same for the "searched" highlight.
   useEffect(() => {
@@ -128,6 +126,56 @@ export default function MemoryViewer() {
     };
   }, [showRowsOnScreen]);
 
+  /**
+   * Show `size` bytes at `address`: scrolled to (a third from the top) only if not all on
+   * screen, then highlighted like a search result.
+   */
+  const revealAddress = useCallback(
+    (address: number, size: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      const first = Math.floor(address / ROW_SIZE);
+      const last = Math.floor((address + size - 1) / ROW_SIZE);
+      const top = container.scrollTop / ROW_HEIGHT;
+      const bottom = (container.scrollTop + container.clientHeight) / ROW_HEIGHT;
+      if (first < top || last + 1 > bottom) {
+        container.scrollTop = Math.max(0, first * ROW_HEIGHT - container.clientHeight / 3);
+      }
+      setSearchedNodes(new Set(Array.from({ length: Math.min(size, 64) }, (_, i) => address + i)));
+      showRowsOnScreen();
+    },
+    [showRowsOnScreen],
+  );
+
+  // Requests from elsewhere: a Watch variable, the last write, a symbol in the listing.
+  const revealRequest = useMemoryViewStore(state => state.revealRequest);
+  useEffect(() => {
+    if (revealRequest) revealAddress(revealRequest.address, revealRequest.size);
+  }, [revealRequest, revealAddress]);
+
+  const lastWrite = useLastWriteStore(state => state.last);
+  /** Show the bytes the last store instruction wrote (through its pointer, for STA @P). */
+  const showLastWrite = async () => {
+    if (!lastWrite) return;
+    let address = lastWrite.address;
+    if (lastWrite.indirect) {
+      try {
+        const { values } = await simulator.memory(address, address + 2);
+        address = (values[0] << 16) | (values[1] << 8) | values[2];
+      } catch {
+        // The pointer could not be read: show where it is.
+      }
+    }
+    revealAddress(address, lastWrite.size);
+  };
+
+  /** A byte double-clicked while a program runs: the listing row that holds it. */
+  const onGridDoubleClick = (event: React.MouseEvent) => {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-memory-address]');
+    if (!cell || !useRunningStore.getState().isRunning) return;
+    void showAddressInListing(Number(cell.dataset.memoryAddress));
+  };
+
   const scrollToAddress = useCallback(
     (address: number) => {
       setSearchedNodes(new Set([address]));
@@ -139,14 +187,30 @@ export default function MemoryViewer() {
     [showRowsOnScreen],
   );
 
-  const handleSearch = () => {
-    if (!containerRef.current || !searchAddress) return;
+  const t = useStrings();
+  const [searchError, setSearchError] = useState('');
 
-    const address = parseInt(searchAddress, 16);
+  /**
+   * An address in hex (with or without 0x), or a label of the loaded program (its variables).
+   * A wrong entry is said under the field (it was a browser alert).
+   */
+  const handleSearch = () => {
+    if (!containerRef.current) return;
+    const text = searchAddress.trim();
+    if (!text) return;
+    const variable = useWatchStore
+      .getState()
+      .watch.find(v => v.name.toUpperCase() === text.toUpperCase());
+    const address = variable
+      ? variable.address
+      : /^(0x)?[0-9a-f]+$/i.test(text)
+        ? parseInt(text.replace(/^0x/i, ''), 16)
+        : NaN;
     if (isNaN(address) || address < 0 || address >= totalMemorySize) {
-      alert('유효하지 않은 메모리 주소입니다.');
+      setSearchError(t.memory.invalid(text));
       return;
     }
+    setSearchError('');
     scrollToAddress(address);
   };
 
@@ -167,30 +231,64 @@ export default function MemoryViewer() {
   return (
     <section className="flex flex-1 min-h-0 flex-col px-2">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-semibold">메모리 뷰어</h2>
+        <h2 className="text-sm font-semibold">{t.memory.title}</h2>
       </div>
 
       <div className="mt-2 flex items-center gap-2">
         <input
           type="text"
           value={searchAddress}
-          onChange={e => setSearchAddress(e.target.value)}
+          onChange={e => {
+            setSearchAddress(e.target.value);
+            setSearchError('');
+          }}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          placeholder="memory address"
+          placeholder={t.memory.placeholder}
+          aria-label={t.memory.placeholder}
+          aria-invalid={!!searchError}
           className={`${FORM_FIELD} min-w-0 flex-1 font-mono text-sm`}
         />
         <button
           onClick={handleSearch}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-500 text-white transition-colors hover:bg-blue-600"
-          title="이 주소로 이동"
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded-md bg-blue-600 px-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          title={t.memory.goTitle}
         >
-          <Search size={16} />
+          {t.memory.go}
         </button>
       </div>
+      {/* Where the last store instruction wrote: one click shows it (it may be far off screen). */}
+      {lastWrite && (
+        <button
+          type="button"
+          className="mt-1 inline-flex min-w-0 items-center gap-1 self-start rounded px-1 text-xs text-gray-700 hover:bg-gray-200"
+          title={t.memory.lastWriteTitle(lastWrite.instruction, formatAddress(lastWrite.pc))}
+          onClick={() => void showLastWrite()}
+          data-last-write={lastWrite.address}
+        >
+          <PenLine className="size-3.5 shrink-0 text-orange-700" aria-hidden />
+          {/* px-0.5: the closing ")" (and, at display scale 1.5, the first Hangul stroke) lean
+              past the box; truncate would cut them. */}
+          <span className="truncate px-0.5">
+            {t.memory.lastWrite(
+              lastWrite.indirect
+                ? `@${formatAddress(lastWrite.address)}`
+                : formatAddress(lastWrite.address),
+              lastWrite.size,
+            )}
+          </span>
+        </button>
+      )}
+      {searchError && (
+        <p className="mt-1 text-xs text-red-700" role="alert">
+          {searchError}
+        </p>
+      )}
 
       <div
         ref={containerRef}
         className="slim-scroll mt-2 flex-1 min-h-0 overflow-y-auto font-mono text-sm"
+        onDoubleClick={onGridDoubleClick}
+        title={isRunning ? t.memory.gridTitle : undefined}
       >
         <div
           className="relative"

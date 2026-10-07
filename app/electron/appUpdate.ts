@@ -1,4 +1,5 @@
 // Check GitHub for a newer app release and offer to open the download page.
+import { texts } from './i18n';
 import { app, dialog, shell } from 'electron';
 
 export async function checkUpdate() {
@@ -36,9 +37,9 @@ export async function checkUpdate() {
     if (latestTag && cmp(latestTag, currentVersion) > 0) {
       const result = await dialog.showMessageBox({
         type: 'question',
-        title: '업데이트 확인',
-        message: `새로운 버전이 있습니다.\n현재: ${currentVersion} → 최신: ${latestTag}\n지금 다운로드 페이지로 이동하시겠습니까?`,
-        buttons: ['예', '아니요'],
+        title: texts().updateTitle,
+        message: texts().updateMessage(currentVersion, latestTag),
+        buttons: [texts().yes, texts().no],
         defaultId: 0,
         cancelId: 1,
         noLink: true,

@@ -1,114 +1,105 @@
-import React, { useState } from 'react';
-import { useWatchStore } from '@/features/panel/watchStore';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, FileCode } from 'lucide-react';
+import { useWatchStore, watchKey } from '@/features/panel/watchStore';
 import type { WatchRow } from '@/features/panel/watchStore';
-import { ChevronDown, ChevronRight, Folder, FileText } from 'lucide-react';
-import { PANEL_HEADER } from '@/lib/controls';
-
-const toHex = (value: number[]) => {
-  if (!Array.isArray(value)) return '';
-  return value.map(v => v.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-};
-
-const toChar = (value: number[]) => {
-  if (!Array.isArray(value)) return '';
-  return value
-    .map(v => {
-      if (v < 32 || v > 126) {
-        return '.';
-      }
-      return String.fromCharCode(v);
-    })
-    .join(' ');
-};
-
-interface GroupedWatchData {
-  [filePath: string]: WatchRow[];
-}
-
-interface ExpandedState {
-  [key: string]: boolean;
-}
+import { useMemoryViewStore } from '@/features/debugger/memory/memoryViewStore';
+import { showVariable } from '@/features/listing/navigate';
+import { hexAddress, toChar, toDecimal, toHex } from '@/features/panel/watchFormat';
+import { useStrings } from '@/i18n';
+import { CHANGED_CLASSES } from '@/lib/changeMarks';
 
 export default function WatchPanel() {
+  const t = useStrings();
   const watch = useWatchStore(s => s.watch);
-  const [expanded, setExpanded] = useState<ExpandedState>({});
+  const changed = useWatchStore(s => s.changed);
+  // A changed value flashes, then stays tinted until the next step (lib/changeMarks); a row
+  // keyed with its mark is drawn anew when the mark is new, so the flash plays again.
 
-  // Rows grouped by source file.
-  const groupedData: GroupedWatchData = watch.reduce((acc, row) => {
-    if (!acc[row.filePath]) {
-      acc[row.filePath] = [];
+  /** The mark of the bytes in [from, to) of this variable that changed (the latest), if any. */
+  const markIn = (row: WatchRow, from: number, to: number) => {
+    let mark: number | null = null;
+    for (const [offset, update] of changed.get(watchKey(row)) ?? []) {
+      if (offset >= from && offset < to) mark = Math.max(mark ?? 0, update);
     }
-    acc[row.filePath].push(row);
-    return acc;
-  }, {} as GroupedWatchData);
-
-  const toggleExpanded = (key: string) => {
-    setExpanded(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    return mark;
   };
+  // The whole row is marked (it was only the value cells), with a gentler flash (row-flash).
+  const flash = (mark: number | null) =>
+    mark === null ? '' : ` ${CHANGED_CLASSES.replace('value-flash', 'row-flash')}`;
+  // Files and arrays: files are open unless closed, arrays closed unless opened.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+
+  // Rows grouped by source file, in address order (the order of the source).
+  const groupedData = useMemo(() => {
+    const groups: Record<string, WatchRow[]> = {};
+    for (const row of watch) (groups[row.filePath] ??= []).push(row);
+    Object.values(groups).forEach(rows => rows.sort((a, b) => a.address - b.address));
+    return groups;
+  }, [watch]);
+
+  const toggle = (key: string) => setToggled(prev => ({ ...prev, [key]: !prev[key] }));
+  // pr-3: a cut-off HEX value ('48 45 4C …') ran straight into the CHAR text.
+  const cell = 'py-1 pr-3 font-mono truncate';
 
   const renderArrayElements = (row: WatchRow) => {
     if (row.elementCount <= 1) return null;
-
     const elements = [];
     for (let i = 0; i < row.elementCount; i++) {
       const startIndex = i * row.elementSize;
-      const endIndex = startIndex + row.elementSize;
-      const elementValue = row.value?.slice(startIndex, endIndex) || [];
-
+      const elementValue = row.value?.slice(startIndex, startIndex + row.elementSize) || [];
+      const elementMark = markIn(row, startIndex, startIndex + row.elementSize);
+      const elementFlash = flash(elementMark);
       elements.push(
-        <tr key={`${row.name}[${i}]`} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-          <td className="py-1 font-mono pl-8 truncate">
-            <FileText className="inline w-3 h-3 mr-1" />
+        <tr
+          key={`${row.name}[${i}]@${elementMark ?? ''}`}
+          className={`cursor-default hover:bg-gray-200${elementFlash}`}
+          title={t.panel.watchRowTitle}
+          data-watch-row={`${row.name}[${i}]`}
+          onDoubleClick={() =>
+            void showVariable(row).then(() =>
+              useMemoryViewStore.getState().reveal(row.address + startIndex, row.elementSize),
+            )
+          }
+        >
+          <td className={`${cell} pl-10`}>
             {row.name}[{i}]
           </td>
-          <td className="py-1 font-mono truncate">{row.dataType}</td>
-          <td className="py-1 font-mono truncate">
-            {'0x' + (row.address + i * row.elementSize).toString(16).toUpperCase().padStart(6, '0')}
-          </td>
-          <td className="py-1 font-mono truncate">
-            {elementValue.length > 0 ? parseInt(toHex(elementValue).replaceAll(' ', ''), 16) : ''}
-          </td>
-          <td className="py-1 font-mono truncate">{toHex(elementValue)}</td>
-          <td className="py-1 font-mono truncate">{toChar(elementValue)}</td>
+          <td className={cell}>{row.dataType}</td>
+          <td className={cell}>{hexAddress(row.address + i * row.elementSize)}</td>
+          <td className={cell}>{toDecimal(elementValue)}</td>
+          <td className={cell}>{toHex(elementValue)}</td>
+          <td className={cell}>{toChar(elementValue)}</td>
         </tr>,
       );
     }
     return elements;
   };
 
+  if (watch.length === 0) {
+    return <p className="p-4 text-sm text-gray-600">{t.panel.watchEmpty}</p>;
+  }
+
   return (
-    <div className="flex h-full flex-col overflow-hidden text-black dark:text-white">
-      <div className={PANEL_HEADER}>
-        <span className="font-semibold text-sm">Watch</span>
-      </div>
+    <div className="flex h-full flex-col overflow-hidden text-gray-900">
       {/* Narrower than the table's minimum, the table scrolls instead of overlapping. */}
       <div className="slim-scroll flex-1 overflow-auto p-2">
         <table className="w-full min-w-[36rem] text-sm table-fixed border-collapse">
-          <thead className="text-left text-gray-500 dark:text-gray-400">
+          <thead className="text-left text-gray-700">
             <tr>
-              <th className="py-2 font-semibold w-[22%]">Name</th>
-              <th className="py-2 font-semibold w-[12%]">Type</th>
-              <th className="py-2 font-semibold w-[16%]">Address</th>
-              <th className="py-2 font-semibold w-[18%]">DEC</th>
-              <th className="py-2 font-semibold w-[18%]">HEX</th>
-              <th className="py-2 font-semibold w-[14%]">CHAR</th>
+              <th className="py-2 font-semibold w-[22%]">{t.panel.watchName}</th>
+              <th className="py-2 font-semibold w-[12%]">{t.panel.watchType}</th>
+              <th className="py-2 font-semibold w-[16%]">{t.panel.watchAddress}</th>
+              <th className="py-2 font-semibold w-[16%]">{t.panel.watchDec}</th>
+              <th className="py-2 font-semibold w-[18%]">{t.panel.watchHex}</th>
+              <th className="py-2 font-semibold w-[16%]">{t.panel.watchChar}</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(groupedData).map(([filePath, rows]) => {
-              const fileKey = filePath;
-              const isFileExpanded = expanded[fileKey];
-
+              const isFileExpanded = !toggled[filePath];
               return (
                 <React.Fragment key={filePath}>
-                  {/* the file's row */}
-                  <tr
-                    className="hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
-                    onClick={() => toggleExpanded(fileKey)}
-                  >
+                  <tr className="hover:bg-gray-200 cursor-pointer" onClick={() => toggle(filePath)}>
                     <td colSpan={6} className="py-1">
                       <div className="flex items-center gap-1 font-semibold">
                         {isFileExpanded ? (
@@ -116,53 +107,57 @@ export default function WatchPanel() {
                         ) : (
                           <ChevronRight className="w-4 h-4 shrink-0" />
                         )}
-                        <Folder className="w-4 h-4 shrink-0" />
+                        <FileCode className="w-4 h-4 shrink-0 text-green-700" />
                         <span className="min-w-0 truncate">{filePath.split('/').pop()}</span>
                       </div>
                     </td>
                   </tr>
-
-                  {/* its variables */}
                   {isFileExpanded &&
                     rows.map(row => {
                       const arrayKey = `${filePath}-${row.name}`;
-                      const isArrayExpanded = expanded[arrayKey];
                       const isArray = row.elementCount > 1;
-
+                      const isArrayExpanded = !!toggled[arrayKey];
+                      const rowMark = markIn(row, 0, Infinity);
+                      const rowFlash = flash(rowMark);
                       return (
                         <React.Fragment key={row.name}>
-                          {/* a variable */}
-                          <tr className="hover:bg-gray-200 dark:hover:bg-gray-800">
-                            <td className="py-1 font-mono pl-4 truncate">
-                              {isArray && (
-                                <span
-                                  className="cursor-pointer mr-1"
-                                  onClick={() => toggleExpanded(arrayKey)}
+                          <tr
+                            key={`row@${rowMark ?? ''}`}
+                            className={`cursor-default hover:bg-gray-200${rowFlash}`}
+                            title={t.panel.watchRowTitle}
+                            data-watch-row={row.name}
+                            onDoubleClick={() => void showVariable(row)}
+                          >
+                            <td className={`${cell} pl-5`} title={row.name}>
+                              {isArray ? (
+                                <button
+                                  type="button"
+                                  className="mr-1"
+                                  onClick={() => toggle(arrayKey)}
+                                  onDoubleClick={e => e.stopPropagation()}
                                 >
                                   {isArrayExpanded ? (
                                     <ChevronDown className="inline w-3 h-3" />
                                   ) : (
                                     <ChevronRight className="inline w-3 h-3" />
                                   )}
-                                </span>
+                                </button>
+                              ) : (
+                                <span className="mr-1 inline-block w-3" />
                               )}
-                              <FileText className="inline w-3 h-3 mr-1" />
-                              {row.name} ({row.dataType.toUpperCase()})
+                              {/* An array: NAME[] (its elements unfold below). */}
+                              {isArray ? `${row.name}[]` : row.name}
                             </td>
-                            <td className="py-1 font-mono truncate">{row.dataType}</td>
-                            <td className="py-1 font-mono truncate">
-                              {'0x' + row.address.toString(16).toUpperCase().padStart(6, '0')}
+                            <td className={cell}>{row.dataType}</td>
+                            <td className={cell}>{hexAddress(row.address)}</td>
+                            <td className={cell}>{isArray ? '' : toDecimal(row.value ?? [])}</td>
+                            <td className={cell} title={toHex(row.value ?? [])}>
+                              {toHex(row.value ?? [])}
                             </td>
-                            <td className="py-1 font-mono truncate">
-                              {row.value && row.value.length > 0
-                                ? parseInt(toHex(row.value).replaceAll(' ', ''), 16)
-                                : ''}
+                            <td className={cell} title={toChar(row.value ?? [])}>
+                              {toChar(row.value ?? [])}
                             </td>
-                            <td className="py-1 font-mono truncate">{toHex(row.value ?? [])}</td>
-                            <td className="py-1 font-mono truncate">{toChar(row.value ?? [])}</td>
                           </tr>
-
-                          {/* the elements of an array */}
                           {isArray && isArrayExpanded && renderArrayElements(row)}
                         </React.Fragment>
                       );

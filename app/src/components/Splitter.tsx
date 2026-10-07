@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { useStrings } from '@/i18n';
 
 interface SplitterProps {
   /** 'vertical': a line between two columns (dragged sideways); 'horizontal': between rows. */
@@ -42,6 +43,7 @@ export default function Splitter({
   onReset,
   className = '',
 }: SplitterProps) {
+  const t = useStrings();
   const drag = useRef<{ pointer: number; start: number } | null>(null);
   const vertical = orientation === 'vertical';
   const position = (e: PointerEvent) => (vertical ? e.clientX : e.clientY);
@@ -106,7 +108,7 @@ export default function Splitter({
       aria-valuemin={Math.round(min)}
       aria-valuemax={Math.round(max)}
       tabIndex={0}
-      title={`${label}: 끌어서 조절, 두 번 클릭하면 기본 크기`}
+      title={t.splitter.hint(label)}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
