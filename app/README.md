@@ -68,8 +68,8 @@ src/
     project/             프로젝트 열기·닫기, project.sic 설정 화면(어셈블 순서, 장치 표), 시작 화면
     fileTree/            왼쪽 파일 트리 (프로젝트가 뿌리)
     devices/             장치 패널(프로그램이 읽고 쓴 바이트), 소스에서 장치·제어 섹션 읽기
-    editor/              Monaco 에디터(파일마다 모델 하나), 탭, 저장 확인, 자동 열 맞춤, 구문 검사
-    listing/             실행 중 표시되는 리스팅 탭
+    editor/              Monaco 편집기(파일마다 모델 하나), 탭, 저장 확인, 자동 열 맞춤, 구문 검사
+    listing/             실행 중 표시되는 리스트파일 탭
     debugger/            실행 제어(runningStore), 도구 모음, 실행 간격, 레지스터, 메모리 뷰어
     panel/               아래 패널: 변수 / 장치 / 오류 / 시뮬레이터
   lib/, types/           여러 기능이 함께 쓰는 유틸, 전역 타입
@@ -90,7 +90,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 
 ## 화면 배치
 
-- 세 열(파일 목록 | 에디터 | 실행 패널)과 아래 패널의 크기는 `src/features/layout/columns.ts` 에 있습니다. 최소값은 측정해서 정했습니다 (작업 공간의 `documentations/08_layout`): 파일 목록 180 px, 실행 패널 296 px(SIC/XE 의 다섯 자리 주소와 8바이트 열, 스크롤 막대까지), 에디터 320 px. 정한 크기는 localStorage(`umjoonsic.layout`)에 남습니다.
+- 세 열(파일 목록 | 편집기 | 실행 패널)과 아래 패널의 크기는 `src/features/layout/columns.ts` 에 있습니다. 최소값은 측정해서 정했습니다 (작업 공간의 `documentations/08_layout`): 파일 목록 180 px, 실행 패널 296 px(SIC/XE 의 다섯 자리 주소와 8바이트 열, 스크롤 막대까지), 편집기 320 px. 정한 크기는 localStorage(`umjoonsic.layout`)에 남습니다.
 - 경계는 `src/components/Splitter.tsx` 하나로 만듭니다(끌기, 키보드, 두 번 클릭).
 - 크기 단계: 위쪽 막대 40 px, 패널 머리 막대 32 px, 막대와 입력 칸의 컨트롤 28 px, 패널 머리와 줄 안의 작은 버튼 24 px, 대화상자 36 px (`src/lib/controls.ts`). 새 컨트롤은 이 상수를 씁니다.
 - 글꼴은 `font-sans`(Pretendard)와 `font-mono`(JetBrains Mono) 둘뿐이고, 둘 다 앱에 들어 있습니다 (`src/index.css` 의 `@theme`). 글자 크기는 12 / 14 / 16 / 24 px, 패널 안은 14 px.
@@ -106,7 +106,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 실행 제어는 `src/features/debugger/runningStore.ts` 에 있습니다. 상태는 준비 → 실행 중 → 멈춤 → 종료이고, 상태 표시줄에 늘 보입니다. 중단점은 그 줄을 실행하기 전에 멈춥니다.
   - 실행(Run) 메뉴와 단축키: 실행·계속 F5, 일시 중지 F6, 한 단계 F10, 처음부터 다시 Ctrl+Shift+F5, 중지 Shift+F5.
   - 실행 간격(명령어 사이의 시간)은 도구 모음의 목록과 실행 메뉴에서 고르며, 실행 중에도 바로 적용됩니다. 기본 250 ms. 20 ms 보다 짧으면 화면을 덜 자주 그립니다(레지스터 50 ms, 메모리·변수 250 ms 마다). 시뮬레이터는 바꾸지 않았습니다.
-  - 프로그램이 끝나면(halt) 창을 띄우지 않습니다. 레지스터, 메모리, 변수, 리스팅은 마지막 상태로 남고, 리스팅에 끝난 줄이 표시되며, 시뮬레이터 패널에 한 줄이 남습니다. 중지(Shift+F5)해야 실행이 닫힙니다.
+  - 프로그램이 끝나면(halt) 창을 띄우지 않습니다. 레지스터, 메모리, 변수, 리스트파일은 마지막 상태로 남고, 리스트파일에 끝난 줄이 표시되며, 시뮬레이터 패널에 한 줄이 남습니다. 중지(Shift+F5)해야 실행이 닫힙니다.
   - 실행 전에 project.sic 의 파일과 장치 파일이 있는지 확인하고, 프로그램이 쓰는 장치가 파일에 연결되어 있지 않으면 알립니다. 알림의 버튼은 새 파일(레이블 이름, 예: `outdev.txt`)을 만들어 연결하고 다시 시작합니다.
   - 출력만 하는 장치(WD 만 있고 RD 는 없는 장치)의 파일은 실행을 시작할 때 비웁니다. 시뮬레이터는 파일을 앞에서부터 덮어쓰고 자르지 않아서, 짧은 출력 뒤에 지난 실행의 끝이 남았습니다(`XXXXXX` 에 `AB` → `ABXXXX`). 시뮬레이터는 바꾸지 않았습니다.
   - 연결 안 된 장치는 0 을 읽고 쓴 것을 버리며, TD 에 준비되지 않았다고 답합니다(이 저장소의 SicTools 는 `Device.test()` 가 false). 그래서 교재의 `TD` / `JEQ` 루프는 끝나지 않고, 장치 패널이 "대기 중"으로 알립니다.
@@ -128,15 +128,15 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 파일 트리의 뿌리는 프로젝트 폴더입니다(Visual Studio 의 솔루션처럼). 누르면 프로젝트 설정이 열리고, 접히지 않습니다. project.sic 는 파일로 보이지 않습니다.
   - 어셈블하는 파일에는 순서(1st, 2nd …; 한국어 1번째 …)가 붙고, 메인 프로그램의 표시는 채워져 있습니다. 순서는 설정에서 손잡이를 끌거나, 손잡이에서 Alt+↑ / Alt+↓, ▲ / ▼ 로, 또는 트리의 오른쪽 클릭 메뉴로 바꿉니다.
   - 새 파일 창: `.asm` 은 "어셈블 파일에 추가"(기본 켬), `.txt` 는 "장치에 연결"(번호 입력)을 고를 수 있습니다.
-- 장치 패널(`src/features/devices/`)은 실행 중 RD, WD, TD 를 명령어마다 기록합니다. 시뮬레이터에 묻지 않습니다: 실행한 명령어의 주소와 그 전후 레지스터, 리스팅으로 압니다(WD 는 실행 전 A 의 마지막 바이트, RD 는 실행 후, TD 는 SW 의 CC).
+- 장치 패널(`src/features/devices/`)은 실행 중 RD, WD, TD 를 명령어마다 기록합니다. 시뮬레이터에 묻지 않습니다: 실행한 명령어의 주소와 그 전후 레지스터, 리스트파일로 압니다(WD 는 실행 전 A 의 마지막 바이트, RD 는 실행 후, TD 는 SW 의 CC).
   - 입력은 파일을 테이프처럼(읽은 바이트, 다음에 읽을 바이트, 남은 바이트, EOF), 출력은 쓴 바이트를 보여 줍니다. 연결 안 된 장치에 쓴 바이트는 지운 줄로 "버려짐" 표시. 문자 / 16진 보기, 복사, 장치마다 마지막 64 KiB.
   - 끝까지 내려가 있을 때만 따라가고, 위로 올렸으면 "새 바이트 N개" 버튼을 띄웁니다. 실행이 끝나거나 중지해도 다음 실행까지 남습니다. 탭이 보이지 않을 때 새 바이트가 오면 탭에 점이 붙고, 탭이 저절로 바뀌지는 않습니다.
 - 바뀐 값 표시는 메모리 뷰어, 변수, 장치 패널이 같은 규칙을 씁니다(`src/lib/changeMarks.ts`). 한 단계에서 바뀐 값은 0.6 초 깜빡이고, 다음 단계까지 옅은 색과 굵은 글씨로 남습니다. 자동 실행 중 계속 바뀌는 값은 깜빡임을 다시 시작하지 않고 켜진 채로 둡니다(깜빡임이 초당 3번을 넘지 않도록). 20 ms 보다 짧은 간격에서는 표시하지 않습니다. 운영체제의 "움직임 줄이기"에서는 메모리 칸이 커지지 않습니다.
 - 메모리 뷰어의 변수 밑줄과 이름은 값 아래에 따로 줄이 있습니다(값 17 px, 밑줄 3 px, 이름 12 px; `gridLayout.ts`). 위치는 CSS grid 로 정합니다. Chromium 이 `calc()` 안에서 곱과 합의 뺄셈을 잘못 줄여 밑줄이 한 칸 짧아진 일이 있어 그런 식을 쓰지 않습니다.
 - 실행 간격은 프로젝트가 아니라 앱의 설정이라 렌더러의 localStorage(`umjoonsic.runInterval`)에 둡니다.
 - 메시지는 세 가지뿐입니다: 묻거나 오류를 알리는 창(`src/stores/dialogStore.ts` 의 `ask`, `showError` → `AppDialog`), 잠깐 보이는 알림(`toastStore` 의 `notify` → `Toasts`), 입력 칸 아래의 오류. 운영체제의 메시지 창은 시작 오류와 파일 선택 창에만 씁니다.
-- 에디터에서 Tab 은 다음 열로 갑니다. 키보드로 에디터를 나가려면 Ctrl+M(macOS 는 Ctrl+Shift+M)으로 Monaco 의 "Tab 으로 포커스 이동"을 켭니다 (VS Code 와 같음). 그래서 Windows·Linux 의 창 최소화에는 단축키가 없습니다.
-- 탭: 끌어서 순서를 바꾸고, Ctrl+PageDown / Ctrl+PageUp 으로 옮겨 가며, Ctrl+Shift+PageDown / Ctrl+Shift+PageUp 으로 자리를 옮깁니다 (File 메뉴). macOS 에서도 Ctrl 입니다 (Cmd+PageDown 은 에디터의 스크롤).
+- 편집기에서 Tab 은 다음 열로 갑니다. 키보드로 편집기를 나가려면 Ctrl+M(macOS 는 Ctrl+Shift+M)으로 Monaco 의 "Tab 으로 포커스 이동"을 켭니다 (VS Code 와 같음). 그래서 Windows·Linux 의 창 최소화에는 단축키가 없습니다.
+- 탭: 끌어서 순서를 바꾸고, Ctrl+PageDown / Ctrl+PageUp 으로 옮겨 가며, Ctrl+Shift+PageDown / Ctrl+Shift+PageUp 으로 자리를 옮깁니다 (File 메뉴). macOS 에서도 Ctrl 입니다 (Cmd+PageDown 은 편집기의 스크롤).
 - 스플래시는 시작이 끝날 때까지의 창입니다. 닫으면 시작을 취소하고 앱이 끝납니다 (`electron/main.ts`).
 
 ## 화면 언어와 테마
@@ -154,7 +154,13 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 - 니모닉(LDA, JSUB …), 지시어(START, BYTE, EXTDEF …), 레지스터 이름(A, X, L, B, S, T, F, PC, SW), 레코드 문자(H, T, E, M, D, R), SYMTAB·OPTAB·LOCCTR, nixbpe 는 옮기지 않습니다.
 - 약어는 약어를 먼저, 뜻을 괄호에: PC(프로그램 카운터), SYMTAB(기호 테이블).
 - 한국어 용어에는 영어를 한 번은 붙입니다(툴팁이나 메시지): 기호(symbol), 중단점(breakpoint).
-- 한 개념에는 한 가지 말만 씁니다. 에러가 아니라 오류.
+- 한 개념에는 한 가지 말만 씁니다. 에러가 아니라 오류, 에디터가 아니라 편집기, listing 은 리스트파일. "use" 는 `사용하다` 로 씁니다(`쓰다` 는 WD 의 "write" 와 헷갈립니다).
+- 문체는 VS Code·Visual Studio·JetBrains 의 한국어판과 Microsoft 한국어 지역화 지침을 따릅니다:
+  - 메뉴, 버튼, 탭, 열 제목, 체크박스는 명사형(`파일 선택`, `실행 취소`, `열린 파일 없음`).
+  - 툴팁의 설명, 안내, 띠, 오류 메시지는 `~합니다` 문장과 마침표. 질문은 `~할까요?`, 할 일은 `~하세요`.
+  - 한 문자열에서 문장과 명사형을 섞지 않고, 화면에 이미 보이는 내용은 다시 쓰지 않습니다.
+  - 조사는 붙여 씁니다(`${name}을(를)`, `RD로`, `00을`). 받침을 알 수 없는 이름 뒤에는 `을(를)`, `이(가)`.
+  - 설명하는 괄호는 붙이고(`입력(RD)`), 단축키 앞에는 한 칸(`계속 (F5)`). 개수는 명사 뒤에(`명령어 42개`).
 
 | 영어                        | 한국어 모드            | 영어                 | 한국어 모드          |
 | --------------------------- | ---------------------- | -------------------- | -------------------- |
@@ -162,7 +168,7 @@ public/                  splash.html, progress.html, about.html (창에서 직�
 | instruction                 | 명령어                 | label                | 레이블               |
 | mnemonic                    | 니모닉                 | operand              | 피연산자             |
 | directive                   | 어셈블러 지시어        | object code          | 목적 코드            |
-| listing                     | 리스팅                 | location counter     | 위치 카운터 (LOCCTR) |
+| listing                     | 리스트파일             | location counter     | 위치 카운터 (LOCCTR) |
 | control section             | 제어 섹션              | addressing mode      | 주소 지정 방식       |
 | accumulator (A)             | 누산기                 | index register (X)   | 인덱스 레지스터      |
 | linkage register (L)        | 연결 레지스터          | base register (B)    | 베이스 레지스터      |
