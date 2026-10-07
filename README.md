@@ -26,7 +26,14 @@
 
 ## 리눅스(x64) 설치
 
-[Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases)에서 `UmJoonSIC-linux-x64-<버전>.tar.gz`를 받아 압축을 풀고 `install.sh`를 실행합니다. 관리자 권한은 필요 없습니다.
+[Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases)에서 `install-linux.sh`만 받아 실행하면 됩니다. 프로그램 본체(`UmJoonSIC-linux-x64-<버전>.tar.gz`)는 설치 스크립트가 받아 옵니다. (curl 또는 wget 필요)
+
+```bash
+curl -fLO https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v1.1.0/install-linux.sh
+bash install-linux.sh
+```
+
+tar.gz를 직접 받았다면 압축을 풀고 안의 `install.sh`를 실행합니다. 결과는 같습니다.
 
 ```bash
 tar -xzf UmJoonSIC-linux-x64-1.1.0.tar.gz
@@ -34,7 +41,9 @@ cd UmJoonSIC-linux-x64-1.1.0
 ./install.sh
 ```
 
-설치 후 앱 목록의 엄준SIC 또는 터미널의 `umjoonsic`으로 실행합니다. 삭제는 `./install.sh --uninstall`입니다.
+현재 사용자 계정에 설치됩니다(`~/.local`). 빠진 라이브러리나 한글 글꼴을 설치하거나 샌드박스를 설정해야 할 때만 관리자(sudo) 비밀번호를 묻습니다.
+
+설치 후 앱 목록의 엄준SIC 또는 터미널의 `umjoonsic`으로 실행합니다. 삭제는 `bash ~/.local/share/umjoonsic/install.sh --uninstall`입니다.
 
 ## 라이선스 및 서브트리 고지
 

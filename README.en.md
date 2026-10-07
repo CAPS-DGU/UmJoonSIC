@@ -26,7 +26,14 @@ To solve this, **CAPS**, a central club of Dongguk University, **remastered** th
 
 ## Installing on Linux (x64)
 
-From [Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases), download `UmJoonSIC-linux-x64-<version>.tar.gz`, unpack it and run `install.sh`. No administrator rights are needed.
+From [Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases), download only `install-linux.sh` and run it. It downloads the program itself (`UmJoonSIC-linux-x64-<version>.tar.gz`); curl or wget is needed.
+
+```bash
+curl -fLO https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v1.1.0/install-linux.sh
+bash install-linux.sh
+```
+
+If you downloaded the tar.gz yourself, unpack it and run the `install.sh` inside. The result is the same.
 
 ```bash
 tar -xzf UmJoonSIC-linux-x64-1.1.0.tar.gz
@@ -34,7 +41,9 @@ cd UmJoonSIC-linux-x64-1.1.0
 ./install.sh
 ```
 
-Then start UmJoonSIC from the applications menu, or with `umjoonsic` in a terminal. To remove it, run `./install.sh --uninstall`.
+It installs for the current user (`~/.local`). It asks for the administrator (sudo) password only when it has to install missing libraries or a Korean font, or set up the sandbox.
+
+Then start UmJoonSIC from the applications menu, or with `umjoonsic` in a terminal. To remove it, run `bash ~/.local/share/umjoonsic/install.sh --uninstall`.
 
 ## Licence and subtree notice
 
