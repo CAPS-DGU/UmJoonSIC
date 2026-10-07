@@ -22,7 +22,11 @@ stage="$dist/$name"
 rm -rf "$stage" "$dist/$name.tar.gz"
 mkdir -p "$stage"
 cp -a "$src" "$stage/UmJoonSIC"
-sed "s/@VERSION@/$version/" "$here/install.sh" >"$stage/install.sh"
+# The newest glibc symbol version the app's binaries need: the installer checks the system's.
+min_glibc="$(objdump -T "$src/UmJoonSIC" "$src/chrome_crashpad_handler" "$src"/*.so* 2>/dev/null |
+  grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -n 1)"
+[ -n "$min_glibc" ] || echo "warning: objdump found no glibc versions; the installer will not check glibc" >&2
+sed -e "s/@VERSION@/$version/" -e "s/@MIN_GLIBC@/${min_glibc:-@MIN_GLIBC@}/" "$here/install.sh" >"$stage/install.sh"
 chmod 755 "$stage/install.sh"
 cp "$stage/install.sh" "$dist/install-linux.sh"
 cp "$root/LICENSE" "$stage/LICENSE"
