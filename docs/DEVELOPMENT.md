@@ -325,9 +325,9 @@ bash ../linux-installer/pack.sh     # out/release/UmJoonSIC-linux-x64-<version>.
 
 The archive contains the app, `install.sh`, the icon and the licence. `install.sh`:
 
-- installs for the current user without root (`~/.local/share/umjoonsic`, the `umjoonsic` command in `~/.local/bin`, a menu entry), or for all users with `sudo ./install.sh --system` (`/opt/umjoonsic`, `/usr/local/bin`, `/usr/local/share/applications`);
+- installs for the current user without root (`~/.local/share/umjoonsic`, the `umjoonsic` command in `~/.local/bin`, a menu entry), or for all users when run as root or with `--system` (`/opt/umjoonsic`, `/usr/local/bin`, `/usr/local/share/applications`). A system install is made root-owned and readable by everyone (`chmod -R u=rwX,go=rX`): the packager leaves the app folder 0700, and `cp -a` keeps modes and owners, which once locked other users out ("Permission denied");
 - keeps a copy of itself in the install folder, and removes the app with `--uninstall` (`--purge` also removes the settings and the downloaded Java runtime);
-- run on its own (as `install-linux.sh`), downloads the archive of its version from the release first;
+- run on its own, usually piped (`curl -fsSL …/releases/latest/download/install-linux.sh | bash`, or `| sudo bash`; options after `| bash -s --`), downloads the archive of its version into a temporary folder, installs from it and deletes it. The script is one `{ … }` block, so a download cut short fails as a syntax error instead of running half a script;
 - does not register the app for `.asm` files (it would become their default); "Open With" can still choose it;
 - checks the system first and adapts to it:
   - glibc: the app's binaries need glibc 2.25 or newer (measured by `pack.sh` from the binaries' symbol versions and written into the installer). That is Debian 10, Ubuntu 18.04, RHEL 8 and newer. musl systems (Alpine) are refused with a clear message;
