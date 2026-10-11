@@ -37,6 +37,8 @@ else
   cp "$app/src/assets/icon.png" "$stage/umjoonsic.png"
 fi
 
+# Normal modes in the archive: the packager leaves the app folder 0700.
+chmod -R u=rwX,go=rX "$stage"
 tar -C "$dist" --owner=0 --group=0 -czf "$dist/$name.tar.gz" "$name"
 rm -rf "$stage"
 (cd "$dist" && sha256sum "$name.tar.gz" install-linux.sh)

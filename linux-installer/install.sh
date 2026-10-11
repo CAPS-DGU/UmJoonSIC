@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # UmJoonSIC installer for Linux on x86-64 (Wayland and X11 desktops).
 #
-#   ./install.sh                  install for the current user (~/.local), no root needed
-#   sudo ./install.sh --system    install for all users (/opt/umjoonsic)
-#   ./install.sh --uninstall      remove it again (with --system for a system install;
+#   curl -fsSL <release>/install-linux.sh | bash     for the current user (~/.local)
+#   curl -fsSL <release>/install-linux.sh | sudo bash   for all users (/opt/umjoonsic)
+#   ./install.sh [--system]       the same from the extracted release folder
+#   ./install.sh --uninstall      remove it (with --system for a system install;
 #                                 --purge also removes the settings and the downloaded Java)
-#   ./install.sh --help
+# Options after "| bash -s --": --system, --uninstall, --purge, -y (yes to all questions).
 #
-# Run it from the extracted release folder (UmJoonSIC-linux-x64-<version>/). Run on its own
-# (for example after downloading only this script), it first downloads that folder for its
-# version from the GitHub release.
+# Run on its own (piped, or downloaded alone), it downloads the release archive of its version
+# into a temporary folder, installs from it and deletes it. A copy of this script stays in the
+# app folder for --uninstall.
 #
 # What it sets up: the app files, a launcher command (umjoonsic), a menu entry with the icon.
 # The launcher chooses the display backend (X11, or Xwayland on a Wayland session; native
 # Wayland when there is no X server) and Chromium's sandbox mode (see sandbox_ok below).
 set -euo pipefail
+# The whole script is one block, so bash reads all of it before running any of it: a download
+# cut short (curl ... | bash) fails as a syntax error instead of running half a script.
+{
 
 VERSION="@VERSION@"     # filled in by pack.sh
 MIN_GLIBC="@MIN_GLIBC@" # the newest glibc symbol version the app needs (measured by pack.sh)
@@ -135,7 +139,8 @@ if [ -z "$src_dir" ]; then
     die "curl or wget is needed to download $url"
   fi
   tar -xzf "$tmp/$name.tar.gz" -C "$tmp" || die "could not unpack $name.tar.gz"
-  bash "$tmp/$name/install.sh" "$@"
+  # stdin may be the pipe this script came from; questions are read from /dev/tty.
+  bash "$tmp/$name/install.sh" "$@" </dev/null
   exit $?
 fi
 
@@ -334,6 +339,11 @@ cp "$src_dir/install.sh" "$app_dir.new/install.sh"
 chmod 755 "$app_dir.new/install.sh"
 rm -rf "$app_dir"
 mv "$app_dir.new" "$app_dir"
+# Readable for every user, whatever modes the archive or the umask gave (the packager makes the
+# app folder 0700, which locked other users out of a system install).
+chmod -R u=rwX,go=rX "$app_dir"
+# A system install belongs to root, not to whoever extracted the archive (cp -a keeps owners).
+[ "$system" -eq 0 ] || chown -R 0:0 "$app_dir"
 
 # Chromium's sandbox needs either unprivileged user namespaces or a setuid-root helper.
 # Some systems (Ubuntu 24.04 and later, Debian with the old default, hardened kernels) do not
@@ -453,3 +463,4 @@ if [ "$system" -eq 1 ]; then
 else
   say "  Remove it with: $app_dir/install.sh --uninstall"
 fi
+}
