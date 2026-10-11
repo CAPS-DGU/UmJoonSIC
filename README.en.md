@@ -26,24 +26,17 @@ To solve this, **CAPS**, a central club of Dongguk University, **remastered** th
 
 ## Installing on Linux (x64)
 
-From [Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases), download only `install-linux.sh` and run it. It downloads the program itself (`UmJoonSIC-linux-x64-<version>.tar.gz`); curl or wget is needed.
+Paste this line into a terminal:
 
 ```bash
-curl -fLO https://github.com/CAPS-DGU/UmJoonSIC/releases/download/v1.1.0/install-linux.sh
-bash install-linux.sh
+curl -fsSL https://github.com/CAPS-DGU/UmJoonSIC/releases/latest/download/install-linux.sh | bash
 ```
 
-If you downloaded the tar.gz yourself, unpack it and run the `install.sh` inside. The result is the same.
+To install for all users (`/opt/umjoonsic`), replace the final `bash` with `sudo bash`.
 
-```bash
-tar -xzf UmJoonSIC-linux-x64-1.1.0.tar.gz
-cd UmJoonSIC-linux-x64-1.1.0
-./install.sh
-```
+The installer downloads the program into a temporary folder and deletes it when it is done. It asks for the administrator (sudo) password only when it has to install missing libraries or a Korean font, or set up the sandbox. (Downloading the tar.gz from [Releases](https://github.com/CAPS-DGU/UmJoonSIC/releases), unpacking it and running `./install.sh` does the same.)
 
-It installs for the current user (`~/.local`). It asks for the administrator (sudo) password only when it has to install missing libraries or a Korean font, or set up the sandbox.
-
-Then start UmJoonSIC from the applications menu, or with `umjoonsic` in a terminal. To remove it, run `bash ~/.local/share/umjoonsic/install.sh --uninstall`.
+Then start UmJoonSIC from the applications menu, or with `umjoonsic` in a terminal. To remove it, run `bash ~/.local/share/umjoonsic/install.sh --uninstall` (for all users: `sudo bash /opt/umjoonsic/install.sh --uninstall --system`).
 
 ## Licence and subtree notice
 
